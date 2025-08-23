@@ -82,7 +82,7 @@ def parse_selected_palettes(value):
         return None
 
 def clean_output(output_dir="output"):
-    """Limpia el directorio de salida, eliminando todos los archivos."""
+    """Cleans the output directory, removing all files."""
     if os.path.exists(output_dir):
         try:
             shutil.rmtree(output_dir)
@@ -142,18 +142,18 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
     temp_dir = "temp"
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Validar bpp
+    # Validate bpp
     if bpp not in (4, 8):
         print(translate("error_bpp_invalid"))
         sys.exit(1)
 
-    # Variables comunes
+    # Common variables
     reconstructed_path = None
     preview_source_dir = temp_dir  # Por defecto
 
-    # === PROCESAR SEGÚN BPP ===
+    # === PROCESS ACCORDING TO BPP ===
     if bpp == 4:
-        # --- Flujo 4bpp ---
+        # --- 4bpp Flow ---
         if selected_palettes is None:
             selected_palettes = [0]
         if not all(0 <= p <= 15 for p in selected_palettes):
@@ -250,7 +250,7 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
         )
 
     else:  # bpp == 8
-        # --- Flujo 8bpp ---
+        # --- 8bpp Flow ---
         print(translate("status_processing_8bpp"), flush=True)
 
         if start_index < 0 or start_index > 255:
@@ -339,7 +339,7 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
         create_gbagfx_preview_8bpp(transparent_color=transparent_color, keep_transparent=keep_transparent)
     print(translate("preview_generated", path="temp/preview/preview.png"), flush=True)
 
-    # === 2. Limpiar temp/ (común) ===
+    # === 2. Clean temp/ (common) ===
     if not keep_temp:
         try:
             for item in os.listdir(temp_dir):
@@ -394,7 +394,7 @@ def cli_main():
         print(translate("error_transparent_color"))
         sys.exit(1)
 
-    # === Manejo de start_index y palette_size (solo para bpp=8) ===
+    # === Handling start_index and palette_size (only for bpp=8) ===
     start_index = args.start_index
     palette_size = args.palette_size
 
@@ -415,7 +415,7 @@ def cli_main():
         start_index = 0
         palette_size = 256
 
-    # === Llamar a main ===
+    # === Call main ===
     main(
         input_path=args.input,
         tilemap_path=args.tilemap,

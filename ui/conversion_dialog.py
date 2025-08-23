@@ -489,7 +489,7 @@ class ConversionDialog(QDialog):
             if self.parent() and hasattr(self.parent(), 'load_conversion_results'):
                 self.parent().load_conversion_results()
             
-            # === Mostrar ventana de éxito ===
+            # === Show success window ===
             self.show_success_dialog()
             time.sleep(0.3)
             self.accept()
@@ -572,7 +572,7 @@ class ConversionDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        # Título
+        # Title
         title = QLabel("The conversion was completed successfully!")
         title.setStyleSheet("font-weight: bold; font-size: 14px; color: #006600;")
         title.setAlignment(Qt.AlignCenter)
@@ -580,7 +580,7 @@ class ConversionDialog(QDialog):
 
         layout.addWidget(QLabel("Generated files:"))
 
-        # Lista de archivos
+        # File list
         list_widget = QListWidget()
         output_dir = "output"
         if os.path.exists(output_dir):
@@ -590,7 +590,7 @@ class ConversionDialog(QDialog):
             list_widget.addItem("(No output folder)")
         layout.addWidget(list_widget)
 
-        # Botón: Open Folder
+        # Button: Open Folder
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         open_btn = QPushButton("📁 Open Output Folder")

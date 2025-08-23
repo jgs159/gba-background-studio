@@ -17,6 +17,13 @@ def calculate_relative_luminance(color):
     r, g, b = color
     return round(0.3 * r + 0.59 * g + 0.11 * b)
 
+def generate_grayscale_palette():
+    colors = []
+    for i in range(256):
+        level = int((i / 255) * 248) & 0b11111000
+        colors.append((level, level, level))
+    return colors
+
 def extract_palettes_from_indexed(indexed_dir, num_palettes=16):
     palettes = []
     for i in range(num_palettes):

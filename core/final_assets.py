@@ -23,7 +23,7 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
 
     # === Detección de tiles únicos con H/V flip ===
     unique_tiles = []
-    tile_map = []  # (tile_id, hflip, vflip, pal_idx)
+    tile_map = []
     seen = {}
     empty_tile = np.zeros((8, 8), dtype=np.uint8)
     empty_key = tuple(empty_tile.flatten())
@@ -35,7 +35,6 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
 
     for i, tile_p in enumerate(tiles_p):
         tile_4bpp = np.array(tile_p)
-        # Obtener índice real en selected_palettes
         local_idx = pal_indices[i]
         if local_idx < len(selected_palettes):
             pal_idx = selected_palettes[local_idx]
@@ -45,14 +44,14 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         t_original = tile_4bpp
         t_hflip = np.fliplr(t_original)
         t_vflip = np.flipud(t_original)
-        t_hvflip = np.fliplr(t_vflip)  # o np.flipud(t_hflip)
+        t_hvflip = np.fliplr(t_vflip)
 
         # === Priorizar: original → hflip → vflip → hvflip ===
         candidates = [
-            (t_original, 0, 0),      # original
-            (t_hflip,    1, 0),      # solo horizontal
-            (t_vflip,    0, 1),      # solo vertical
-            (t_hvflip,   1, 1),      # ambos
+            (t_original, 0, 0),
+            (t_hflip,    1, 0),
+            (t_vflip,    0, 1),
+            (t_hvflip,   1, 1),
         ]
 
         matched = False
@@ -66,7 +65,7 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
 
         if not matched:
             new_id = len(unique_tiles)
-            unique_tiles.append(t_original)  # Guardar el original
+            unique_tiles.append(t_original)
             key_orig = tuple(t_original.flatten())
             seen[key_orig] = (new_id, pal_idx)
             tile_map.append((new_id, 0, 0, pal_idx))
@@ -109,7 +108,7 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         # Ajustar índice 0: si es MARKER_COLOR, reemplazar
         for i in range(0, len(combined_palette), 16):
             if rgb_to_gba_rounded(combined_palette[i]) == marker_gba:
-                combined_palette[i] = (0, 0, 0)  # ya fue manejado en quantize
+                combined_palette[i] = (0, 0, 0)
 
         filename = f"palette_{base_idx:02d}.pal"
         with open(os.path.join(output_dir, filename), "w") as f:
@@ -220,7 +219,6 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
     pal_filename = f"palette_{start_index:03d}.pal"
     pal_path = os.path.join(output_dir, pal_filename)
 
-    # Extraer paleta de la imagen desde start_index con tamaño palette_size
     raw_pal = img.getpalette()
     saved_palette = []
     start_byte = start_index * 3
@@ -262,10 +260,10 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
 
         # === Priorizar: original → hflip → vflip → hvflip ===
         candidates = [
-            (t_original, 0, 0),      # original
-            (t_hflip,    1, 0),      # solo horizontal
-            (t_vflip,    0, 1),      # solo vertical
-            (t_hvflip,   1, 1),      # ambos
+            (t_original, 0, 0),
+            (t_hflip,    1, 0),
+            (t_vflip,    0, 1),
+            (t_hvflip,   1, 1),
         ]
 
         matched = False
@@ -319,25 +317,21 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
             if padding > 4:
                 continue
             score = padding * 100 + abs(c - r)
-            # Preferir layouts donde el ancho sea mayor que el alto
             if c > r:
-                score -= 100  # Bonus por ancho > alto
+                score -= 100
             if c >= r:
-                score -= 50   # Bonus por ancho >= alto
+                score -= 50
             if score < best_score:
                 best_score = score
                 best_cols = c
         
-        # Si no se encontró solución válida, usar la mejor opción posible
         if best_score == float('inf'):
-            # Buscar la opción que minimice el alto aunque supere 32
             for c in range(1, min(65, n + 1)):
                 r = (n + c - 1) // c
-                # Relajar restricciones pero mantener ancho >= alto
                 if c < r:
                     continue
                 padding = c * r - n
-                score = padding * 100 + abs(c - r) + (max(0, r - 32) * 1000)  # Penalizar alto > 32
+                score = padding * 100 + abs(c - r) + (max(0, r - 32) * 1000)
                 if c > r:
                     score -= 100
                 if score < best_score:

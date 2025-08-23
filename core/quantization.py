@@ -38,7 +38,7 @@ def get_irfanview_path():
         if os.path.exists(path):
             return path
 
-    raise FileNotFoundError(f"No se encontró IrfanView. Por favor instala la versión {'64' if is_64bit else '32'}-bit desde irfanview.info")
+    raise FileNotFoundError(f"IrfanView not found. Please install the {'64' if is_64bit else '32'}-bit version from irfanview.info")
 
 def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=None, transparent_color=(0,0,0), keep_transparent=False):
     indexed_dir = os.path.join(groups_dir, "01_indexed")
@@ -48,7 +48,7 @@ def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=N
     if irfanview_path is None:
         irfanview_path = get_irfanview_path()
 
-    # Pre-calcular valores
+    # Pre-calculate values
     transparent_color_gba = rgb_to_gba_rounded(transparent_color)
     final_color_0 = transparent_color_gba if keep_transparent else (0, 0, 0)
     marker_gba = rgb_to_gba_rounded(MARKER_COLOR)
@@ -127,10 +127,10 @@ def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=N
                 flat_palette.append(0)
             new_img.putpalette(flat_palette)
 
-            # Mapear índices antiguos a nuevos
+            # Map old indices to new ones
             old_to_new = {}
             for new_idx, color in enumerate(reordered_rgb):
-                # Buscar el índice original más cercano
+                # Find the closest original index
                 best_old_idx = 0
                 best_dist = float('inf')
                 for old_idx in range(16):
@@ -143,7 +143,7 @@ def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=N
                         best_old_idx = old_idx
                 old_to_new[best_old_idx] = new_idx
 
-            # Aplicar mapeo
+            # Apply mapping
             img_flat = img_data.flatten()
             new_flat = np.array([old_to_new.get(idx, 0) for idx in img_flat])
             new_img.putdata(new_flat.tolist())
@@ -245,7 +245,7 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
                 indices[y, x] = 0
                 continue
 
-            # Calcular distancias euclidianas al cuadrado
+            # Calculate squared Euclidean distances
             distances = np.sum((palette_rgb - [r, g, b])**2, axis=1)
             closest_idx = np.argmin(distances)
 
@@ -272,7 +272,7 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
     print(translate("rebuilding_image"), flush=True)
     out_img = Image.fromarray(indices, mode="P")
 
-    # Paleta final: reemplazar blancos por negro
+    # Final palette: replace whites with black
     final_palette = []
     for color in full_palette_gba:
         if color == (255, 255, 255):

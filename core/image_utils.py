@@ -26,8 +26,8 @@ def extract_tiles_rgba(img):
 
 def pil_to_qimage(pil_img):
     """
-    Convierte una imagen PIL a QImage para usar en PySide6.
-    Soporta modos RGBA y RGB.
+    Converts a PIL image to QImage for use in PySide6.
+    Supports RGBA and RGB modes.
     """
     if pil_img.mode == "RGBA":
         data = pil_img.tobytes("raw", "RGBA")
