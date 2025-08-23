@@ -1,4 +1,20 @@
 # ui/main_window.py
+import os
+import math
+import colorsys
+from PIL import Image as PilImage
+from PySide6.QtCore import Qt
+from utils.translator import Translator
+from ui.conversion_dialog import ConversionDialog
+from core.image_utils import pil_to_qimage
+from PySide6.QtGui import (
+    QFont,
+    QPixmap,
+    QPainter,
+    QColor,
+    QBrush,
+    QPen,
+)
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -19,27 +35,35 @@ from PySide6.QtWidgets import (
     QPushButton,
     QProgressBar,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import (
-    QFont,
-    QPixmap,
-    QPainter,
-    QColor,
-    QBrush,
-    QPen,
-    QImage,
-)
-from PIL import Image as PilImage
-import os
 
 
 class GBABackgroundStudio(QMainWindow):
     def __init__(self, language="english"):
         super().__init__()
-        from utils.translator import Translator
         self.translator = Translator(lang_dir="lang", default_lang=language)
         self.setWindowTitle(self.translator.tr("app_name"))
         self.resize(1200, 800)
+
+        # === CONFIGURACIÓN DE TILES ===
+        self.tile_size = 8
+        
+        # === SISTEMA DE SELECCIÓN DE TILES ===
+        self.selected_tile_id = None
+        self.selected_tile_image = None
+        self.tileset_columns = 0
+        self.tileset_rows = 0
+        self.tileset_tiles = []
+        self.tileset_ids = {}
+        
+        # === SISTEMA DE TILEMAP ===  
+        self.tilemap_ids = []
+        self.tilemap_tiles = []
+        self.tilemap_columns = 0
+        self.tilemap_rows = 0
+        self.tilemap_scene = None
+        
+        # === VARIABLES TEMPORALES ===
+        self.current_tileset = None
 
         # Central widget
         central_widget = QWidget()
@@ -72,15 +96,15 @@ class GBABackgroundStudio(QMainWindow):
         tile_palette_splitter.setOpaqueResize(True)
 
         # Input Tiles Area
-        self.tiles_view = QGraphicsView()
-        self.tiles_scene = QGraphicsScene()
-        self.tiles_view.setScene(self.tiles_scene)
-        self.tiles_view.setRenderHint(QPainter.Antialiasing, False)
-        self.tiles_view.setRenderHint(QPainter.SmoothPixmapTransform)
-        self.tiles_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
-        self.tiles_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.tiles_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        tile_palette_splitter.addWidget(self.tiles_view)
+        self.tileset_view = QGraphicsView()
+        self.tileset_scene = QGraphicsScene()
+        self.tileset_view.setScene(self.tileset_scene)
+        self.tileset_view.setRenderHint(QPainter.Antialiasing, False)
+        self.tileset_view.setRenderHint(QPainter.SmoothPixmapTransform)
+        self.tileset_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
+        self.tileset_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.tileset_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        tile_palette_splitter.addWidget(self.tileset_view)
 
         # Palette Editor Area
         self.palette_view = QGraphicsView()
@@ -166,27 +190,48 @@ class GBABackgroundStudio(QMainWindow):
     def init_default_palette(self):
         self.palette_scene.clear()
         tile_size = 8
-        for i in range(256):
+        palette_path = "assets/default_rainbow.pal"
+        
+        colors = self.generate_grayscale_palette()
+        
+        try:
+            if os.path.exists(palette_path):
+                colors = self.load_gba_palette(palette_path)
+            else:
+                print("ℹ️ Archivo de paleta no encontrado, usando escala de grises")
+                
+        except Exception as e:
+            print(f"❌ Error cargando paleta: {e}, usando escala de grises")
+        
+        for i, (r, g, b) in enumerate(colors):
+            if i >= 256:
+                break
+                
             row = i // 16
             col = i % 16
-            level = int((i / 255) * 248) & 0b11111000
-            color = QColor(level, level, level)
+            color = QColor(r, g, b)
             brush = QBrush(color)
-            rect = self.palette_scene.addRect(col * tile_size, row * tile_size, tile_size, tile_size, QPen(Qt.gray), brush)
-            rect.setData(1, (level, level, level))
-            rect.mousePressEvent = lambda e, r=level, g=level, b=level: self.show_color_rgb(r, g, b)
+            
+            rect = self.palette_scene.addRect(
+                col * tile_size, 
+                row * tile_size, 
+                tile_size, 
+                tile_size, 
+                QPen(Qt.gray), 
+                brush
+            )
+            rect.setData(1, (r, g, b))
+            rect.mousePressEvent = lambda e, r=r, g=g, b=b: self.show_color_rgb(r, g, b)
+
+    def generate_grayscale_palette(self):
+        colors = []
+        for i in range(256):
+            level = int((i / 255) * 248) & 0b11111000
+            colors.append((level, level, level))
+        return colors
 
     def show_color_rgb(self, r, g, b):
         self.status_bar.showMessage(f"RGB: ({r}, {g}, {b})")
-
-    def pil_to_qimage(self, pil_img):
-        if pil_img.mode == "RGBA":
-            data = pil_img.tobytes("raw", "RGBA")
-            return QImage(data, pil_img.size[0], pil_img.size[1], QImage.Format_RGBA8888)
-        else:
-            rgb_img = pil_img.convert("RGB")
-            data = rgb_img.tobytes("raw", "RGB")
-            return QImage(data, rgb_img.size[0], rgb_img.size[1], QImage.Format_RGB888)
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
@@ -197,6 +242,7 @@ class GBABackgroundStudio(QMainWindow):
         action_open.triggered.connect(self.open_image)
 
         action_convert = file_menu.addAction("Convert Image to Tilemap")
+        action_convert.setShortcut("Ctrl+I")
         action_convert.triggered.connect(self.convert_image)
 
         file_menu.addSeparator()
@@ -243,55 +289,8 @@ class GBABackgroundStudio(QMainWindow):
         if not input_path:
             return
 
-        from ui.conversion_dialog import ConversionDialog
         dialog = ConversionDialog(image_path=input_path, parent=self)
-        if dialog.exec() == QDialog.Accepted:
-            params = dialog.get_parameters()
-            try:
-                import core.converter as converter
-                converter.LANGUAGE = "eng"
-
-                converter.main(
-                    input_path=input_path,
-                    tilemap_path=None,
-                    start_index=params['start_index'],
-                    num_palettes=params['num_palettes'],
-                    transparent_color=params['transparent_color'],
-                    extra_transparent_tiles=params['extra_transparent_tiles'],
-                    tile_width=params['tile_width'],
-                    origin=params['origin'],
-                    end=None,
-                    output_size=params['output_size'],
-                    keep_temp=params['keep_temp'],
-                    keep_transparent=params['keep_transparent']
-                )
-
-                tiles_path = "output/tiles.png"
-                preview_path = "output/preview.png"
-                palette_path = "output/palette.pal"
-
-                if os.path.exists(tiles_path):
-                    tiles_img = PilImage.open(tiles_path)
-                    self.display_tileset(tiles_img)
-
-                if os.path.exists(preview_path):
-                    preview_img = PilImage.open(preview_path)
-                    preview_qimg = self.pil_to_qimage(preview_img)
-                    preview_pixmap = QPixmap.fromImage(preview_qimg)
-                    self.preview_scene.clear()
-                    self.preview_scene.addPixmap(preview_pixmap)
-                    self.preview_scene.setSceneRect(preview_pixmap.rect())
-
-                if os.path.exists(palette_path):
-                    palette_colors = self.load_gba_palette(palette_path)
-                    self.display_palette_colors(palette_colors)
-                else:
-                    self.display_palette_colors([(0, 0, 0)] * 256)
-
-                self.status_bar.showMessage("✓ Conversion completed: output/")
-
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Conversion failed: {str(e)}")
+        dialog.exec()
 
     def load_gba_palette(self, pal_path):
         if not os.path.exists(pal_path):
@@ -332,17 +331,17 @@ class GBABackgroundStudio(QMainWindow):
             rect.mousePressEvent = lambda event, r=r, g=g, b=b: self.show_color_rgb(r, g, b)
 
     def display_tileset(self, pil_img):
-        self.tiles_scene.clear()
+        self.tileset_scene.clear()
         tile_size_px = 16
         w, h = pil_img.size
         for y in range(0, h, 8):
             for x in range(0, w, 8):
                 box = (x, y, x+8, y+8)
                 tile = pil_img.crop(box)
-                qimg = self.pil_to_qimage(tile)
+                qimg = pil_to_qimage(tile)
                 pix = QPixmap.fromImage(qimg).scaled(tile_size_px, tile_size_px, Qt.IgnoreAspectRatio, Qt.FastTransformation)
-                self.tiles_scene.addPixmap(pix).setPos(x * 2, y * 2)
-        self.tiles_scene.setSceneRect(0, 0, w * 2, h * 2)
+                self.tileset_scene.addPixmap(pix).setPos(x * 2, y * 2)
+        self.tileset_scene.setSceneRect(0, 0, w * 2, h * 2)
 
     def show_about(self):
         QMessageBox.about(
@@ -350,3 +349,85 @@ class GBABackgroundStudio(QMainWindow):
             self.translator.tr("about_title"),
             self.translator.tr("about_text")
         )
+        
+    def load_conversion_results(self):
+        """Actualiza la interfaz con los resultados de conversión."""
+        tiles_path = "output/tiles.png"
+        preview_path = "temp/preview/preview.png"
+        palette_path = "temp/preview/palette.pal"
+
+        # === 1. CARGAR TILESET (GUARDAR TILES E IDs) ===
+        if os.path.exists(tiles_path):
+            tiles_img = PilImage.open(tiles_path)
+            tiles_qimg = pil_to_qimage(tiles_img)
+            tiles_pixmap = QPixmap.fromImage(tiles_qimg)
+            
+            self.tileset_scene.clear()
+            self.tileset_scene.addPixmap(tiles_pixmap)
+            self.tileset_scene.setSceneRect(tiles_pixmap.rect())
+            
+            zoom_factor = 2.0
+            self.tileset_view.resetTransform()
+            self.tileset_view.scale(zoom_factor, zoom_factor)
+            
+            # Centrar la vista después del zoom
+            self.tileset_view.centerOn(self.tileset_scene.items()[0])
+
+            # PRE-CALCULAR todos los tiles e IDs
+            self.tileset_tiles = []  # Lista de imágenes de tiles
+            self.tileset_ids = {}    # Diccionario ID -> tile image
+            
+            # USAR self.tile_size definido en el constructor
+            tile_width = self.tile_size
+            tile_height = self.tile_size
+            columns = tiles_img.width // tile_width
+            rows = tiles_img.height // tile_height
+            
+            # Guardar dimensiones para selección futura
+            self.tileset_columns = columns
+            self.tileset_rows = rows
+            
+            for y in range(rows):
+                for x in range(columns):
+                    # Recortar tile individual
+                    left = x * tile_width
+                    upper = y * tile_height
+                    right = left + tile_width
+                    lower = upper + tile_height
+                    
+                    tile_img = tiles_img.crop((left, upper, right, lower))
+                    tile_id = y * columns + x
+                    
+                    self.tileset_tiles.append(tile_img)
+                    self.tileset_ids[tile_id] = tile_img  # ID -> imagen
+
+        # === 2. CARGAR PREVIEW ===
+        if os.path.exists(preview_path):
+            preview_img = PilImage.open(preview_path)
+            preview_qimg = pil_to_qimage(preview_img)
+            preview_pixmap = QPixmap.fromImage(preview_qimg)
+            self.preview_scene.clear()
+            self.preview_scene.addPixmap(preview_pixmap)
+            self.preview_scene.setSceneRect(preview_pixmap.rect())
+
+        # === 3. CARGAR PALETA UNIFICADA ===
+        if os.path.exists(palette_path):
+            palette_colors = [(0, 0, 0)] * 256
+            try:
+                with open(palette_path, 'r', encoding='utf-8') as f:
+                    lines = [line.strip() for line in f 
+                            if line.strip() and not line.startswith(("JASC-PAL", "0100"))]
+                
+                if lines:
+                    color_count = int(lines[0])
+                    for i in range(1, min(1 + color_count, 257)):
+                        r, g, b = map(int, lines[i].split())
+                        palette_colors[i - 1] = (r, g, b)
+
+            except Exception as e:
+                print(f"Error loading palette: {e}")
+
+
+        self.display_palette_colors(palette_colors)
+
+        self.status_bar.showMessage("✓ Conversion completed")

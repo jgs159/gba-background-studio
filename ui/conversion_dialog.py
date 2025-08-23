@@ -1,4 +1,15 @@
 # ui/conversion_dialog.py
+import io
+import os
+import sys
+import time
+import subprocess
+from PIL import Image as PilImage
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap, QPainter, QFont
+from core.image_utils import pil_to_qimage
+from core.main import main as converter_main
+from contextlib import redirect_stdout
 from PySide6.QtWidgets import (
     QDialog,
     QWidget,
@@ -21,11 +32,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
     QGridLayout,
+    QListWidget,
+    QSplitter,
+    QApplication,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QPainter, QImage
-from PIL import Image as PilImage
-import os
 
 
 class ConversionDialog(QDialog):
@@ -38,6 +48,44 @@ class ConversionDialog(QDialog):
         "BG3 (512x512)": (64, 64),
         "Custom": None
     }
+
+    class AutoSpinBox(QSpinBox):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self._is_auto = True
+            self.setRange(1, 256)
+            self.setSpecialValueText("Auto (256 - start)")
+            super().setValue(1)
+
+        def setValue(self, value):
+            if value == 0:
+                super().setValue(1)
+                self._is_auto = True
+            else:
+                super().setValue(value)
+                self._is_auto = False
+
+        def value(self):
+            if self._is_auto:
+                return 0
+            return super().value()
+
+        def textFromValue(self, value):
+            if self._is_auto:
+                return "Auto (256 - start)"
+            return super().textFromValue(value)
+
+        def valueFromText(self, text):
+            if text.strip() == "Auto (256 - start)":
+                self._is_auto = True
+                return 1
+            self._is_auto = False
+            return super().valueFromText(text)
+
+        def stepEnabled(self):
+            if self._is_auto:
+                return QSpinBox.StepNone
+            return super().stepEnabled()
 
     def __init__(self, image_path, parent=None):
         super().__init__(parent)
@@ -61,12 +109,9 @@ class ConversionDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        from PySide6.QtGui import QFont
-
         layout = QVBoxLayout(self)
 
         # Main splitter: left (image) 70% / right (params) 30%
-        from PySide6.QtWidgets import QSplitter
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setChildrenCollapsible(False)
         main_splitter.setHandleWidth(6)
@@ -85,7 +130,6 @@ class ConversionDialog(QDialog):
         left_layout.addWidget(input_header)
 
         # Input Image View (100% scale)
-        from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
         self.input_view = QGraphicsView()
         self.input_scene = QGraphicsScene()
         self.input_view.setScene(self.input_scene)
@@ -129,37 +173,71 @@ class ConversionDialog(QDialog):
         params_group = QGroupBox("Conversion Parameters")
         form_layout = QFormLayout()
 
-        # === Palettes (styled like other form labels) ===
-        # This ensures "Palettes" has same font/style as "Transparent Color:"
-        palette_label = QLabel("Palettes")
-        # No need to set font manually — QFormLayout does it
-        form_layout.addRow(palette_label, QLabel(""))  # Hack: add empty widget to keep layout
+        # --- BPP Selector ---
+        self.bpp_combo = QComboBox()
+        self.bpp_combo.addItems(["4bpp (16 colors per palette)", "8bpp (256 colors)"])
+        self.bpp_combo.setCurrentIndex(0)
+        self.bpp_combo.currentIndexChanged.connect(self.on_bpp_changed)
+        form_layout.addRow("Bits per pixel:", self.bpp_combo)
 
-        palette_widget = QWidget()
+        # --- Selector de paletas (4bpp) ---
+        self.palettes_container = QWidget()
+        palettes_main_layout = QVBoxLayout()
+        palettes_main_layout.setContentsMargins(0, 0, 0, 0)
+        palettes_main_layout.setSpacing(2)
+        self.palettes_container.setLayout(palettes_main_layout)
+
+        self.palettes_label = QLabel("Palettes (4bpp):")
+        palettes_main_layout.addWidget(self.palettes_label)
+
+        self.palettes_widget = QWidget()
         grid_layout = QGridLayout()
-        grid_layout.setContentsMargins(0, 2, 0, 2)
+        grid_layout.setContentsMargins(0, 1, 0, 1)
         grid_layout.setSpacing(1)
-        palette_widget.setLayout(grid_layout)
+        self.palettes_widget.setLayout(grid_layout)
 
         self.palette_checks = []
-
         for i in range(16):
-            # Checkbox
             cb = QCheckBox("")
-            cb.setFixedSize(20, 20)
+            cb.setFixedSize(16, 16)
             cb.setChecked(i == 0)
             cb.toggled.connect(self.on_palette_toggled)
             self.palette_checks.append(cb)
             grid_layout.addWidget(cb, 0, i)
 
-            # Label (number)
             label = QLabel(hex(i)[2:].upper())
+            label.setFixedSize(16, 12)
             label.setAlignment(Qt.AlignCenter)
-            label.setFixedWidth(20)
-            label.setStyleSheet("QLabel { font-size: 9px; font-weight: bold; color: #555; }")
+            label.setStyleSheet("QLabel { font-size: 10px; font-weight: bold; color: #555; margin: 0; padding: 0; }")
             grid_layout.addWidget(label, 1, i)
 
-        form_layout.addRow(palette_widget)
+        self.palettes_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.palettes_widget.setFixedWidth(300)
+        palettes_main_layout.addWidget(self.palettes_widget)
+
+        form_layout.addRow(self.palettes_container)
+
+        # --- 8bpp Parameters (start-index, palette-size) ---
+        self.bpp8_widget = QWidget()
+        bpp8_layout = QFormLayout()
+
+        self.start_index = QSpinBox()
+        self.start_index.setRange(0, 255)
+        self.start_index.setValue(0)
+        self.start_index.valueChanged.connect(self.on_8bpp_param_changed)
+        bpp8_layout.addRow("Start Index:", self.start_index)
+
+        self.palette_size = self.AutoSpinBox()
+        self.palette_size.valueChanged.connect(self.on_8bpp_param_changed)
+        bpp8_layout.addRow("Palette Size:", self.palette_size)
+
+        self.size_warning = QLabel("")
+        self.size_warning.setStyleSheet("QLabel { color: #cc0000; font-weight: bold; }")
+        self.size_warning.setVisible(False)
+        bpp8_layout.addRow("", self.size_warning)
+
+        self.bpp8_widget.setLayout(bpp8_layout)
+        form_layout.addRow(self.bpp8_widget)
 
         # --transparent-color
         self.transparent_color = QLineEdit("0,0,0")
@@ -186,13 +264,11 @@ class ConversionDialog(QDialog):
 
         # --output-size (Combo + Custom widgets)
         output_hlayout = QHBoxLayout()
-
         self.output_combo = QComboBox()
         for label in self.PRESETS.keys():
             self.output_combo.addItem(label)
         self.output_combo.setCurrentText("Original")
         self.output_combo.currentTextChanged.connect(self.on_output_size_changed)
-
         output_hlayout.addWidget(self.output_combo)
         form_layout.addRow("Output Size:", output_hlayout)
 
@@ -204,25 +280,21 @@ class ConversionDialog(QDialog):
         self.custom_stack.addWidget(self.custom_widget)
 
         custom_layout = QFormLayout()
-
         self.custom_width = QSpinBox()
         self.custom_width.setRange(1, 64)
         self.custom_width.setValue(32)
         self.custom_width.valueChanged.connect(self.update_output_info)
-
         self.custom_height = QSpinBox()
         self.custom_height.setRange(1, 64)
         self.custom_height.setValue(20)
         self.custom_height.valueChanged.connect(self.update_output_info)
-
         custom_layout.addRow("Width (tiles):", self.custom_width)
         custom_layout.addRow("Height (tiles):", self.custom_height)
         self.custom_widget.setLayout(custom_layout)
-
         form_layout.addRow(self.custom_stack)
 
         # Output size info
-        self.output_info = QLabel("Tamaño de Salida: 256x160 px")
+        self.output_info = QLabel("Output Size: 256x160 px")
         self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
         form_layout.addRow(self.output_info)
 
@@ -251,8 +323,10 @@ class ConversionDialog(QDialog):
         # Add right panel
         main_splitter.addWidget(right_panel)
 
-        # Set sizes: 70% / 30%
+        # Set sizes: 770 / 330
         main_splitter.setSizes([770, 330])
+        main_splitter.setCollapsible(0, False)
+        main_splitter.setCollapsible(1, False)
 
         layout.addWidget(main_splitter)
 
@@ -275,19 +349,41 @@ class ConversionDialog(QDialog):
         # Load input image at 100%
         self.load_input_image()
         self.on_output_size_changed()
+        self.on_bpp_changed()
+
+    def on_bpp_changed(self):
+        is_8bpp = self.bpp_combo.currentIndex() == 1
+        self.palettes_container.setVisible(not is_8bpp)
+        self.bpp8_widget.setVisible(is_8bpp)
+        self.update_8bpp_size()
+
+    def on_8bpp_param_changed(self):
+        self.update_8bpp_size()
+
+    def update_8bpp_size(self):
+        start = self.start_index.value()
+        raw_size = self.palette_size.value()
+        auto_size = 256 - start
+        current_size = auto_size if raw_size == 0 else raw_size
+        total = start + current_size
+        if total > 256:
+            self.size_warning.setText("❌ Overflow: max 256")
+            self.size_warning.setVisible(True)
+            self.convert_btn.setEnabled(False)
+        else:
+            self.size_warning.setVisible(False)
+            self.convert_btn.setEnabled(True)
 
     def on_palette_toggled(self):
-        """Ensure at least one palette is selected."""
         if not any(cb.isChecked() for cb in self.palette_checks):
             sender = self.sender()
-            sender.setChecked(True)   
-    
+            sender.setChecked(True)
+
     def load_input_image(self):
         try:
             pil_img = PilImage.open(self.image_path).convert("RGBA")
-            qimg = self.pil_to_qimage(pil_img)
+            qimg = pil_to_qimage(pil_img)
             pix = QPixmap.fromImage(qimg)
-
             self.input_scene.clear()
             item = self.input_scene.addPixmap(pix)
             self.input_scene.setSceneRect(pix.rect())
@@ -297,15 +393,6 @@ class ConversionDialog(QDialog):
         except Exception as e:
             print(f"Error loading input image: {e}")
 
-    def pil_to_qimage(self, pil_img):
-        if pil_img.mode == "RGBA":
-            data = pil_img.tobytes("raw", "RGBA")
-            return QImage(data, pil_img.size[0], pil_img.size[1], QImage.Format_RGBA8888)
-        else:
-            rgb_img = pil_img.convert("RGB")
-            data = rgb_img.tobytes("raw", "RGB")
-            return QImage(data, rgb_img.size[0], rgb_img.size[1], QImage.Format_RGB888)
-
     def on_output_size_changed(self):
         text = self.output_combo.currentText()
         if text == "Custom":
@@ -313,29 +400,27 @@ class ConversionDialog(QDialog):
             self.update_output_info()
         elif text == "Original":
             self.custom_stack.setCurrentIndex(0)
-            w_tiles = self.img_width_tiles
-            h_tiles = self.img_height_tiles
-            w_px, h_px = w_tiles * 8, h_tiles * 8
-            self.output_width_tiles = w_tiles
-            self.output_height_tiles = h_tiles
-            self.output_info.setText(f"Tamaño de Salida: {w_px}x{h_px} px")
+            w_px, h_px = self.img_width_tiles * 8, self.img_height_tiles * 8
+            self.output_width_tiles = self.img_width_tiles
+            self.output_height_tiles = self.img_height_tiles
+            self.output_info.setText(f"Output Size: {w_px}x{h_px} px")
         else:
             self.custom_stack.setCurrentIndex(0)
             w_tiles, h_tiles = self.PRESETS[text]
             self.output_width_tiles = w_tiles
             self.output_height_tiles = h_tiles
             w_px, h_px = w_tiles * 8, h_tiles * 8
-            self.output_info.setText(f"Tamaño de Salida: {w_px}x{h_px} px")
+            self.output_info.setText(f"Output Size: {w_px}x{h_px} px")
 
     def update_output_info(self):
         w_tiles = self.custom_width.value()
         h_tiles = self.custom_height.value()
         w_px, h_px = w_tiles * 8, h_tiles * 8
         if w_px > 512 or h_px > 512:
-            self.output_info.setText(f"Tamaño de Salida: {w_px}x{h_px} px ⚠️ Excede 512px")
+            self.output_info.setText(f"Output Size: {w_px}x{h_px} px ⚠️ Exceeds 512px")
             self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #cc0000; padding: 4px; }")
         else:
-            self.output_info.setText(f"Tamaño de Salida: {w_px}x{h_px} px")
+            self.output_info.setText(f"Output Size: {w_px}x{h_px} px")
             self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
         self.output_width_tiles = w_tiles
         self.output_height_tiles = h_tiles
@@ -347,54 +432,39 @@ class ConversionDialog(QDialog):
             if len(tc) != 3 or not all(0 <= c <= 255 for c in tc):
                 raise ValueError
         except:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Error", "Invalid transparent color. Use 'R,G,B' with values 0-255.")
             return
 
         self.convert_btn.setEnabled(False)
-        self.output_combo.setEnabled(False)
-        self.origin.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setFormat("Starting...")
         self.progress_bar.setValue(0)
-        from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
 
         try:
-            import core.converter as converter
-            converter.LANGUAGE = "eng"
-
-            steps = [
-                ("Validating input...", 10),
-                ("Splitting into groups...", 25),
-                ("Quantizing with IrfanView...", 40),
-                ("Applying GBA palette...", 55),
-                ("Rebuilding image...", 70),
-                ("Generating assets...", 85),
-                ("Cleaning temp files...", 95),
-                ("Done", 100)
-            ]
-
-            import io
-            import sys
-            from contextlib import redirect_stdout
-
             def update_progress(text):
-                for keyword, value in [
-                    ("Validating", 10),
-                    ("Splitting", 25),
-                    ("Quantizing", 40),
-                    ("Applying", 55),
-                    ("Rebuilding", 70),
-                    ("Generating", 85),
-                    ("Cleaning", 95),
-                    ("completed", 100),
-                ]:
-                    if keyword.lower() in text.lower():
-                        self.progress_bar.setValue(value)
-                        self.progress_bar.setFormat(keyword.capitalize() + "...")
-                        QApplication.processEvents()
-                        break
+                if "Splitting" in text:
+                    self.progress_bar.setValue(10)
+                    self.progress_bar.setFormat("Splitting...")
+                elif "Quantizing" in text:
+                    self.progress_bar.setValue(25)
+                    self.progress_bar.setFormat("Quantizing...")
+                elif "Applying" in text:
+                    self.progress_bar.setValue(50)
+                    self.progress_bar.setFormat("Applying GBA palette...")
+                elif "Extracting" in text:
+                    self.progress_bar.setValue(65)
+                    self.progress_bar.setFormat("Extracting palettes...")
+                elif "Rebuilding" in text:
+                    self.progress_bar.setValue(70)
+                    self.progress_bar.setFormat("Rebuilding image...")
+                elif "Generating" in text:
+                    self.progress_bar.setValue(85)
+                    self.progress_bar.setFormat("Generating assets...")
+                elif "completed" in text and "Process" in text:
+                    self.progress_bar.setValue(100)
+                    self.progress_bar.setFormat("Conversion completed.")
+                QApplication.processEvents()
 
             class ProgressWriter:
                 def write(self, text):
@@ -408,30 +478,21 @@ class ConversionDialog(QDialog):
 
             try:
                 params = self.get_parameters()
-                converter.main(
-                    input_path=self.image_path,
-                    tilemap_path=None,
-                    start_index=params['start_index'],
-                    num_palettes=params['num_palettes'],
-                    transparent_color=params['transparent_color'],
-                    extra_transparent_tiles=params['extra_transparent_tiles'],
-                    tile_width=params['tile_width'],
-                    origin=params['origin'],
-                    end=None,
-                    output_size=params['output_size'],
-                    keep_temp=params['keep_temp'],
-                    keep_transparent=params['keep_transparent']
-                )
+                converter_main(**params)
             finally:
                 sys.stdout = old_stdout
 
             self.progress_bar.setValue(100)
             self.progress_bar.setFormat("Conversion completed.")
             QApplication.processEvents()
-            import time
-            time.sleep(0.5)
-            self.accept()
 
+            if self.parent() and hasattr(self.parent(), 'load_conversion_results'):
+                self.parent().load_conversion_results()
+            
+            # === Mostrar ventana de éxito ===
+            self.show_success_dialog()
+            time.sleep(0.3)
+            self.accept()
         except Exception as e:
             self.progress_bar.setFormat("Error")
             QApplication.processEvents()
@@ -439,7 +500,6 @@ class ConversionDialog(QDialog):
             self.convert_btn.setEnabled(True)
 
     def get_parameters(self):
-        """Return conversion parameters as dict."""
         output_text = self.output_combo.currentText()
         if output_text == "Custom":
             w = self.custom_width.value()
@@ -452,21 +512,101 @@ class ConversionDialog(QDialog):
         else:
             output_size = output_text.split()[0].lower()
 
-        # Get selected palette indices
-        selected_palettes = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
-        # Ensure at least one
-        if not selected_palettes:
-            selected_palettes = [0]
+        is_8bpp = self.bpp_combo.currentIndex() == 1
 
-        return {
-            'num_palettes': len(selected_palettes),  # Number of palettes to use
-            'start_index': min(selected_palettes),   # Not used in logic, but pass min index
-            'selected_palettes': selected_palettes,  # To be used in converter logic
-            'transparent_color': tuple(map(int, self.transparent_color.text().split(','))),
-            'extra_transparent_tiles': self.extra_transparent.value(),
-            'tile_width': self.tileset_width.value() if self.tileset_width.value() > 0 else None,
-            'origin': self.origin.text(),
-            'output_size': output_size,
-            'keep_temp': self.keep_temp.isChecked(),
-            'keep_transparent': self.keep_transparent.isChecked()
-        }
+        if is_8bpp:
+            start_index = self.start_index.value()
+            raw_size = self.palette_size.value()
+
+            if raw_size == 0:
+                palette_size = 256 - start_index
+            else:
+                palette_size = raw_size
+
+            if start_index + palette_size > 256:
+                palette_size = 256 - start_index
+
+            params = {
+                'input_path': self.image_path,
+                'tilemap_path': None,
+                'selected_palettes': None,
+                'transparent_color': tuple(map(int, self.transparent_color.text().split(','))),
+                'extra_transparent_tiles': self.extra_transparent.value(),
+                'tile_width': self.tileset_width.value() if self.tileset_width.value() > 0 else None,
+                'origin': self.origin.text(),
+                'end': None,
+                'output_size': output_size,
+                'keep_temp': self.keep_temp.isChecked(),
+                'keep_transparent': self.keep_transparent.isChecked(),
+                'bpp': 8,
+                'start_index': start_index,
+                'palette_size': palette_size
+            }
+        else:
+            selected_palettes = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
+            if not selected_palettes:
+                selected_palettes = [0]
+            params = {
+                'input_path': self.image_path,
+                'tilemap_path': None,
+                'selected_palettes': selected_palettes,
+                'transparent_color': tuple(map(int, self.transparent_color.text().split(','))),
+                'extra_transparent_tiles': self.extra_transparent.value(),
+                'tile_width': self.tileset_width.value() if self.tileset_width.value() > 0 else None,
+                'origin': self.origin.text(),
+                'end': None,
+                'output_size': output_size,
+                'keep_temp': self.keep_temp.isChecked(),
+                'keep_transparent': self.keep_transparent.isChecked(),
+                'bpp': 4,
+                'start_index': 0,
+                'palette_size': 256
+            }
+
+        return params
+
+    def show_success_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("✅ Conversion Completed")
+        dialog.resize(400, 300)
+
+        layout = QVBoxLayout()
+
+        # Título
+        title = QLabel("The conversion was completed successfully!")
+        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #006600;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        layout.addWidget(QLabel("Generated files:"))
+
+        # Lista de archivos
+        list_widget = QListWidget()
+        output_dir = "output"
+        if os.path.exists(output_dir):
+            for file in sorted(os.listdir(output_dir)):
+                list_widget.addItem(file)
+        else:
+            list_widget.addItem("(No output folder)")
+        layout.addWidget(list_widget)
+
+        # Botón: Open Folder
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        open_btn = QPushButton("📁 Open Output Folder")
+
+        def open_folder():
+            path = os.path.abspath(output_dir)
+            if sys.platform == "win32":
+                os.startfile(path)
+            elif sys.platform == "darwin":  # macOS
+                subprocess.run(["open", path])
+            else:  # Linux
+                subprocess.run(["xdg-open", path])
+
+        open_btn.clicked.connect(open_folder)
+        btn_layout.addWidget(open_btn)
+        layout.addLayout(btn_layout)
+
+        dialog.setLayout(layout)
+        dialog.exec()
