@@ -3,7 +3,8 @@ import os
 from PIL import Image
 import numpy as np
 from core.config import MARKER_COLOR
-from core.language import translate
+from utils.translator import Translator
+translator = Translator()
 
 def rgb_to_gba_rounded(color):
     r, g, b = color
@@ -67,4 +68,22 @@ def apply_gba_palette_format(indexed_dir, num_palettes=16):
             img.putpalette(flat_gba)
             img.save(path)
         except Exception as e:
-            print(translate("error_apply_gba_palette", i=i, e=e))
+            print(translator.tr("error_apply_gba_palette", i=i, e=e))
+
+def group_consecutive_palettes(indices):
+    """Group consecutive indices: [0,1,3,6,7,8] → [(0,2), (3,1), (6,3)]"""
+    if not indices:
+        return []
+    indices = sorted(indices)
+    groups = []
+    start = indices[0]
+    count = 1
+    for i in range(1, len(indices)):
+        if indices[i] == indices[i-1] + 1:
+            count += 1
+        else:
+            groups.append((start, count))
+            start = indices[i]
+            count = 1
+    groups.append((start, count))
+    return groups

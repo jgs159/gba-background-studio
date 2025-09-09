@@ -2,31 +2,43 @@
 import os
 from PIL import Image as PilImage
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTabWidget, QMessageBox, QFileDialog
-from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTabWidget, QMessageBox, QFileDialog, QGraphicsView
+from PySide6.QtGui import QPixmap, QPen, QColor, QImage, QCursor
 from .custom_status_bar import CustomStatusBar
 from .preview_tab import PreviewTab
 from .edit_tiles_tab import EditTilesTab
 from .edit_palettes_tab import EditPalettesTab
 from .menu_bar import MenuBar
 from utils.translator import Translator
-from ui.conversion_dialog import ConversionDialog
+from ui.dialogs.conversion_dialog import ConversionDialog
 from core.image_utils import pil_to_qimage
 from core.palette_utils import generate_grayscale_palette
+from core.config_manager import ConfigManager
+from ui.hover_manager import HoverManager
 
 
 class GBABackgroundStudio(QMainWindow):
-    def __init__(self, language="english"):
+    def __init__(self):
         super().__init__()
-        self.translator = Translator(lang_dir="lang", default_lang=language)
-        self.setWindowTitle(self.translator.tr("app_name"))
+        self.config_manager = ConfigManager()
+        
+        self.load_configuration()
+        
+        self.translator = Translator(lang_dir="lang", default_lang=self.config_manager.get('SETTINGS', 'language', 'english'))
+
+        self.setWindowTitle("GBA Background Studio")
         self.resize(754, 644)
 
         # === TILES CONFIGURATION ===
         self.tile_size = 8
+
+        # === ZOOM CONFIGURATION ===
+        self.zoom_level = 100  # 100% por defecto
+        self.zoom_levels = [100, 200, 300, 400, 500, 600, 700, 800]
+        self.current_zoom_index = 0
         
         # === TILE SELECTION SYSTEM ===
-        self.selected_tile_id = None
+        self.selected_tile_id = 0
         self.selected_tile_image = None
         self.tileset_columns = 0
         self.tileset_rows = 0
@@ -41,7 +53,9 @@ class GBABackgroundStudio(QMainWindow):
         
         # === TEMPORARY VARIABLES ===
         self.current_tileset = None
-        self.current_status_message = "Ready"
+        self.is_drawing = False
+        self.current_status_message = self.translator.tr("ready_status")
+        self.last_tile_pos = (-1, -1)
 
         # Main container widget
         main_container = QWidget()
@@ -55,39 +69,98 @@ class GBABackgroundStudio(QMainWindow):
         self.main_tabs.setTabPosition(QTabWidget.North)
         main_layout.addWidget(self.main_tabs)
 
+        # === HOVER MANAGER ===
+        self.hover_manager = HoverManager()
+
         # Create tabs
         self.preview_tab = PreviewTab(self)
         self.edit_tiles_tab = EditTilesTab(self)
         self.edit_palettes_tab = EditPalettesTab(self)
         
-        self.main_tabs.addTab(self.preview_tab, "Preview")
-        self.main_tabs.addTab(self.edit_tiles_tab, "Edit Tiles")
-        self.main_tabs.addTab(self.edit_palettes_tab, "Edit Palettes")
+        self.main_tabs.addTab(self.preview_tab, self.translator.tr("preview_tab"))
+        self.main_tabs.addTab(self.edit_tiles_tab, self.translator.tr("edit_tiles_tab"))
+        self.main_tabs.addTab(self.edit_palettes_tab, self.translator.tr("edit_palettes_tab"))
 
         # Custom status bar at the bottom
         self.custom_status_bar = CustomStatusBar()
+        self.custom_status_bar.show_message(self.current_status_message)
         main_layout.addWidget(self.custom_status_bar)
 
         # Menu bar
         self.menu_bar = MenuBar(self)
+        
+        self.apply_configuration_to_menu()
+        self.setup_wheel_events()
 
-        # Store references to actions for easy access
-        self.action_save_tileset = self.menu_bar.action_save_tileset
-        self.action_append_tiles = self.menu_bar.action_append_tiles
-        self.action_open_tilemap = self.menu_bar.action_open_tilemap
-        self.action_save_tilemap = self.menu_bar.action_save_tilemap
-        self.action_save_selection = self.menu_bar.action_save_selection
-        self.action_status_bar = self.menu_bar.action_status_bar
+        self.hover_manager.register_view(self.edit_tiles_tab.edit_tilemap_view)
+        self.hover_manager.register_view(self.edit_palettes_tab.edit_tilemap2_view)
+
+        self.main_tabs.currentChanged.connect(self.on_tab_changed)
+
+    def on_tab_changed(self, index):
+        current_tab = self.main_tabs.widget(index)
+        
+        if hasattr(self, 'edit_tiles_tab') and hasattr(self.edit_tiles_tab, 'edit_tilemap_view'):
+            self.hover_manager.hide_hover(self.edit_tiles_tab.edit_tilemap_view)
+        if hasattr(self, 'edit_palettes_tab') and hasattr(self.edit_palettes_tab, 'edit_tilemap2_view'):
+            self.hover_manager.hide_hover(self.edit_palettes_tab.edit_tilemap2_view)
+        
+        if current_tab == self.edit_tiles_tab:
+            self.update_hover_from_current_cursor()
+        elif current_tab == self.edit_palettes_tab:
+            self.update_hover_from_current_cursor()
+
+    def setup_wheel_events(self):
+        """Configurar eventos de rueda del ratón para todas las vistas con zoom"""
+        self.preview_tab.preview_image_view.wheelEvent = lambda event: self.zoom_wheel_event(self.preview_tab.preview_image_view, event)
+        self.edit_tiles_tab.edit_tileset_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_tiles_tab.edit_tileset_view, event)
+        self.edit_tiles_tab.edit_tilemap_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_tiles_tab.edit_tilemap_view, event)
+        self.edit_palettes_tab.edit_palettes_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_palettes_tab.edit_palettes_view, event)
+        self.edit_palettes_tab.edit_tilemap2_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_palettes_tab.edit_tilemap2_view, event)
+
+    def zoom_wheel_event(self, view, event):
+        """Manejar evento de rueda del ratón para zoom con Ctrl"""
+        if event.modifiers() & Qt.ControlModifier:
+            if event.angleDelta().y() > 0:
+                self.zoom_in()
+            else:
+                self.zoom_out()
+            event.accept()
+            
+            self.update_hover_from_current_cursor()
+        else:
+            QGraphicsView.wheelEvent(view, event)
+
+    def load_configuration(self):
+        """Carga la configuración desde el archivo"""
+        self.save_preview_files = self.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
+        self.keep_transparent_color = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
+        self.keep_temp_files = self.config_manager.getboolean('SETTINGS', 'keep_temp_files', False)
+
+    def apply_configuration_to_menu(self):
+        """Aplica la configuración cargada a los elementos del menú"""
+        if hasattr(self, 'menu_bar'):
+            self.menu_bar.action_save_preview.setChecked(self.save_preview_files)
+            self.menu_bar.action_keep_transparent.setChecked(self.keep_transparent_color)
+            self.menu_bar.action_keep_temp.setChecked(self.keep_temp_files)
+            
+            theme = self.config_manager.get('SETTINGS', 'theme', 'light')
+            for theme_code, action in self.menu_bar.theme_actions.items():
+                action.setChecked(theme_code == theme)
+            
+            language = self.config_manager.get('SETTINGS', 'language', 'english')
+            for lang_code, action in self.menu_bar.language_actions.items():
+                action.setChecked(lang_code == language)
 
     def show_color_rgb(self, r, g, b):
-        self.current_status_message = f"RGB: ({r}, {g}, {b})"
+        self.current_status_message = self.translator.tr("rgb_values").format(r=r, g=g, b=b)
         self.custom_status_bar.show_message(self.current_status_message)
 
     def open_image_for_conversion(self):
         """Open image for conversion (File -> Open Image)"""
         input_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Select image to convert",
+            self.translator.tr("open_image"),
             "",
             "Images (*.png *.jpg *.jpeg *.bmp *.gif);;All files (*)"
         )
@@ -101,7 +174,7 @@ class GBABackgroundStudio(QMainWindow):
         """Open tileset image (Tileset -> Open)"""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Open Tileset",
+            self.translator.tr("open_tileset"),
             "",
             "Images (*.png *.jpg *.jpeg *.bmp *.gif);;All files (*)"
         )
@@ -115,107 +188,157 @@ class GBABackgroundStudio(QMainWindow):
             
             # Switch to Edit Tiles tab
             self.main_tabs.setCurrentIndex(1)
-            
-            # Update status message
-            self.current_status_message = f"Tileset loaded: {os.path.basename(file_path)}"
-            self.custom_status_bar.show_message(self.current_status_message)
-            
+
         except Exception as e:
-            self.current_status_message = f"Error loading tileset: {str(e)}"
+            self.current_status_message = self.translator.tr("error_loading_tileset").format(error=str(e))
             self.custom_status_bar.show_message(self.current_status_message)
-            QMessageBox.warning(self, "Error", f"Could not load tileset:\n{str(e)}")
+            QMessageBox.warning(self, self.translator.tr("error"), self.translator.tr("could_not_load_tileset").format(error=str(e)))
 
     def save_tileset(self):
-        # Placeholder for save tileset functionality
         pass
 
     def append_tiles(self):
-        # Placeholder for append tiles functionality
         pass
 
     def open_tilemap(self):
-        # Placeholder for open tilemap functionality
         pass
 
     def save_tilemap(self):
-        # Placeholder for save tilemap functionality
         pass
 
     def save_selection(self):
-        # Placeholder for save selection functionality
         pass
 
     def open_palette(self):
-        """Placeholder for open palette functionality"""
-        # TODO: Implementar apertura de paleta
-        self.current_status_message = "Open Palette functionality not implemented yet"
+        self.current_status_message = self.translator.tr("open_palette_not_implemented")
         self.custom_status_bar.show_message(self.current_status_message)
 
     def save_palette(self):
-        """Placeholder for save palette functionality"""
-        # TODO: Implementar guardado de paleta
-        self.current_status_message = "Save Palette functionality not implemented yet"
+        self.current_status_message = self.translator.tr("save_palette_not_implemented")
+        self.custom_status_bar.show_message(self.current_status_message)
+
+    def toggle_save_preview(self, checked):
+        self.save_preview_files = checked
+        self.config_manager.set('SETTINGS', 'save_preview_files', checked)
+        self.current_status_message = self.translator.tr("save_preview_status").format(status='Enabled' if checked else 'Disabled')
         self.custom_status_bar.show_message(self.current_status_message)
 
     def toggle_keep_transparent(self, checked):
-        """Toggle Keep Transparent Color setting"""
-        self.current_status_message = f"Keep Transparent Color: {'Enabled' if checked else 'Disabled'}"
+        self.keep_transparent_color = checked
+        self.config_manager.set('SETTINGS', 'keep_transparent_color', checked)
+        self.current_status_message = self.translator.tr("keep_transparent_status").format(status='Enabled' if checked else 'Disabled')
         self.custom_status_bar.show_message(self.current_status_message)
-        # TODO: Implementar lógica para mantener color transparente
 
     def toggle_keep_temp(self, checked):
-        """Toggle Keep Temp setting"""
-        self.current_status_message = f"Keep Temp Files: {'Enabled' if checked else 'Disabled'}"
+        self.keep_temp_files = checked
+        self.config_manager.set('SETTINGS', 'keep_temp_files', checked)
+        self.current_status_message = self.translator.tr("keep_temp_status").format(status='Enabled' if checked else 'Disabled')
         self.custom_status_bar.show_message(self.current_status_message)
-        # TODO: Implementar lógica para mantener archivos temporales
 
     def reset_zoom(self):
-        # Placeholder for reset zoom functionality
-        pass
+        self.current_zoom_index = 0
+        self.zoom_level = self.zoom_levels[self.current_zoom_index]
+        self.apply_zoom_to_all()
+        self.update_hover_from_current_cursor()
 
     def zoom_in(self):
-        # Placeholder for zoom in functionality
-        pass
+        if self.current_zoom_index < len(self.zoom_levels) - 1:
+            self.current_zoom_index += 1
+            self.zoom_level = self.zoom_levels[self.current_zoom_index]
+            self.apply_zoom_to_all()
+            self.update_hover_from_current_cursor()
+            self.current_status_message = self.translator.tr("zoom_level", level=f"{self.zoom_level}%")
+            self.custom_status_bar.show_message(self.current_status_message)
 
     def zoom_out(self):
-        # Placeholder for zoom out functionality
-        pass
+        if self.current_zoom_index > 0:
+            self.current_zoom_index -= 1
+            self.zoom_level = self.zoom_levels[self.current_zoom_index]
+            self.apply_zoom_to_all()
+            self.update_hover_from_current_cursor()
+            self.current_status_message = self.translator.tr("zoom_level", level=f"{self.zoom_level}%")
+            self.custom_status_bar.show_message(self.current_status_message)
+
+    def apply_zoom_to_all(self):
+        zoom_factor = self.zoom_level / 100.0
+
+        self.apply_zoom_to_view(self.preview_tab.preview_image_view, zoom_factor)
+        self.apply_zoom_to_view(self.edit_tiles_tab.edit_tileset_view, zoom_factor)
+        self.apply_zoom_to_view(self.edit_tiles_tab.edit_tilemap_view, zoom_factor)
+        
+        self.edit_palettes_tab.apply_zoom(zoom_factor)
+        self.apply_zoom_to_view(self.edit_palettes_tab.edit_tilemap2_view, zoom_factor)
+
+        self.update_hover_from_current_cursor()
+
+    def apply_zoom_to_view(self, view, zoom_factor):
+        if view and view.scene() and view.scene().items():
+            view.resetTransform()
+            view.scale(zoom_factor, zoom_factor)
+            if view.scene().items():
+                view.centerOn(view.scene().items()[0])
+            
+            if view == self.edit_tiles_tab.edit_tileset_view:
+                if hasattr(self.edit_tiles_tab, 'selected_tile_pos') and self.edit_tiles_tab.selected_tile_pos != (-1, -1):
+                    tile_x, tile_y = self.edit_tiles_tab.selected_tile_pos
+                    self.edit_tiles_tab.highlight_selected_tile(tile_x, tile_y)
+
+    def update_hover_from_current_cursor(self):
+        current_tab = self.main_tabs.currentWidget()
+        
+        if current_tab == self.edit_tiles_tab:
+            self.hover_manager.update_hover_from_cursor(self.edit_tiles_tab.edit_tilemap_view)
+        elif current_tab == self.edit_palettes_tab:
+            self.hover_manager.update_hover_from_cursor(self.edit_palettes_tab.edit_tilemap2_view)
+
+    def apply_zoom_to_new_content(self, view):
+        if view:
+            self.apply_zoom_to_view(view, self.zoom_level / 100.0)
 
     def toggle_grid(self, checked):
-        # Placeholder for grid toggle functionality
         pass
 
     def toggle_status_bar(self, checked):
         self.custom_status_bar.setVisible(checked)
 
-    def toggle_logging_bar(self, checked):
-        # Placeholder for logging bar toggle functionality
-        pass
-
     def change_language(self, language_code):
-        # Update check states
+        self.config_manager.set('SETTINGS', 'language', language_code)
+        self.translator.load_language(language_code)
         for lang_code, action in self.menu_bar.language_actions.items():
             action.setChecked(lang_code == language_code)
         
-        # Placeholder for language change functionality
-        print(f"Language changed to: {language_code}")
+        self.retranslate_ui()
+        self.current_status_message = self.translator.tr("language_changed", lang=language_code)
+        self.custom_status_bar.show_message(self.current_status_message)
 
     def change_theme(self, theme_code):
-        # Update check states
         for theme_c, action in self.menu_bar.theme_actions.items():
             action.setChecked(theme_c == theme_code)
         
-        # Placeholder for theme change functionality
-        print(f"Theme changed to: {theme_code}")
-
-    def toggle_save_preview(self, checked):
-        """Toggle Save Preview Files setting"""
-        self.current_status_message = f"Save Preview Files: {'Enabled' if checked else 'Disabled'}"
+        self.config_manager.set('SETTINGS', 'theme', theme_code)
+        
+        from utils.theme_manager import apply_theme
+        apply_theme(theme_code)
+        
+        self.current_status_message = self.translator.tr("theme_changed").format(theme=theme_code)
         self.custom_status_bar.show_message(self.current_status_message)
-        # TODO: Implementar lógica para guardar archivos de preview
+
+    def retranslate_ui(self):
+        self.main_tabs.setTabText(0, self.translator.tr("preview_tab"))
+        self.main_tabs.setTabText(1, self.translator.tr("edit_tiles_tab"))
+        self.main_tabs.setTabText(2, self.translator.tr("edit_palettes_tab"))
+        
+        self.current_status_message = self.translator.tr("ready_status")
+        self.custom_status_bar.show_message(self.current_status_message)
+        
+        self.recreate_menu()
+
+    def recreate_menu(self):
+        self.menu_bar.menu_bar.clear()
+        self.menu_bar.create_menus()
+        self.apply_configuration_to_menu()
 
     def show_contribute(self):
-        """Show contribution information dialog"""
         contribute_text = """
         <h3>❤️ Support GBA Background Studio Development</h3>
         
@@ -236,7 +359,7 @@ class GBABackgroundStudio(QMainWindow):
         """
         
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Support Development")
+        msg_box.setWindowTitle(self.translator.tr("support_development"))
         msg_box.setTextFormat(Qt.RichText)
         msg_box.setText(contribute_text)
         msg_box.setIcon(QMessageBox.Information)
@@ -244,67 +367,72 @@ class GBABackgroundStudio(QMainWindow):
         msg_box.exec()
 
     def display_tileset(self, pil_img):
-        """Display tileset image in the Edit Tiles section with crisp pixels"""
-        self.edit_tiles_tab.edit_tileset_scene.clear()
-        w, h = pil_img.size
-        
-        # Convert PIL image to QPixmap and display
-        qimg = pil_to_qimage(pil_img)
-        pixmap = QPixmap.fromImage(qimg)
-        
-        # Add pixmap to scene without scaling for crisp pixels
-        pixmap_item = self.edit_tiles_tab.edit_tileset_scene.addPixmap(pixmap)
-        self.edit_tiles_tab.edit_tileset_scene.setSceneRect(0, 0, w, h)
-        
-        # Reset zoom to 1:1 for crisp pixel display
-        self.edit_tiles_tab.edit_tileset_view.resetTransform()
-        self.edit_tiles_tab.edit_tileset_view.scale(1.0, 1.0)
-        self.edit_tiles_tab.edit_tileset_view.centerOn(pixmap_item)
+        self.edit_tiles_tab.display_tileset(pil_img)
+        self.apply_zoom_to_view(self.edit_tiles_tab.edit_tileset_view, self.zoom_level / 100.0)
+
+    def sync_palettes_tab(self):
+        if hasattr(self, 'preview_tab') and hasattr(self.preview_tab, 'palette_colors'):
+            self.edit_palettes_tab.display_palette_colors(self.preview_tab.palette_colors)
+
+        if hasattr(self, 'edit_tiles_tab') and hasattr(self.edit_tiles_tab, 'edit_tilemap_scene'):
+            self.edit_palettes_tab.display_tilemap_replica(self.edit_tiles_tab.edit_tilemap_scene)
+            self.edit_palettes_tab.update_palette_overlay(
+                self.edit_tiles_tab.edit_tilemap_scene,
+                self.edit_tiles_tab.tilemap_data,
+                self.edit_tiles_tab.tilemap_width,
+                self.edit_tiles_tab.tilemap_height
+            )
+            
+            self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
+            self.edit_palettes_tab.tilemap_width = self.edit_tiles_tab.tilemap_width
+            self.edit_palettes_tab.tilemap_height = self.edit_tiles_tab.tilemap_height
 
     def show_about(self):
         about_text = """
         <h3>GBA Background Studio</h3>
         <p>A comprehensive tool for creating and editing Game Boy Advance background graphics.</p>
-        
-        <p><b>📥 Downloads:</b><br>
-        <a href="https://github.com/CompuMaxx">https://github.com/CompuMaxx</a></p>
-        
-        <p><b>💬 Contact:</b><br>
+
+        <p><b>📥 Downloads:</b>
+        <a href="https://github.com/CompuMaxx">GitHub Repository</a></p>
+
+        <p><b>💬 Contact:</b>
         Discord: <a href="https://discordapp.com/users/213803341988364289">CompuMax</a></p>
-        
-        <p><b>👨‍💻 Developer:</b><br>
+
+        <p><b>👨‍💻 Developer:</b>
         CompuMax</p>
-        
-        <p><b>© Copyright 2025</b><br>
+
+        <p><b>© Copyright 2025</b>
         All rights reserved</p>
-        
-        <p>Developed with ❤️ for the GBA homebrew community</p>
         """
         
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("About GBA Background Studio")
+        msg_box.setWindowTitle(self.translator.tr("about_title"))
         msg_box.setTextFormat(Qt.RichText)
         msg_box.setText(about_text)
         msg_box.setIcon(QMessageBox.Information)
-        
-        # Hacer los enlaces clickeables
         msg_box.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec()
         
     def load_conversion_results(self):
-        """Updates the interface with conversion results."""
         tiles_path = "output/tiles.png"
         preview_path = "temp/preview/preview.png"
         palette_path = "temp/preview/palette.pal"
+        tilemap_path = "output/map.bin"
 
-        # === 1. LOAD TILESET IN EDIT TILES TAB ===
         if os.path.exists(tiles_path):
             tiles_img = PilImage.open(tiles_path)
             self.display_tileset(tiles_img)
 
-        # === 2. LOAD PREVIEW IN PREVIEW TAB ===
+        if os.path.exists(tilemap_path):
+            with open(tilemap_path, 'rb') as f:
+                tilemap_data = f.read()
+            self.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path)
+            
+            self.edit_palettes_tab.tilemap_data = tilemap_data
+            self.edit_palettes_tab.tilemap_width = self.edit_tiles_tab.tilemap_width
+            self.edit_palettes_tab.tilemap_height = self.edit_tiles_tab.tilemap_height
+
         if os.path.exists(preview_path):
             preview_img = PilImage.open(preview_path)
             preview_qimg = pil_to_qimage(preview_img)
@@ -314,12 +442,9 @@ class GBABackgroundStudio(QMainWindow):
             self.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
             self.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
             
-            # Center the preview image
-            self.preview_tab.preview_image_view.resetTransform()
-            self.preview_tab.preview_image_view.scale(1.0, 1.0)
+            self.apply_zoom_to_view(self.preview_tab.preview_image_view, self.zoom_level / 100.0)
             self.preview_tab.preview_image_view.centerOn(self.preview_tab.preview_image_scene.items()[0])
 
-        # === 3. LOAD UNIFIED PALETTE IN PREVIEW PALETTE ===
         if os.path.exists(palette_path):
             palette_colors = [(0, 0, 0)] * 256
             try:
@@ -333,25 +458,58 @@ class GBABackgroundStudio(QMainWindow):
                         r, g, b = map(int, lines[i].split())
                         palette_colors[i - 1] = (r, g, b)
                         
-                # Display the loaded palette
                 self.preview_tab.display_palette_colors(palette_colors)
 
             except Exception as e:
                 print(f"Error loading palette: {e}")
-                # Fallback to grayscale if there's an error
                 grayscale_colors = generate_grayscale_palette()
                 self.preview_tab.display_palette_colors(grayscale_colors)
 
-        # Update status message
-        self.current_status_message = "✓ Conversion completed"
+        self.current_status_message = self.translator.tr("conversion_completed")
         self.custom_status_bar.show_message(self.current_status_message)
         
-        # Enable relevant menu actions after conversion
-        self.action_save_tileset.setEnabled(True)
-        self.action_append_tiles.setEnabled(True)
-        self.action_open_tilemap.setEnabled(True)
-        self.action_save_tilemap.setEnabled(True)
-        self.action_save_selection.setEnabled(True)
+        self.menu_bar.action_save_tileset.setEnabled(True)
+        self.menu_bar.action_append_tiles.setEnabled(True)
+        self.menu_bar.action_open_tilemap.setEnabled(True)
+        self.menu_bar.action_save_tilemap.setEnabled(True)
+        self.menu_bar.action_save_selection.setEnabled(True)
         
-        # Switch to Preview tab to show results
-        self.main_tabs.setCurrentIndex(0)
+        self.main_tabs.setCurrentIndex(1)
+        self.sync_palettes_tab()
+
+
+class CustomGraphicsView(QGraphicsView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(False)
+        self._is_drawing = False
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._is_drawing = True
+            self.mouseMoveEvent(event)
+            event.accept()
+        elif event.button() == Qt.RightButton:
+            self.mouseMoveEvent(event)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._is_drawing and (event.buttons() & Qt.LeftButton):
+            pos = self.mapToScene(event.pos())
+            if self.scene():
+                tile_x = max(0, min(int(pos.x()) // 8, self.scene().width() // 8 - 1))
+                tile_y = max(0, min(int(pos.y()) // 8, self.scene().height() // 8 - 1))
+                if hasattr(self, 'on_tile_drawing'):
+                    self.on_tile_drawing(tile_x, tile_y)
+                event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._is_drawing = False
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)

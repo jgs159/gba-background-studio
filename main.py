@@ -1,6 +1,5 @@
 # main.py
 import os
-# === Suppress joblib warnings ===
 os.environ['JOBLIB_WORKER_COUNT'] = '4'
 os.environ['JOBLIB_MULTIPROCESSING'] = '0'
 os.environ['LOKY_MAX_CPU_COUNT'] = '4'
@@ -16,7 +15,7 @@ def main():
         sys.path.insert(0, script_dir)
     
     app = QApplication(sys.argv)
-    window = GBABackgroundStudio(language="english")
+    window = GBABackgroundStudio()
     window.show()
     sys.exit(app.exec())
 
