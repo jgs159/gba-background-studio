@@ -111,11 +111,14 @@ class MenuBar:
         
         view_menu.addSeparator()
         
-        action_grid = view_menu.addAction(self.main_window.translator.tr("grid_toggle"))
-        action_grid.setShortcut("Ctrl+G")
-        action_grid.setCheckable(True)
-        action_grid.setChecked(False)
-        action_grid.triggered.connect(self.main_window.toggle_grid)
+        # Grid toggle action
+        self.action_grid = view_menu.addAction(self.main_window.translator.tr("grid_toggle"))
+        self.action_grid.setShortcut("Ctrl+G")
+        self.action_grid.setCheckable(True)
+        # Establecer el estado inicial desde la configuración
+        grid_visible = self.main_window.config_manager.getboolean('SETTINGS', 'show_grid', False)
+        self.action_grid.setChecked(grid_visible)
+        self.action_grid.triggered.connect(self.main_window.toggle_grid)
         
         view_menu.addSeparator()
         

@@ -78,6 +78,7 @@ class ConversionDialog(QDialog):
         self.img_height_tiles = 32
         self.output_width_tiles = 32
         self.output_height_tiles = 20
+        self.grid_was_visible = False
 
         try:
             pil_img = PilImage.open(image_path)
@@ -472,6 +473,14 @@ class ConversionDialog(QDialog):
         self.output_height_tiles = h_tiles
 
     def on_convert(self):
+        # Ocultar la grilla si está visible
+        if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
+            self.parent().grid_manager.is_grid_visible()):
+            self.grid_was_visible = True
+            self.parent().grid_manager.set_grid_visible(False)
+        else:
+            self.grid_was_visible = False
+
         tc_text = self.transparent_color.text().strip()
         try:
             tc = tuple(map(int, tc_text.split(',')))
@@ -581,10 +590,20 @@ class ConversionDialog(QDialog):
             if self.parent() and hasattr(self.parent(), 'load_conversion_results'):
                 self.parent().load_conversion_results()
             
+            # Restaurar la grilla si estaba visible antes de la conversión
+            if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
+                self.grid_was_visible):
+                self.parent().grid_manager.set_grid_visible(True)
+            
             show_success_dialog(self)
             time.sleep(0.3)
             self.accept()
         except Exception as e:
+            # También restaurar la grilla en caso de error
+            if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
+                self.grid_was_visible):
+                self.parent().grid_manager.set_grid_visible(True)
+                
             self.progress_bar.setFormat("Error")
             QApplication.processEvents()
             QMessageBox.critical(self, "Error", f"Conversion failed: {str(e)}")

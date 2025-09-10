@@ -411,6 +411,10 @@ class EditPalettesTab(QWidget):
             pixmap = item.pixmap()
             self._pixmap_item = self.edit_tilemap2_scene.addPixmap(pixmap)
             self.edit_tilemap2_scene.setSceneRect(pixmap.rect())
+            
+        if self.main_window and hasattr(self.main_window, 'grid_manager'):
+            if self.main_window.grid_manager.is_grid_visible():
+                self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
 
     def update_palette_overlay(self, source_scene, tilemap_data, tile_width, tile_height):
         """Dibuja el overlay de paletas completo (solo al cargar)"""
@@ -439,6 +443,10 @@ class EditPalettesTab(QWidget):
                 entry = tilemap_data[idx * 2] | (tilemap_data[idx * 2 + 1] << 8)
                 palette_id = (entry >> 12) & 0xF
                 self.update_palette_overlay_for_tile(j, i, palette_id)
+
+        if self.main_window and hasattr(self.main_window, 'grid_manager'):
+            if self.main_window.grid_manager.is_grid_visible():
+                self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
 
     def update_single_tile_replica(self, tile_x, tile_y):
         source_scene = self.main_window.edit_tiles_tab.edit_tilemap_scene
@@ -483,3 +491,8 @@ class EditPalettesTab(QWidget):
         self.grid_view.colors = colors
         self.grid_view.draw_grid()
         self.highlight_selected_palette(self.selected_palette_id % 4, self.selected_palette_id // 4)
+        
+        if self.main_window and hasattr(self.main_window, 'grid_manager'):
+            if self.main_window.grid_manager.is_grid_visible():
+                self.main_window.grid_manager.update_grid_for_view("palettes")
+

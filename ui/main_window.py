@@ -15,6 +15,7 @@ from core.image_utils import pil_to_qimage
 from core.palette_utils import generate_grayscale_palette
 from core.config_manager import ConfigManager
 from ui.hover_manager import HoverManager
+from ui.grid_manager import GridManager
 
 
 class GBABackgroundStudio(QMainWindow):
@@ -72,6 +73,9 @@ class GBABackgroundStudio(QMainWindow):
         # === HOVER MANAGER ===
         self.hover_manager = HoverManager()
 
+        # === GRID MANAGER ===
+        self.grid_manager = GridManager()
+
         # Create tabs
         self.preview_tab = PreviewTab(self)
         self.edit_tiles_tab = EditTilesTab(self)
@@ -97,6 +101,8 @@ class GBABackgroundStudio(QMainWindow):
 
         self.main_tabs.currentChanged.connect(self.on_tab_changed)
 
+        self.setup_grids()
+
     def on_tab_changed(self, index):
         current_tab = self.main_tabs.widget(index)
         
@@ -111,7 +117,6 @@ class GBABackgroundStudio(QMainWindow):
             self.update_hover_from_current_cursor()
 
     def setup_wheel_events(self):
-        """Configurar eventos de rueda del ratón para todas las vistas con zoom"""
         self.preview_tab.preview_image_view.wheelEvent = lambda event: self.zoom_wheel_event(self.preview_tab.preview_image_view, event)
         self.edit_tiles_tab.edit_tileset_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_tiles_tab.edit_tileset_view, event)
         self.edit_tiles_tab.edit_tilemap_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_tiles_tab.edit_tilemap_view, event)
@@ -132,13 +137,11 @@ class GBABackgroundStudio(QMainWindow):
             QGraphicsView.wheelEvent(view, event)
 
     def load_configuration(self):
-        """Carga la configuración desde el archivo"""
         self.save_preview_files = self.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
         self.keep_transparent_color = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
         self.keep_temp_files = self.config_manager.getboolean('SETTINGS', 'keep_temp_files', False)
 
     def apply_configuration_to_menu(self):
-        """Aplica la configuración cargada a los elementos del menú"""
         if hasattr(self, 'menu_bar'):
             self.menu_bar.action_save_preview.setChecked(self.save_preview_files)
             self.menu_bar.action_keep_transparent.setChecked(self.keep_transparent_color)
@@ -209,6 +212,18 @@ class GBABackgroundStudio(QMainWindow):
     def save_selection(self):
         pass
 
+    def setup_grids(self):
+        self.grid_manager.register_view(self.edit_tiles_tab.edit_tileset_view, "tileset")
+        self.grid_manager.register_view(self.edit_tiles_tab.edit_tilemap_view, "tilemap_edit")
+        self.grid_manager.register_view(self.edit_palettes_tab.edit_palettes_view, "palettes")
+        self.grid_manager.register_view(self.edit_palettes_tab.edit_tilemap2_view, "tilemap_palettes")
+        
+        grid_visible = self.config_manager.getboolean('SETTINGS', 'show_grid', False)
+        self.grid_manager.set_grid_visible(grid_visible)
+        
+        if hasattr(self, 'menu_bar') and hasattr(self.menu_bar, 'action_grid'):
+            self.menu_bar.action_grid.setChecked(grid_visible)
+
     def open_palette(self):
         self.current_status_message = self.translator.tr("open_palette_not_implemented")
         self.custom_status_bar.show_message(self.current_status_message)
@@ -278,10 +293,36 @@ class GBABackgroundStudio(QMainWindow):
             if view.scene().items():
                 view.centerOn(view.scene().items()[0])
             
+            if (self.grid_manager.is_grid_visible() and 
+                self._is_editor_view(view)):
+                view_name = self._get_view_name(view)
+                if view_name:
+                    self.grid_manager.update_grid_for_view(view_name)
+            
             if view == self.edit_tiles_tab.edit_tileset_view:
                 if hasattr(self.edit_tiles_tab, 'selected_tile_pos') and self.edit_tiles_tab.selected_tile_pos != (-1, -1):
                     tile_x, tile_y = self.edit_tiles_tab.selected_tile_pos
                     self.edit_tiles_tab.highlight_selected_tile(tile_x, tile_y)
+
+    def _is_editor_view(self, view):
+        editor_views = [
+            self.edit_tiles_tab.edit_tileset_view,
+            self.edit_tiles_tab.edit_tilemap_view,
+            self.edit_palettes_tab.edit_palettes_view,
+            self.edit_palettes_tab.edit_tilemap2_view
+        ]
+        return view in editor_views
+
+    def _get_view_name(self, view):
+        if view == self.edit_tiles_tab.edit_tileset_view:
+            return "tileset"
+        elif view == self.edit_tiles_tab.edit_tilemap_view:
+            return "tilemap_edit"
+        elif view == self.edit_palettes_tab.edit_palettes_view:
+            return "palettes"
+        elif view == self.edit_palettes_tab.edit_tilemap2_view:
+            return "tilemap_palettes"
+        return None
 
     def update_hover_from_current_cursor(self):
         current_tab = self.main_tabs.currentWidget()
@@ -296,7 +337,12 @@ class GBABackgroundStudio(QMainWindow):
             self.apply_zoom_to_view(view, self.zoom_level / 100.0)
 
     def toggle_grid(self, checked):
-        pass
+        self.grid_manager.set_grid_visible(checked)
+        self.config_manager.set('SETTINGS', 'show_grid', checked)
+        
+        status = "Enabled" if checked else "Disabled"
+        self.current_status_message = self.translator.tr("grid_status").format(status=status)
+        self.custom_status_bar.show_message(self.current_status_message)
 
     def toggle_status_bar(self, checked):
         self.custom_status_bar.setVisible(checked)

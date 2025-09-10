@@ -312,6 +312,9 @@ class EditTilesTab(QWidget):
         self.edit_tileset_scene.addPixmap(pixmap)
         self.edit_tileset_scene.setSceneRect(0, 0, pil_img.width, pil_img.height)
         self.highlight_selected_tile(0, 0)
+        if self.main_window and hasattr(self.main_window, 'grid_manager'):
+            if self.main_window.grid_manager.is_grid_visible():
+                self.main_window.grid_manager.update_grid_for_view("tileset")
 
     def load_tilemap(self, tilemap_data, tileset_path, preview_path=None):
         from PIL import Image as PilImage
@@ -365,6 +368,10 @@ class EditTilesTab(QWidget):
 
         if hasattr(self.main_window, 'sync_palettes_tab'):
             self.main_window.sync_palettes_tab()
+
+        if self.main_window and hasattr(self.main_window, 'grid_manager'):
+            if self.main_window.grid_manager.is_grid_visible():
+                self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
 
     def apply_zoom(self, factor):
         self.edit_tileset_view.resetTransform()
