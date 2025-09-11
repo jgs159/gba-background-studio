@@ -101,6 +101,7 @@ output/*.*
 !output/.gitkeep
 
 # Session or cache files  
+config.ini  
 *.log  
 *.tmp  
 *.txt  
@@ -111,4 +112,3 @@ output/*.*
 *.png  
 *.gif  
 *.bmp  
-*.ini  
