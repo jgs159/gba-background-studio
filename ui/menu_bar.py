@@ -197,6 +197,10 @@ class MenuBar:
         self.action_save_conversion_params.setChecked(self.main_window.save_conversion_params)
         self.action_save_conversion_params.triggered.connect(self.main_window.toggle_save_conversion_params)
 
+        self.action_show_success_dialog = settings_menu.addAction(self.main_window.translator.tr("show_success_dialog"))
+        self.action_show_success_dialog.setCheckable(True)
+        self.action_show_success_dialog.triggered.connect(self.main_window.toggle_show_success_dialog)
+
         # Tools menu
         tools_menu = self.menu_bar.addMenu(self.main_window.translator.tr("tools_menu"))
         action_preview = tools_menu.addAction(self.main_window.translator.tr("preview_tool"))

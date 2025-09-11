@@ -22,7 +22,8 @@ class ConfigManager:
                 'load_last_output': 'False',
                 'save_conversion_params': 'False',
                 'load_last_output': 'False',
-                'save_conversion_params': 'False'
+                'save_conversion_params': 'False',
+                'show_success_dialog': 'True'
             },
             self.config['CONVERSION'] = {
                 'bpp': '4',

@@ -233,7 +233,8 @@ class ConversionDialogLogic:
                 self.parent().grid_manager.set_grid_visible(True)
             
             self.save_conversion_settings(params)
-            show_success_dialog(self)
+            if self.parent() and self.parent().show_success_dialog:
+                show_success_dialog(self)
             time.sleep(0.3)
             self.accept()
         except Exception as e:

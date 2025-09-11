@@ -111,6 +111,7 @@ class GBABackgroundStudio(QMainWindow):
         self.keep_transparent_color = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
         self.keep_temp_files = self.config_manager.getboolean('SETTINGS', 'keep_temp_files', False)
         self.load_last_output = self.config_manager.getboolean('SETTINGS', 'load_last_output', True)
+        self.show_success_dialog = self.config_manager.getboolean('SETTINGS', 'show_success_dialog', True)
         self.save_conversion_params = self.config_manager.getboolean('SETTINGS', 'save_conversion_params', True)
 
     def load_last_output_files(self):
@@ -218,19 +219,13 @@ class GBABackgroundStudio(QMainWindow):
         else:
             QGraphicsView.wheelEvent(view, event)
 
-    def load_configuration(self):
-        self.save_preview_files = self.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
-        self.keep_transparent_color = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
-        self.keep_temp_files = self.config_manager.getboolean('SETTINGS', 'keep_temp_files', False)
-        self.load_last_output = self.config_manager.getboolean('SETTINGS', 'load_last_output', False)
-        self.save_conversion_params = self.config_manager.getboolean('SETTINGS', 'save_conversion_params', False)
-    
     def apply_configuration_to_menu(self):
         if hasattr(self, 'menu_bar'):
             self.menu_bar.action_save_preview.setChecked(self.save_preview_files)
             self.menu_bar.action_keep_transparent.setChecked(self.keep_transparent_color)
             self.menu_bar.action_keep_temp.setChecked(self.keep_temp_files)
             self.menu_bar.action_load_last_output.setChecked(self.load_last_output)
+            self.menu_bar.action_show_success_dialog.setChecked(self.show_success_dialog)
             self.menu_bar.action_save_conversion_params.setChecked(self.save_conversion_params)
             
             theme = self.config_manager.get('SETTINGS', 'theme', 'light')
@@ -240,6 +235,10 @@ class GBABackgroundStudio(QMainWindow):
             language = self.config_manager.get('SETTINGS', 'language', 'english')
             for lang_code, action in self.menu_bar.language_actions.items():
                 action.setChecked(lang_code == language)
+
+    def toggle_show_success_dialog(self, checked):
+        self.show_success_dialog = checked
+        self.config_manager.set('SETTINGS', 'show_success_dialog', checked)
 
     def open_image_for_conversion(self):
         input_path, _ = QFileDialog.getOpenFileName(
