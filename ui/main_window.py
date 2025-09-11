@@ -474,30 +474,25 @@ class GBABackgroundStudio(QMainWindow):
         self.apply_configuration_to_menu()
 
     def show_contribute(self):
-        contribute_text = """
-        <h3>❤️ Support GBA Background Studio Development</h3>
-        
-        <p>If you're enjoying this application and find it useful for your 
-        Game Boy Advance development projects, please consider supporting 
-        my work!</p>
-        
-        <p>Your support helps me continue developing and improving this tool, 
-        adding new features, and providing regular updates.</p>
-        
-        <p><b>You can support me with a donation at:</b></p>
-        <p style="text-align: center; font-size: 14px;">
-            <a href="https://ko-fi.com/compumax">https://ko-fi.com/compumax</a>
-        </p>
-        
-        <p>Every contribution, no matter how small, makes a big difference 
-        and is greatly appreciated! Thank you for using GBA Background Studio. 🎮</p>
-        """
+        contribute_text = self.translator.tr("contribute_text")
         
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(self.translator.tr("support_development"))
+        msg_box.setWindowTitle(self.translator.tr("contribute_title"))
         msg_box.setTextFormat(Qt.RichText)
         msg_box.setText(contribute_text)
         msg_box.setIcon(QMessageBox.Information)
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec()
+
+    def show_about(self):
+        about_text = self.translator.tr("about_text")
+        
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(self.translator.tr("about_title"))
+        msg_box.setTextFormat(Qt.RichText)
+        msg_box.setText(about_text)
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setTextInteractionFlags(Qt.TextBrowserInteraction)
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec()
 
@@ -535,33 +530,6 @@ class GBABackgroundStudio(QMainWindow):
             if grid_was_visible:
                 self.grid_manager.set_grid_visible(True)
 
-    def show_about(self):
-        about_text = """
-        <h3>GBA Background Studio</h3>
-        <p>A comprehensive tool for creating and editing Game Boy Advance background graphics.</p>
-
-        <p><b>📥 Downloads:</b>
-        <a href="https://github.com/CompuMaxx">GitHub Repository</a></p>
-
-        <p><b>💬 Contact:</b>
-        Discord: <a href="https://discordapp.com/users/213803341988364289">CompuMax</a></p>
-
-        <p><b>👨‍💻 Developer:</b>
-        CompuMax</p>
-
-        <p><b>© Copyright 2025</b>
-        All rights reserved</p>
-        """
-        
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(self.translator.tr("about_title"))
-        msg_box.setTextFormat(Qt.RichText)
-        msg_box.setText(about_text)
-        msg_box.setIcon(QMessageBox.Information)
-        msg_box.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec()
-        
     def load_conversion_results(self):
         tiles_path = "output/tiles.png"
         preview_path = "temp/preview/preview.png"
