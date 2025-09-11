@@ -110,4 +110,5 @@ output/*.*
 *.jpeg  
 *.png  
 *.gif  
-*.bmp
+*.bmp  
+*.ini  
