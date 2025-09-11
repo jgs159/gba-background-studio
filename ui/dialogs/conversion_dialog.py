@@ -4,7 +4,7 @@ import sys
 import time
 import subprocess
 from PIL import Image as PilImage
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap, QPainter, QFont
 from core.image_utils import pil_to_qimage
 from core.main import main as converter_main
@@ -36,34 +36,72 @@ class ConversionDialog(QDialog):
         def __init__(self, parent=None):
             super().__init__(parent)
             self._is_auto = True
-            self.setRange(1, 256)
-            self.setSpecialValueText("Auto (256 - start)")
-            super().setValue(1)
+            self.setRange(0, 256)
+            super().setValue(0)
+            self.dialog = None
+
+        def set_dialog(self, dialog):
+            self.dialog = dialog
+            if hasattr(self.dialog, 'start_index'):
+                self.dialog.start_index.valueChanged.connect(
+                    lambda value: self.check_and_update(value)
+                )
+
+        def check_and_update(self, start_value):
+            if self._is_auto:
+                self.update()
+                if self.lineEdit():
+                    self.lineEdit().setText(self.textFromValue(0))
+            else:
+                current_size = self.value()
+                if start_value + current_size > 256:
+                    self._is_auto = True
+                    super().setValue(0)
+                    self.update()
+                    if self.lineEdit():
+                        self.lineEdit().setText(self.textFromValue(0))
 
         def setValue(self, value):
             if value == 0:
-                super().setValue(1)
                 self._is_auto = True
             else:
-                super().setValue(value)
                 self._is_auto = False
+            super().setValue(value)
+            self.update()
 
         def value(self):
-            if self._is_auto:
-                return 0
             return super().value()
 
         def textFromValue(self, value):
-            if self._is_auto:
-                return "Auto (256 - start)"
+            if self._is_auto and hasattr(self, 'dialog') and self.dialog:
+                try:
+                    start_val = self.dialog.start_index.value()
+                    calculated = 256 - start_val
+                    return str(calculated)
+                except:
+                    return "256"
             return super().textFromValue(value)
 
         def valueFromText(self, text):
-            if text.strip() == "Auto (256 - start)":
+            if text == "0":
                 self._is_auto = True
-                return 1
+                return 0
+            
+            if hasattr(self, 'dialog') and self.dialog:
+                try:
+                    start_val = self.dialog.start_index.value()
+                    auto_value = 256 - start_val
+                    if text == str(auto_value):
+                        self._is_auto = True
+                        return 0
+                except:
+                    pass
+            
             self._is_auto = False
-            return super().valueFromText(text)
+            try:
+                return int(text)
+            except:
+                return 0
 
         def stepEnabled(self):
             if self._is_auto:
@@ -90,6 +128,7 @@ class ConversionDialog(QDialog):
         self.setWindowTitle("Convert Image to Tilemap")
         self.setFixedSize(844, 558)
         self.setup_ui()
+        self.load_conversion_settings()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -230,32 +269,30 @@ class ConversionDialog(QDialog):
         self.start_index = QSpinBox()
         self.start_index.setRange(0, 255)
         self.start_index.setValue(0)
-        self.start_index.valueChanged.connect(self.on_8bpp_param_changed)
-        self.start_index.setVisible(False)  # Hide initially
+        self.start_index.setVisible(False)
 
         self.palette_size = self.AutoSpinBox()
-        self.palette_size.valueChanged.connect(self.on_8bpp_param_changed)
-        self.palette_size.setVisible(False)  # Hide initially
+        self.palette_size.setVisible(False)
 
-        self.size_warning = QLabel("")
-        self.size_warning.setStyleSheet("QLabel { color: #cc0000; font-weight: bold; }")
-        self.size_warning.setVisible(False)
-
-        # Add fields to main form (this automatically creates two columns)
+        # Add fields to main form
         form_layout.addRow("Palette Start Index:", self.start_index)
         form_layout.addRow("Palette Size:", self.palette_size)
-        form_layout.addRow("", self.size_warning)
 
-        # Create containers to group visibility (but keep them in main layout)
-        self.bpp8_widgets = [self.start_index, self.palette_size, self.size_warning]
-        self.bpp8_labels = []  # Store labels to be able to hide them too
+        # Create containers to group visibility
+        self.bpp8_widgets = [self.start_index, self.palette_size]
+        self.bpp8_labels = []
 
         # Find labels in layout and store them
         for i in range(form_layout.rowCount()):
             item = form_layout.itemAt(i, QFormLayout.LabelRole)
             if item and item.widget() and item.widget().text() in ["Palette Start Index:", "Palette Size:"]:
                 self.bpp8_labels.append(item.widget())
-                item.widget().setVisible(False)  # Hide labels initially
+                item.widget().setVisible(False)
+
+        # Configurar después de crear todos los widgets
+        self.palette_size.set_dialog(self)
+        self.start_index.valueChanged.connect(self._handle_start_index_change)
+        self.palette_size.valueChanged.connect(self.update_8bpp_size)
 
         # --transparent-color
         self.transparent_color = QLineEdit("0,0,0")
@@ -362,6 +399,10 @@ class ConversionDialog(QDialog):
         self.on_output_size_changed()
         self.on_bpp_changed()
 
+    def _handle_start_index_change(self, value):
+        self.palette_size.update()
+        QTimer.singleShot(10, self.update_8bpp_size)
+
     def on_palette_tilemap_toggled(self):
         use_palettes = self.use_palettes_radio.isChecked()
         self.palettes_widget_container.setVisible(use_palettes)
@@ -399,27 +440,14 @@ class ConversionDialog(QDialog):
             self.palettes_widget_container.setVisible(use_palettes)
             self.tilemap_file_container.setVisible(not use_palettes)
         
-        self.update_8bpp_size()
-
-    def update_8bpp_size(self):
-        self.bpp8_container.setVisible(self.bpp_combo.currentIndex() == 1)
-
-    def on_8bpp_param_changed(self):
-        self.update_8bpp_size()
+        if hasattr(self, 'palette_size'):
+            self.palette_size.update()
 
     def update_8bpp_size(self):
         start = self.start_index.value()
         raw_size = self.palette_size.value()
-        auto_size = 256 - start
-        current_size = auto_size if raw_size == 0 else raw_size
-        total = start + current_size
-        if total > 256:
-            self.size_warning.setText("❌ Overflow: max 256")
-            self.size_warning.setVisible(True)
-            self.convert_btn.setEnabled(False)
-        else:
-            self.size_warning.setVisible(False)
-            self.convert_btn.setEnabled(True)
+        
+        self.convert_btn.setEnabled(True)
 
     def on_palette_toggled(self):
         if not any(cb.isChecked() for cb in self.palette_checks):
@@ -473,7 +501,6 @@ class ConversionDialog(QDialog):
         self.output_height_tiles = h_tiles
 
     def on_convert(self):
-        # Ocultar la grilla si está visible
         if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
             self.parent().grid_manager.is_grid_visible()):
             self.grid_was_visible = True
@@ -590,16 +617,15 @@ class ConversionDialog(QDialog):
             if self.parent() and hasattr(self.parent(), 'load_conversion_results'):
                 self.parent().load_conversion_results()
             
-            # Restaurar la grilla si estaba visible antes de la conversión
             if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
                 self.grid_was_visible):
                 self.parent().grid_manager.set_grid_visible(True)
             
+            self.save_conversion_settings(params)
             show_success_dialog(self)
             time.sleep(0.3)
             self.accept()
         except Exception as e:
-            # También restaurar la grilla en caso de error
             if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
                 self.grid_was_visible):
                 self.parent().grid_manager.set_grid_visible(True)
@@ -608,3 +634,81 @@ class ConversionDialog(QDialog):
             QApplication.processEvents()
             QMessageBox.critical(self, "Error", f"Conversion failed: {str(e)}")
             self.convert_btn.setEnabled(True)
+
+    def load_conversion_settings(self):
+        if not (self.parent() and hasattr(self.parent(), 'config_manager') and 
+                self.parent().save_conversion_params):
+            return
+        
+        try:
+            config = self.parent().config_manager
+            
+            bpp_index = int(config.get('CONVERSION', 'bpp', '0'))
+            if 0 <= bpp_index <= 1:
+                self.bpp_combo.setCurrentIndex(bpp_index)
+            
+            if bpp_index == 0:
+                use_palettes = config.getboolean('CONVERSION', 'use_palettes', True)
+                if use_palettes:
+                    self.use_palettes_radio.setChecked(True)
+                else:
+                    self.use_tilemap_radio.setChecked(True)
+                
+                palettes_str = config.get('CONVERSION', 'selected_palettes', '0')
+                selected_palettes = list(map(int, palettes_str.split(',')))
+                for i, cb in enumerate(self.palette_checks):
+                    cb.setChecked(i in selected_palettes)
+            
+            self.transparent_color.setText(config.get('CONVERSION', 'transparent_color', '0,0,0'))
+            self.extra_transparent.setValue(int(config.get('CONVERSION', 'extra_transparent', '0')))
+            self.tileset_width.setValue(int(config.get('CONVERSION', 'tileset_width', '0')))
+            self.origin.setText(config.get('CONVERSION', 'origin', '0,0'))
+            
+            output_size = config.get('CONVERSION', 'output_size', 'Original')
+            index = self.output_combo.findText(output_size)
+            if index >= 0:
+                self.output_combo.setCurrentIndex(index)
+                self.on_output_size_changed()
+            
+            self.custom_width.setValue(int(config.get('CONVERSION', 'custom_width', '32')))
+            self.custom_height.setValue(int(config.get('CONVERSION', 'custom_height', '20')))
+            
+            self.start_index.setValue(int(config.get('CONVERSION', 'start_index', '0')))
+            self.palette_size.setValue(int(config.get('CONVERSION', 'palette_size', '1')))
+            
+            if hasattr(self, 'palette_size'):
+                self.palette_size.update()
+            
+        except Exception as e:
+            print(f"Error loading conversion settings: {e}")
+
+    def save_conversion_settings(self, params):
+        if not (self.parent() and hasattr(self.parent(), 'config_manager') and 
+                self.parent().save_conversion_params):
+            return
+        
+        try:
+            config = self.parent().config_manager
+            
+            config.set('CONVERSION', 'bpp', str(self.bpp_combo.currentIndex()))
+            
+            if self.bpp_combo.currentIndex() == 0:
+                config.set('CONVERSION', 'use_palettes', str(self.use_palettes_radio.isChecked()))
+                
+                selected_palettes = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
+                config.set('CONVERSION', 'selected_palettes', ','.join(map(str, selected_palettes)))
+            
+            config.set('CONVERSION', 'transparent_color', self.transparent_color.text())
+            config.set('CONVERSION', 'extra_transparent', str(self.extra_transparent.value()))
+            config.set('CONVERSION', 'tileset_width', str(self.tileset_width.value()))
+            config.set('CONVERSION', 'origin', self.origin.text())
+            
+            config.set('CONVERSION', 'output_size', self.output_combo.currentText())
+            config.set('CONVERSION', 'custom_width', str(self.custom_width.value()))
+            config.set('CONVERSION', 'custom_height', str(self.custom_height.value()))
+            
+            config.set('CONVERSION', 'start_index', str(self.start_index.value()))
+            config.set('CONVERSION', 'palette_size', str(self.palette_size.value()))
+            
+        except Exception as e:
+            print(f"Error saving conversion settings: {e}")

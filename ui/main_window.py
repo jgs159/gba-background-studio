@@ -103,6 +103,96 @@ class GBABackgroundStudio(QMainWindow):
 
         self.setup_grids()
 
+        if self.load_last_output:
+            self.load_last_output_files()
+
+    def load_configuration(self):
+        self.save_preview_files = self.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
+        self.keep_transparent_color = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
+        self.keep_temp_files = self.config_manager.getboolean('SETTINGS', 'keep_temp_files', False)
+        self.load_last_output = self.config_manager.getboolean('SETTINGS', 'load_last_output', True)
+        self.save_conversion_params = self.config_manager.getboolean('SETTINGS', 'save_conversion_params', True)
+
+    def load_last_output_files(self):
+        tiles_path = "output/tiles.png"
+        preview_path = "temp/preview/preview.png"
+        palette_path = "temp/preview/palette.pal"
+        tilemap_path = "output/map.bin"
+        
+        if not (os.path.exists(tiles_path) and os.path.exists(tilemap_path)):
+            return False
+        
+        try:
+            tiles_img = PilImage.open(tiles_path)
+            self.display_tileset(tiles_img)
+            
+            with open(tilemap_path, 'rb') as f:
+                tilemap_data = f.read()
+            self.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path if os.path.exists(preview_path) else None)
+            
+            if os.path.exists(preview_path):
+                preview_img = PilImage.open(preview_path)
+                preview_qimg = pil_to_qimage(preview_img)
+                preview_pixmap = QPixmap.fromImage(preview_qimg)
+                
+                self.preview_tab.preview_image_scene.clear()
+                self.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
+                self.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
+                
+                self.apply_zoom_to_view(self.preview_tab.preview_image_view, self.zoom_level / 100.0)
+                if self.preview_tab.preview_image_scene.items():
+                    self.preview_tab.preview_image_view.centerOn(self.preview_tab.preview_image_scene.items()[0])
+            
+            if os.path.exists(palette_path):
+                palette_colors = [(0, 0, 0)] * 256
+                try:
+                    with open(palette_path, 'r', encoding='utf-8') as f:
+                        lines = [line.strip() for line in f 
+                                if line.strip() and not line.startswith(("JASC-PAL", "0100"))]
+                    
+                    if lines:
+                        color_count = int(lines[0])
+                        for i in range(1, min(1 + color_count, 257)):
+                            r, g, b = map(int, lines[i].split())
+                            palette_colors[i - 1] = (r, g, b)
+                            
+                    self.preview_tab.display_palette_colors(palette_colors)
+                except Exception as e:
+                    print(f"Error loading palette: {e}")
+                    grayscale_colors = generate_grayscale_palette()
+                    self.preview_tab.display_palette_colors(grayscale_colors)
+            
+            self.sync_palettes_tab()
+            
+            self.menu_bar.action_save_tileset.setEnabled(True)
+            self.menu_bar.action_append_tiles.setEnabled(True)
+            self.menu_bar.action_open_tilemap.setEnabled(True)
+            self.menu_bar.action_save_tilemap.setEnabled(True)
+            self.menu_bar.action_save_selection.setEnabled(True)
+            
+            self.current_status_message = self.translator.tr("last_output_loaded")
+            self.custom_status_bar.show_message(self.current_status_message)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error loading last output: {e}")
+            return False
+
+    def toggle_load_last_output(self, checked):
+        self.load_last_output = checked
+        self.config_manager.set('SETTINGS', 'load_last_output', checked)
+        status = 'Enabled' if checked else 'Disabled'
+        self.current_status_message = self.translator.tr("load_last_output_status").format(status=status)
+        self.custom_status_bar.show_message(self.current_status_message)
+
+    def toggle_save_conversion_params(self, checked):
+        self.save_conversion_params = checked
+        self.config_manager.set('SETTINGS', 'save_conversion_params', checked)
+        status = 'Enabled' if checked else 'Disabled'
+        self.current_status_message = self.translator.tr("save_conversion_params_status").format(status=status)
+        self.custom_status_bar.show_message(self.current_status_message)
+
     def on_tab_changed(self, index):
         current_tab = self.main_tabs.widget(index)
         
@@ -124,7 +214,6 @@ class GBABackgroundStudio(QMainWindow):
         self.edit_palettes_tab.edit_tilemap2_view.wheelEvent = lambda event: self.zoom_wheel_event(self.edit_palettes_tab.edit_tilemap2_view, event)
 
     def zoom_wheel_event(self, view, event):
-        """Manejar evento de rueda del ratón para zoom con Ctrl"""
         if event.modifiers() & Qt.ControlModifier:
             if event.angleDelta().y() > 0:
                 self.zoom_in()
@@ -140,12 +229,16 @@ class GBABackgroundStudio(QMainWindow):
         self.save_preview_files = self.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
         self.keep_transparent_color = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
         self.keep_temp_files = self.config_manager.getboolean('SETTINGS', 'keep_temp_files', False)
-
+        self.load_last_output = self.config_manager.getboolean('SETTINGS', 'load_last_output', False)
+        self.save_conversion_params = self.config_manager.getboolean('SETTINGS', 'save_conversion_params', False)
+    
     def apply_configuration_to_menu(self):
         if hasattr(self, 'menu_bar'):
             self.menu_bar.action_save_preview.setChecked(self.save_preview_files)
             self.menu_bar.action_keep_transparent.setChecked(self.keep_transparent_color)
             self.menu_bar.action_keep_temp.setChecked(self.keep_temp_files)
+            self.menu_bar.action_load_last_output.setChecked(self.load_last_output)
+            self.menu_bar.action_save_conversion_params.setChecked(self.save_conversion_params)
             
             theme = self.config_manager.get('SETTINGS', 'theme', 'light')
             for theme_code, action in self.menu_bar.theme_actions.items():
@@ -160,7 +253,6 @@ class GBABackgroundStudio(QMainWindow):
         self.custom_status_bar.show_message(self.current_status_message)
 
     def open_image_for_conversion(self):
-        """Open image for conversion (File -> Open Image)"""
         input_path, _ = QFileDialog.getOpenFileName(
             self,
             self.translator.tr("open_image"),
@@ -174,7 +266,6 @@ class GBABackgroundStudio(QMainWindow):
         dialog.exec()
 
     def open_tileset(self):
-        """Open tileset image (Tileset -> Open)"""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             self.translator.tr("open_tileset"),
@@ -185,11 +276,9 @@ class GBABackgroundStudio(QMainWindow):
             return
         
         try:
-            # Load and display the tileset in Edit Tiles tab
             pil_img = PilImage.open(file_path)
             self.display_tileset(pil_img)
             
-            # Switch to Edit Tiles tab
             self.main_tabs.setCurrentIndex(1)
 
         except Exception as e:
@@ -417,21 +506,34 @@ class GBABackgroundStudio(QMainWindow):
         self.apply_zoom_to_view(self.edit_tiles_tab.edit_tileset_view, self.zoom_level / 100.0)
 
     def sync_palettes_tab(self):
-        if hasattr(self, 'preview_tab') and hasattr(self.preview_tab, 'palette_colors'):
-            self.edit_palettes_tab.display_palette_colors(self.preview_tab.palette_colors)
+        grid_was_visible = self.grid_manager.is_grid_visible()
+        if grid_was_visible:
+            self.grid_manager.set_grid_visible(False)
+        
+        try:
+            if hasattr(self, 'preview_tab') and hasattr(self.preview_tab, 'palette_colors'):
+                self.edit_palettes_tab.display_palette_colors(self.preview_tab.palette_colors)
 
-        if hasattr(self, 'edit_tiles_tab') and hasattr(self.edit_tiles_tab, 'edit_tilemap_scene'):
-            self.edit_palettes_tab.display_tilemap_replica(self.edit_tiles_tab.edit_tilemap_scene)
-            self.edit_palettes_tab.update_palette_overlay(
-                self.edit_tiles_tab.edit_tilemap_scene,
-                self.edit_tiles_tab.tilemap_data,
-                self.edit_tiles_tab.tilemap_width,
-                self.edit_tiles_tab.tilemap_height
-            )
+            if hasattr(self, 'edit_tiles_tab') and hasattr(self.edit_tiles_tab, 'edit_tilemap_scene'):
+                self.edit_palettes_tab.display_tilemap_replica(self.edit_tiles_tab.edit_tilemap_scene)
+                self.edit_palettes_tab.update_palette_overlay(
+                    self.edit_tiles_tab.edit_tilemap_scene,
+                    self.edit_tiles_tab.tilemap_data,
+                    self.edit_tiles_tab.tilemap_width,
+                    self.edit_tiles_tab.tilemap_height
+                )
+                
+                self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
+                self.edit_palettes_tab.tilemap_width = self.edit_tiles_tab.tilemap_width
+                self.edit_palettes_tab.tilemap_height = self.edit_tiles_tab.tilemap_height
             
-            self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
-            self.edit_palettes_tab.tilemap_width = self.edit_tiles_tab.tilemap_width
-            self.edit_palettes_tab.tilemap_height = self.edit_tiles_tab.tilemap_height
+            if grid_was_visible:
+                self.grid_manager.set_grid_visible(True)
+                
+        except Exception as e:
+            print(f"Error syncing palettes tab: {e}")
+            if grid_was_visible:
+                self.grid_manager.set_grid_visible(True)
 
     def show_about(self):
         about_text = """
@@ -559,3 +661,83 @@ class CustomGraphicsView(QGraphicsView):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+
+    def load_last_output_files(self):
+        grid_was_visible = self.grid_manager.is_grid_visible()
+        if grid_was_visible:
+            self.grid_manager.set_grid_visible(False)
+        
+        tiles_path = "output/tiles.png"
+        preview_path = "temp/preview/preview.png"
+        palette_path = "temp/preview/palette.pal"
+        tilemap_path = "output/map.bin"
+        
+        if not (os.path.exists(tiles_path) and os.path.exists(tilemap_path)):
+            if grid_was_visible:
+                self.grid_manager.set_grid_visible(True)
+            return False
+        
+        try:
+            tiles_img = PilImage.open(tiles_path)
+            self.display_tileset(tiles_img)
+            
+            with open(tilemap_path, 'rb') as f:
+                tilemap_data = f.read()
+            self.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path if os.path.exists(preview_path) else None)
+            
+            if os.path.exists(preview_path):
+                preview_img = PilImage.open(preview_path)
+                preview_qimg = pil_to_qimage(preview_img)
+                preview_pixmap = QPixmap.fromImage(preview_qimg)
+                
+                self.preview_tab.preview_image_scene.clear()
+                self.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
+                self.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
+                
+                self.apply_zoom_to_view(self.preview_tab.preview_image_view, self.zoom_level / 100.0)
+                if self.preview_tab.preview_image_scene.items():
+                    self.preview_tab.preview_image_view.centerOn(self.preview_tab.preview_image_scene.items()[0])
+            
+            if os.path.exists(palette_path):
+                palette_colors = [(0, 0, 0)] * 256
+                try:
+                    with open(palette_path, 'r', encoding='utf-8') as f:
+                        lines = [line.strip() for line in f 
+                                if line.strip() and not line.startswith(("JASC-PAL", "0100"))]
+                    
+                    if lines:
+                        color_count = int(lines[0])
+                        for i in range(1, min(1 + color_count, 257)):
+                            r, g, b = map(int, lines[i].split())
+                            palette_colors[i - 1] = (r, g, b)
+                            
+                    self.preview_tab.display_palette_colors(palette_colors)
+                except Exception as e:
+                    print(f"Error loading palette: {e}")
+                    grayscale_colors = generate_grayscale_palette()
+                    self.preview_tab.display_palette_colors(grayscale_colors)
+            
+            self.sync_palettes_tab()
+            
+            self.menu_bar.action_save_tileset.setEnabled(True)
+            self.menu_bar.action_append_tiles.setEnabled(True)
+            self.menu_bar.action_open_tilemap.setEnabled(True)
+            self.menu_bar.action_save_tilemap.setEnabled(True)
+            self.menu_bar.action_save_selection.setEnabled(True)
+            
+            if grid_was_visible:
+                self.grid_manager.set_grid_visible(True)
+            
+            self.current_status_message = self.translator.tr("last_output_loaded")
+            self.custom_status_bar.show_message(self.current_status_message)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error loading last output: {e}")
+            if grid_was_visible:
+                self.grid_manager.set_grid_visible(True)
+            return False
+
+    def get_config_manager(self):
+        return self.config_manager

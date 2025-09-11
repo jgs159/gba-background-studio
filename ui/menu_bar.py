@@ -115,7 +115,7 @@ class MenuBar:
         self.action_grid = view_menu.addAction(self.main_window.translator.tr("grid_toggle"))
         self.action_grid.setShortcut("Ctrl+G")
         self.action_grid.setCheckable(True)
-        # Establecer el estado inicial desde la configuración
+
         grid_visible = self.main_window.config_manager.getboolean('SETTINGS', 'show_grid', False)
         self.action_grid.setChecked(grid_visible)
         self.action_grid.triggered.connect(self.main_window.toggle_grid)
@@ -186,6 +186,16 @@ class MenuBar:
         self.action_keep_temp = settings_menu.addAction(self.main_window.translator.tr("keep_temp"))
         self.action_keep_temp.setCheckable(True)
         self.action_keep_temp.triggered.connect(self.main_window.toggle_keep_temp)
+
+        self.action_load_last_output = settings_menu.addAction(self.main_window.translator.tr("load_last_output"))
+        self.action_load_last_output.setCheckable(True)
+        self.action_load_last_output.setChecked(self.main_window.load_last_output)
+        self.action_load_last_output.triggered.connect(self.main_window.toggle_load_last_output)
+
+        self.action_save_conversion_params = settings_menu.addAction(self.main_window.translator.tr("save_conversion_params"))
+        self.action_save_conversion_params.setCheckable(True)
+        self.action_save_conversion_params.setChecked(self.main_window.save_conversion_params)
+        self.action_save_conversion_params.triggered.connect(self.main_window.toggle_save_conversion_params)
 
         # Tools menu
         tools_menu = self.menu_bar.addMenu(self.main_window.translator.tr("tools_menu"))

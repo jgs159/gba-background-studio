@@ -18,7 +18,25 @@ class ConfigManager:
                 'theme': 'light',
                 'save_preview_files': 'False',
                 'keep_transparent_color': 'False',
-                'keep_temp_files': 'False'
+                'keep_temp_files': 'False',
+                'load_last_output': 'False',
+                'save_conversion_params': 'False',
+                'load_last_output': 'False',
+                'save_conversion_params': 'False'
+            },
+            self.config['CONVERSION'] = {
+                'bpp': '4',
+                'use_palettes': 'True',
+                'selected_palettes': '0',
+                'transparent_color': '0,0,0',
+                'extra_transparent': '0',
+                'tileset_width': '0',
+                'origin': '0,0',
+                'output_size': 'Original',
+                'custom_width': '32',
+                'custom_height': '20',
+                'start_index': '0',
+                'palette_size': '1'
             }
             self.save_config()
     
