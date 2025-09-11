@@ -169,10 +169,7 @@ class GBABackgroundStudio(QMainWindow):
             self.menu_bar.action_open_tilemap.setEnabled(True)
             self.menu_bar.action_save_tilemap.setEnabled(True)
             self.menu_bar.action_save_selection.setEnabled(True)
-            
-            self.current_status_message = self.translator.tr("last_output_loaded")
-            self.custom_status_bar.show_message(self.current_status_message)
-            
+
             return True
             
         except Exception as e:
@@ -183,15 +180,11 @@ class GBABackgroundStudio(QMainWindow):
         self.load_last_output = checked
         self.config_manager.set('SETTINGS', 'load_last_output', checked)
         status = 'Enabled' if checked else 'Disabled'
-        self.current_status_message = self.translator.tr("load_last_output_status").format(status=status)
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def toggle_save_conversion_params(self, checked):
         self.save_conversion_params = checked
         self.config_manager.set('SETTINGS', 'save_conversion_params', checked)
         status = 'Enabled' if checked else 'Disabled'
-        self.current_status_message = self.translator.tr("save_conversion_params_status").format(status=status)
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def on_tab_changed(self, index):
         current_tab = self.main_tabs.widget(index)
@@ -247,10 +240,6 @@ class GBABackgroundStudio(QMainWindow):
             language = self.config_manager.get('SETTINGS', 'language', 'english')
             for lang_code, action in self.menu_bar.language_actions.items():
                 action.setChecked(lang_code == language)
-
-    def show_color_rgb(self, r, g, b):
-        self.current_status_message = self.translator.tr("rgb_values").format(r=r, g=g, b=b)
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def open_image_for_conversion(self):
         input_path, _ = QFileDialog.getOpenFileName(
@@ -314,30 +303,22 @@ class GBABackgroundStudio(QMainWindow):
             self.menu_bar.action_grid.setChecked(grid_visible)
 
     def open_palette(self):
-        self.current_status_message = self.translator.tr("open_palette_not_implemented")
-        self.custom_status_bar.show_message(self.current_status_message)
+        pass
 
     def save_palette(self):
-        self.current_status_message = self.translator.tr("save_palette_not_implemented")
-        self.custom_status_bar.show_message(self.current_status_message)
+        pass
 
     def toggle_save_preview(self, checked):
         self.save_preview_files = checked
         self.config_manager.set('SETTINGS', 'save_preview_files', checked)
-        self.current_status_message = self.translator.tr("save_preview_status").format(status='Enabled' if checked else 'Disabled')
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def toggle_keep_transparent(self, checked):
         self.keep_transparent_color = checked
         self.config_manager.set('SETTINGS', 'keep_transparent_color', checked)
-        self.current_status_message = self.translator.tr("keep_transparent_status").format(status='Enabled' if checked else 'Disabled')
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def toggle_keep_temp(self, checked):
         self.keep_temp_files = checked
         self.config_manager.set('SETTINGS', 'keep_temp_files', checked)
-        self.current_status_message = self.translator.tr("keep_temp_status").format(status='Enabled' if checked else 'Disabled')
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def reset_zoom(self):
         self.current_zoom_index = 0
@@ -351,8 +332,6 @@ class GBABackgroundStudio(QMainWindow):
             self.zoom_level = self.zoom_levels[self.current_zoom_index]
             self.apply_zoom_to_all()
             self.update_hover_from_current_cursor()
-            self.current_status_message = self.translator.tr("zoom_level", level=f"{self.zoom_level}%")
-            self.custom_status_bar.show_message(self.current_status_message)
 
     def zoom_out(self):
         if self.current_zoom_index > 0:
@@ -360,8 +339,6 @@ class GBABackgroundStudio(QMainWindow):
             self.zoom_level = self.zoom_levels[self.current_zoom_index]
             self.apply_zoom_to_all()
             self.update_hover_from_current_cursor()
-            self.current_status_message = self.translator.tr("zoom_level", level=f"{self.zoom_level}%")
-            self.custom_status_bar.show_message(self.current_status_message)
 
     def apply_zoom_to_all(self):
         zoom_factor = self.zoom_level / 100.0
@@ -430,8 +407,6 @@ class GBABackgroundStudio(QMainWindow):
         self.config_manager.set('SETTINGS', 'show_grid', checked)
         
         status = "Enabled" if checked else "Disabled"
-        self.current_status_message = self.translator.tr("grid_status").format(status=status)
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def toggle_status_bar(self, checked):
         self.custom_status_bar.setVisible(checked)
@@ -443,8 +418,6 @@ class GBABackgroundStudio(QMainWindow):
             action.setChecked(lang_code == language_code)
         
         self.retranslate_ui()
-        self.current_status_message = self.translator.tr("language_changed", lang=language_code)
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def change_theme(self, theme_code):
         for theme_c, action in self.menu_bar.theme_actions.items():
@@ -454,17 +427,11 @@ class GBABackgroundStudio(QMainWindow):
         
         from utils.theme_manager import apply_theme
         apply_theme(theme_code)
-        
-        self.current_status_message = self.translator.tr("theme_changed").format(theme=theme_code)
-        self.custom_status_bar.show_message(self.current_status_message)
 
     def retranslate_ui(self):
         self.main_tabs.setTabText(0, self.translator.tr("preview_tab"))
         self.main_tabs.setTabText(1, self.translator.tr("edit_tiles_tab"))
         self.main_tabs.setTabText(2, self.translator.tr("edit_palettes_tab"))
-        
-        self.current_status_message = self.translator.tr("ready_status")
-        self.custom_status_bar.show_message(self.current_status_message)
         
         self.recreate_menu()
 
@@ -580,10 +547,7 @@ class GBABackgroundStudio(QMainWindow):
                 print(f"Error loading palette: {e}")
                 grayscale_colors = generate_grayscale_palette()
                 self.preview_tab.display_palette_colors(grayscale_colors)
-
-        self.current_status_message = self.translator.tr("conversion_completed")
-        self.custom_status_bar.show_message(self.current_status_message)
-        
+      
         self.menu_bar.action_save_tileset.setEnabled(True)
         self.menu_bar.action_append_tiles.setEnabled(True)
         self.menu_bar.action_open_tilemap.setEnabled(True)
@@ -695,9 +659,6 @@ class CustomGraphicsView(QGraphicsView):
             
             if grid_was_visible:
                 self.grid_manager.set_grid_visible(True)
-            
-            self.current_status_message = self.translator.tr("last_output_loaded")
-            self.custom_status_bar.show_message(self.current_status_message)
             
             return True
             

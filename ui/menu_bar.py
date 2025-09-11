@@ -243,15 +243,11 @@ class MenuBar:
                 if os.path.isfile(source_path):
                     shutil.copy2(source_path, target_path)
             
-            self.main_window.current_status_message = self.main_window.translator.tr("files_exported").format(path=target_dir)
-            self.main_window.custom_status_bar.show_message(self.main_window.current_status_message)
             QMessageBox.information(self.main_window, self.main_window.translator.tr("export_complete"), 
                                   self.main_window.translator.tr("export_success").format(path=target_dir))
             
         except Exception as e:
             error_msg = self.main_window.translator.tr("export_error").format(error=str(e))
-            self.main_window.current_status_message = error_msg
-            self.main_window.custom_status_bar.show_message(self.main_window.current_status_message)
             QMessageBox.warning(self.main_window, self.main_window.translator.tr("export_error_title"), error_msg)
 
     def show_logs_in_explorer(self):
@@ -272,11 +268,7 @@ class MenuBar:
                     import subprocess
                     subprocess.run(['xdg-open', logs_dir])
             
-            self.main_window.current_status_message = self.main_window.translator.tr("opened_logs_directory")
-            self.main_window.custom_status_bar.show_message(self.main_window.current_status_message)
             
         except Exception as e:
-            self.main_window.current_status_message = self.main_window.translator.tr("error_opening_logs").format(error=str(e))
-            self.main_window.custom_status_bar.show_message(self.main_window.current_status_message)
             QMessageBox.warning(self.main_window, self.main_window.translator.tr("error"), 
                               self.main_window.translator.tr("could_not_open_logs").format(error=str(e)))
