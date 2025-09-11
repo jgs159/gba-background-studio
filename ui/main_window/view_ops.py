@@ -1,0 +1,101 @@
+# ui/main_window/view_ops.py
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QGraphicsView
+
+def setup_wheel_events(main_window):
+    main_window.preview_tab.preview_image_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.preview_tab.preview_image_view, event)
+    main_window.edit_tiles_tab.edit_tileset_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_tiles_tab.edit_tileset_view, event)
+    main_window.edit_tiles_tab.edit_tilemap_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_tiles_tab.edit_tilemap_view, event)
+    main_window.edit_palettes_tab.edit_palettes_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_palettes_tab.edit_palettes_view, event)
+    main_window.edit_palettes_tab.edit_tilemap2_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_palettes_tab.edit_tilemap2_view, event)
+
+def zoom_wheel_event(main_window, view, event):
+    if event.modifiers() & Qt.ControlModifier:
+        if event.angleDelta().y() > 0:
+            zoom_in(main_window)
+        else:
+            zoom_out(main_window)
+        event.accept()
+        
+        from .tab_ops import update_hover_from_current_cursor
+        update_hover_from_current_cursor(main_window)
+    else:
+        QGraphicsView.wheelEvent(view, event)
+
+def reset_zoom(main_window):
+    main_window.current_zoom_index = 0
+    main_window.zoom_level = main_window.zoom_levels[main_window.current_zoom_index]
+    apply_zoom_to_all(main_window)
+    from .tab_ops import update_hover_from_current_cursor
+    update_hover_from_current_cursor(main_window)
+
+def zoom_in(main_window):
+    if main_window.current_zoom_index < len(main_window.zoom_levels) - 1:
+        main_window.current_zoom_index += 1
+        main_window.zoom_level = main_window.zoom_levels[main_window.current_zoom_index]
+        apply_zoom_to_all(main_window)
+        from .tab_ops import update_hover_from_current_cursor
+        update_hover_from_current_cursor(main_window)
+
+def zoom_out(main_window):
+    if main_window.current_zoom_index > 0:
+        main_window.current_zoom_index -= 1
+        main_window.zoom_level = main_window.zoom_levels[main_window.current_zoom_index]
+        apply_zoom_to_all(main_window)
+        from .tab_ops import update_hover_from_current_cursor
+        update_hover_from_current_cursor(main_window)
+
+def apply_zoom_to_all(main_window):
+    zoom_factor = main_window.zoom_level / 100.0
+
+    apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, zoom_factor)
+    apply_zoom_to_view(main_window, main_window.edit_tiles_tab.edit_tileset_view, zoom_factor)
+    apply_zoom_to_view(main_window, main_window.edit_tiles_tab.edit_tilemap_view, zoom_factor)
+    
+    main_window.edit_palettes_tab.apply_zoom(zoom_factor)
+    apply_zoom_to_view(main_window, main_window.edit_palettes_tab.edit_tilemap2_view, zoom_factor)
+
+    from .tab_ops import update_hover_from_current_cursor
+    update_hover_from_current_cursor(main_window)
+
+def apply_zoom_to_view(main_window, view, zoom_factor):
+    if view and view.scene() and view.scene().items():
+        view.resetTransform()
+        view.scale(zoom_factor, zoom_factor)
+        if view.scene().items():
+            view.centerOn(view.scene().items()[0])
+        
+        if (main_window.grid_manager.is_grid_visible() and 
+            _is_editor_view(main_window, view)):
+            view_name = _get_view_name(main_window, view)
+            if view_name:
+                main_window.grid_manager.update_grid_for_view(view_name)
+        
+        if view == main_window.edit_tiles_tab.edit_tileset_view:
+            if hasattr(main_window.edit_tiles_tab, 'selected_tile_pos') and main_window.edit_tiles_tab.selected_tile_pos != (-1, -1):
+                tile_x, tile_y = main_window.edit_tiles_tab.selected_tile_pos
+                main_window.edit_tiles_tab.highlight_selected_tile(tile_x, tile_y)
+
+def _is_editor_view(main_window, view):
+    editor_views = [
+        main_window.edit_tiles_tab.edit_tileset_view,
+        main_window.edit_tiles_tab.edit_tilemap_view,
+        main_window.edit_palettes_tab.edit_palettes_view,
+        main_window.edit_palettes_tab.edit_tilemap2_view
+    ]
+    return view in editor_views
+
+def _get_view_name(main_window, view):
+    if view == main_window.edit_tiles_tab.edit_tileset_view:
+        return "tileset"
+    elif view == main_window.edit_tiles_tab.edit_tilemap_view:
+        return "tilemap_edit"
+    elif view == main_window.edit_palettes_tab.edit_palettes_view:
+        return "palettes"
+    elif view == main_window.edit_palettes_tab.edit_tilemap2_view:
+        return "tilemap_palettes"
+    return None
+
+def apply_zoom_to_new_content(main_window, view):
+    if view:
+        apply_zoom_to_view(main_window, view, main_window.zoom_level / 100.0)
