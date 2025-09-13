@@ -90,7 +90,7 @@ class EditTilesTab(QWidget):
         self.main_window = parent
         self.selected_tile_id = 0
         self.last_tile_pos = (-1, -1)
-        self.last_hover_pos = (-1, -1)
+        self.last_hover_pos = (0, 0)
         self.tileset_img = None
         self.tiles_per_row = 0
         self.tilemap_width = 0
@@ -175,7 +175,8 @@ class EditTilesTab(QWidget):
         tile_y = max(0, min(int(pos.y()) // 8, max_tile_y))
         self.selected_tile_id = tile_y * self.tiles_per_row + tile_x
         self.highlight_selected_tile(tile_x, tile_y)
-        self.main_window.custom_status_bar.show_message(f"Tile selected: {self.selected_tile_id}")
+        # Actualizar status bar con la selección actual
+        self.update_status_bar(self.last_hover_pos[0], self.last_hover_pos[1])
 
     def highlight_selected_tile(self, tile_x, tile_y):
         self.selected_tile_pos = (tile_x, tile_y)
@@ -232,8 +233,8 @@ class EditTilesTab(QWidget):
             tx = (tile_id % self.tiles_per_row)
             ty = (tile_id // self.tiles_per_row)
             self.highlight_selected_tile(tx, ty)
-            self.main_window.custom_status_bar.show_message(f"Tile selected from map: {tile_id}")
         self.on_tilemap_hover(tile_x, tile_y)
+        self.update_status_bar(tile_x, tile_y)
 
     def edit_tile_at(self, tile_x, tile_y):
         if not self.tilemap_data:
@@ -258,7 +259,12 @@ class EditTilesTab(QWidget):
         self.tilemap_data = bytes(tilemap_data)
 
         self.update_single_tile_visual(tile_x, tile_y)
-        self.main_window.custom_status_bar.show_message(f"Tile {tile_index} updated with ID {self.selected_tile_id}")
+        
+        # SINCRONIZAR CON EDITOR DE PALETAS
+        if self.main_window and hasattr(self.main_window, 'edit_palettes_tab'):
+            self.main_window.edit_palettes_tab.tilemap_data = self.tilemap_data
+            # Actualizar visualización del tile en editor de paletas
+            self.main_window.edit_palettes_tab.update_single_tile_replica(tile_x, tile_y)
 
     def update_single_tile_visual(self, tile_x, tile_y):
         if not self.tileset_img or not self.tilemap_data:
@@ -391,3 +397,104 @@ class EditTilesTab(QWidget):
         
         if self.selected_tile_pos != (-1, -1):
             self.highlight_selected_tile(*self.selected_tile_pos)
+
+    def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
+        """Actualiza la status bar con la información del tile bajo el cursor - VISTA TILES"""
+        if not hasattr(self, 'main_window') or not self.main_window:
+            return
+        
+        # Siempre mostrar "Tile Selected" en esta vista
+        selection_type = "Tile"
+        selection_id = self.selected_tile_id
+        
+        # Obtener información del tile bajo el cursor (si no se proporciona)
+        if tile_id is None:
+            tile_id = 0
+            if hasattr(self, 'tilemap_data') and self.tilemap_data:
+                tile_index = tile_y * self.tilemap_width + tile_x
+                if 0 <= tile_index < len(self.tilemap_data) // 2:
+                    entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
+                    tile_id = entry & 0x3FF
+        
+        if palette_id is None and hasattr(self, 'tilemap_data') and self.tilemap_data:
+            tile_index = tile_y * self.tilemap_width + tile_x
+            if 0 <= tile_index < len(self.tilemap_data) // 2:
+                entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
+                palette_id = (entry >> 12) & 0xF
+                # Determinar flip state
+                h_flip = bool(entry & (1 << 10))
+                v_flip = bool(entry & (1 << 11))
+                if h_flip and v_flip:
+                    flip_state = "XY"
+                elif h_flip:
+                    flip_state = "X"
+                elif v_flip:
+                    flip_state = "Y"
+                else:
+                    flip_state = "None"
+        
+        if palette_id is None:
+            palette_id = 0
+        
+        if flip_state is None:
+            flip_state = "None"
+        
+        # Obtener el nivel de zoom actual
+        zoom_level = int(self.main_window.zoom_level)
+        
+        self.main_window.custom_status_bar.update_status(
+            selection_type=selection_type,
+            selection_id=selection_id,
+            tilemap_pos=(tile_x, tile_y),
+            tile_id=tile_id,
+            palette_id=palette_id,
+            flip_state=flip_state,
+            zoom_level=zoom_level
+        )
+
+    def on_tilemap_hover(self, tile_x, tile_y):
+        if (tile_x, tile_y) == self.last_hover_pos:
+            return
+        self.last_hover_pos = (tile_x, tile_y)
+        self.main_window.hover_manager.update_hover(tile_x, tile_y, self.edit_tilemap_view)
+        self.update_status_bar(tile_x, tile_y)
+
+
+    def setup_tileset_interaction(self):
+        self.edit_tileset_view.setInteractive(True)
+        self.edit_tileset_view.mousePressEvent = self.on_tileset_click
+        # Añadir hover al tileset
+        self.edit_tileset_view.mouseMoveEvent = self.on_tileset_hover
+        self.edit_tileset_view.leaveEvent = self.on_tileset_leave
+
+    def on_tileset_hover(self, event):
+        """Maneja el hover sobre el tileset"""
+        if not self.tileset_img:
+            return
+            
+        pos = self.edit_tileset_view.mapToScene(event.pos())
+        tile_x = max(0, min(int(pos.x()) // 8, self.tiles_per_row - 1))
+        max_tile_y = (self.tileset_img.height // 8) - 1
+        tile_y = max(0, min(int(pos.y()) // 8, max_tile_y))
+        tile_id = tile_y * self.tiles_per_row + tile_x
+        
+        # Actualizar status bar con el tile bajo el cursor
+        self.update_status_bar(0, 0, tile_id=tile_id)
+
+    def on_tileset_leave(self, event):
+        """Maneja cuando el cursor sale del tileset"""
+        # Restaurar información del tilemap al salir del tileset
+        if hasattr(self, 'last_hover_pos'):
+            self.update_status_bar(*self.last_hover_pos)
+
+    def on_tileset_click(self, event):
+        if event.button() != Qt.LeftButton or not self.tileset_img:
+            return
+        pos = self.edit_tileset_view.mapToScene(event.pos())
+        tile_x = max(0, min(int(pos.x()) // 8, self.tiles_per_row - 1))
+        max_tile_y = (self.tileset_img.height // 8) - 1
+        tile_y = max(0, min(int(pos.y()) // 8, max_tile_y))
+        self.selected_tile_id = tile_y * self.tiles_per_row + tile_x
+        self.highlight_selected_tile(tile_x, tile_y)
+        # Actualizar status bar con la selección
+        self.update_status_bar(self.last_hover_pos[0], self.last_hover_pos[1], tile_id=self.selected_tile_id)

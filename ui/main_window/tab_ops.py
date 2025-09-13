@@ -18,6 +18,20 @@ def on_tab_changed(main_window, index):
         update_hover_from_current_cursor(main_window)
     elif current_tab == main_window.edit_palettes_tab:
         update_hover_from_current_cursor(main_window)
+    if current_tab == main_window.edit_tiles_tab:
+        main_window.edit_tiles_tab.update_status_bar(0, 0)
+    elif current_tab == main_window.edit_palettes_tab:
+        main_window.edit_palettes_tab.update_status_bar(0, 0)
+    elif current_tab == main_window.preview_tab:
+        main_window.custom_status_bar.update_status(
+            selection_type="Tile",
+            selection_id=0,
+            tilemap_pos=(0, 0),
+            tile_id=0,
+            palette_id=0,
+            flip_state="None",
+            zoom_level=main_window.zoom_level
+        )
 
 def update_hover_from_current_cursor(main_window):
     current_tab = main_window.main_tabs.currentWidget()

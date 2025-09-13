@@ -57,6 +57,11 @@ def apply_zoom_to_all(main_window):
 
     from .tab_ops import update_hover_from_current_cursor
     update_hover_from_current_cursor(main_window)
+    current_tab = main_window.main_tabs.currentWidget()
+    if current_tab == main_window.edit_tiles_tab:
+        main_window.edit_tiles_tab.update_status_bar(*main_window.edit_tiles_tab.last_hover_pos)
+    elif current_tab == main_window.edit_palettes_tab:
+        main_window.edit_palettes_tab.update_status_bar(*main_window.edit_palettes_tab.last_hover_pos)
 
 def apply_zoom_to_view(main_window, view, zoom_factor):
     if view and view.scene() and view.scene().items():

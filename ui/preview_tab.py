@@ -125,7 +125,6 @@ class PreviewTab(QWidget):
         except Exception as e:
             if self.parent:
                 self.parent.current_status_message = f"Error opening output directory: {str(e)}"
-                self.parent.custom_status_bar.show_message(self.parent.current_status_message)
 
     def init_palette_150(self):
         """Initialize palette with 150% sized color squares (12x12 pixels)"""

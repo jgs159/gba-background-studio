@@ -103,7 +103,6 @@ def open_tileset(main_window):
 
     except Exception as e:
         main_window.current_status_message = main_window.translator.tr("error_loading_tileset").format(error=str(e))
-        main_window.custom_status_bar.show_message(main_window.current_status_message)
         QMessageBox.warning(main_window, main_window.translator.tr("error"), main_window.translator.tr("could_not_load_tileset").format(error=str(e)))
 
 def save_tileset(main_window):

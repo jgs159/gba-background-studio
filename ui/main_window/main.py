@@ -82,8 +82,17 @@ class GBABackgroundStudio(QMainWindow):
         self.main_tabs.addTab(self.edit_palettes_tab, self.translator.tr("edit_palettes_tab"))
 
         self.custom_status_bar = CustomStatusBar()
-        self.custom_status_bar.show_message(self.current_status_message)
         main_layout.addWidget(self.custom_status_bar)
+
+        self.custom_status_bar.update_status(
+            selection_type="Tile",
+            selection_id=0,
+            tilemap_pos=(0, 0),
+            tile_id=0,
+            palette_id=0,
+            flip_state="None",
+            zoom_level=100
+        )
 
         self.menu_bar = MenuBar(self)
         
@@ -120,6 +129,34 @@ class GBABackgroundStudio(QMainWindow):
                 
         except Exception as e:
             print(f"Error setting window icon: {e}")
+
+    def sync_between_editors(self):
+        """Sincroniza cambios entre los editores de tiles y paletas"""
+        if hasattr(self, 'edit_tiles_tab') and hasattr(self, 'edit_palettes_tab'):
+            # Sincronizar tilemap data entre ambos editores
+            if hasattr(self.edit_tiles_tab, 'tilemap_data'):
+                self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
+            
+            if hasattr(self.edit_palettes_tab, 'tilemap_data'):
+                self.edit_tiles_tab.tilemap_data = self.edit_palettes_tab.tilemap_data
+            
+            # Forzar redibujado de ambos editores
+            if hasattr(self.edit_tiles_tab, 'tilemap_data') and self.edit_tiles_tab.tilemap_data:
+                # Reconstruir la visualización del editor de tiles
+                self.edit_tiles_tab.load_tilemap(
+                    self.edit_tiles_tab.tilemap_data,
+                    "output/tiles.png" if hasattr(self.edit_tiles_tab, 'tileset_img') and self.edit_tiles_tab.tileset_img else None,
+                    "temp/preview/preview.png" if os.path.exists("temp/preview/preview.png") else None
+                )
+            
+            if hasattr(self.edit_palettes_tab, 'tilemap_data') and self.edit_palettes_tab.tilemap_data:
+                # Reconstruir la visualización del editor de paletas
+                self.edit_palettes_tab.update_palette_overlay(
+                    self.edit_tiles_tab.edit_tilemap_scene,
+                    self.edit_palettes_tab.tilemap_data,
+                    self.edit_palettes_tab.tilemap_width,
+                    self.edit_palettes_tab.tilemap_height
+                )
 
     def load_configuration(self):
         from .config import load_configuration
