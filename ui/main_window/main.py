@@ -18,10 +18,12 @@ class GBABackgroundStudio(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config_manager = ConfigManager()
-        
+
+        self.set_window_icon()
+
         from .config import load_configuration
         load_configuration(self)
-        
+
         self.translator = Translator(lang_dir="lang", default_lang=self.config_manager.get('SETTINGS', 'language', 'english'))
 
         self.setWindowTitle("GBA Background Studio")
@@ -93,6 +95,31 @@ class GBABackgroundStudio(QMainWindow):
 
         self.hover_manager.register_view(self.edit_tiles_tab.edit_tilemap_view)
         self.hover_manager.register_view(self.edit_palettes_tab.edit_tilemap2_view)
+
+    def set_window_icon(self):
+        try:
+            from PySide6.QtGui import QIcon
+            
+            app_icon = QIcon()
+            icon_sizes = [
+                ("icons/icon_16x16.png", 16),
+                ("icons/icon_32x32.png", 32),
+                ("icons/icon_64x64.png", 64),
+                ("icons/icon_128x128.png", 128),
+                ("icons/icon_256x256.png", 256),
+                ("icon.png", 512)
+            ]
+            
+            for icon_path, size in icon_sizes:
+                full_path = os.path.join("assets", icon_path)
+                if os.path.exists(full_path):
+                    app_icon.addFile(full_path)
+            
+            if not app_icon.isNull():
+                self.setWindowIcon(app_icon)
+                
+        except Exception as e:
+            print(f"Error setting window icon: {e}")
 
     def load_configuration(self):
         from .config import load_configuration

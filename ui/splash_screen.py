@@ -11,43 +11,44 @@ class GBASplashScreen(QSplashScreen):
         splash_width = 500
         splash_height = 300
         
-        pixmap = QPixmap(splash_width, splash_height)
-        pixmap.fill(QColor(40, 40, 60))
-        
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(QColor(255, 255, 255))
-        
-        splash_image = None
         splash_path = os.path.join("assets", "splash.png")
         if os.path.exists(splash_path):
             try:
-                splash_image = QPixmap(splash_path)
-                if not splash_image.isNull():
-                    scaled_image = splash_image.scaled(400, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    x_pos = (splash_width - scaled_image.width()) // 2
-                    y_pos = 20
-                    painter.drawPixmap(x_pos, y_pos, scaled_image)
+                pixmap = QPixmap(splash_path)
             except Exception as e:
-                print(f"Error loading splash image: {e}")
+                pixmap = QPixmap(splash_width, splash_height)
+                pixmap.fill(QColor(40, 40, 60))
+        else:
+            pixmap = QPixmap(splash_width, splash_height)
+            pixmap.fill(QColor(40, 40, 60))
+        
+        if pixmap.width() == 500 and pixmap.height() == 300:
+            pass
+        else:
+            background = QPixmap(splash_width, splash_height)
+            background.fill(QColor(40, 40, 60))
+            
+            painter = QPainter(background)
+            scaled = pixmap.scaled(splash_width, splash_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            x = (splash_width - scaled.width()) // 2
+            y = (splash_height - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+            painter.end()
+            
+            pixmap = background
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
         
         presents_text = self._tr_splash("splash_presents", "CompuMax Productions Present:")
-        title_text = "GBA Background Studio"
         
-        presents_font = painter.font()
-        presents_font.setPointSize(12)
-        presents_font.setItalic(True)
-        painter.setFont(presents_font)
+        font = painter.font()
+        font.setPointSize(12)
+        font.setItalic(True)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255))
         
         painter.drawText(0, 175, splash_width, 30, Qt.AlignCenter, presents_text)
-        
-        title_font = painter.font()
-        title_font.setPointSize(20)
-        title_font.setBold(True)
-        title_font.setItalic(False)
-        painter.setFont(title_font)
-        painter.drawText(0, 200, splash_width, 40, Qt.AlignCenter, title_text)
-        
         painter.end()
         
         super().__init__(pixmap)
@@ -77,12 +78,12 @@ class GBASplashScreen(QSplashScreen):
         """)
         
         self.setCursor(Qt.BusyCursor)
-    
+
     def _tr_splash(self, key, default_text):
         if self.translator and hasattr(self.translator, 'translations'):
             return self.translator.translations.get(key, default_text)
         return default_text
-    
+
     def set_progress(self, value, message=""):
         self.progress_bar.setValue(value)
         if message:

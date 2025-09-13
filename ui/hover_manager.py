@@ -29,6 +29,11 @@ class HoverManager:
             
         cursor_pos = view.mapFromGlobal(QCursor.pos())
         
+        viewport_rect = view.viewport().rect()
+        if not viewport_rect.contains(cursor_pos):
+            self.hide_hover(view)
+            return
+        
         scene_pos = view.mapToScene(cursor_pos)
         
         tile_x = int(scene_pos.x() // 8)
@@ -91,7 +96,10 @@ class HoverManager:
             zoom_factor = self.parent_view.transform().m11()
             size = int(8 * zoom_factor)
             
-            self.setGeometry(point.x(), point.y(), size, size)
+            corrected_x = point.x() + 1
+            corrected_y = point.y() + 1
+            
+            self.setGeometry(corrected_x, corrected_y, size, size)
             self.update()
 
         def hide(self):
@@ -108,4 +116,5 @@ class HoverManager:
             painter.setRenderHint(QPainter.Antialiasing, False)
             painter.setPen(self.pen)
             painter.setBrush(Qt.NoBrush)
-            painter.drawRect(1, 1, self.width() - 2, self.height() - 2)
+            
+            painter.drawRect(0, 0, self.width() - 1, self.height() - 1)

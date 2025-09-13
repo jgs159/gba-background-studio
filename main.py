@@ -14,7 +14,18 @@ def main():
         sys.path.insert(0, script_dir)
     
     from PySide6.QtWidgets import QApplication
+    from PySide6.QtGui import QIcon
     app = QApplication(sys.argv)
+    
+    icon_path = os.path.join("assets", "icon.png")
+    if os.path.exists(icon_path):
+        try:
+            app_icon = QIcon(icon_path)
+            app.setWindowIcon(app_icon)
+        except Exception as e:
+            pass
+    else:
+        pass
     
     language = "english"
     try:
@@ -22,7 +33,7 @@ def main():
         config_manager = ConfigManager()
         language = config_manager.get('SETTINGS', 'language', 'english')
     except Exception as e:
-        print(f"Error loading config, using default English: {e}")
+        pass
     
     from utils.translator import Translator
     translator = Translator(lang_dir="lang", default_lang=language)
@@ -53,7 +64,6 @@ def main():
             time.sleep(0.03)
             
         except Exception as e:
-            print(f"Error precargando {module_name}: {e}")
             continue
     
     splash.set_progress(90, "Initializing interface...")
@@ -61,6 +71,12 @@ def main():
     
     from ui.main_window import GBABackgroundStudio
     window = GBABackgroundStudio()
+    
+    if os.path.exists(icon_path):
+        try:
+            window.setWindowIcon(app_icon)
+        except Exception as e:
+            pass
     
     splash.set_progress(100, "Ready!")
     time.sleep(0.2)

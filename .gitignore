@@ -106,9 +106,15 @@ config.ini
 *.tmp  
 *.txt  
 
-# Ignore common image files  
+# === Graphics and Assets ===
+# Ignore common image files EXCEPT assets/
 *.jpg  
 *.jpeg  
 *.png  
 *.gif  
-*.bmp  
+*.bmp
+!assets/icon.png
+!assets/splash.png
+!assets/**/*.png
+!assets/**/*.ico
+!assets/**/*.svg
