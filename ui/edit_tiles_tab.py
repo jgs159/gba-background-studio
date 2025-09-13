@@ -317,25 +317,37 @@ class EditTilesTab(QWidget):
                 self.main_window.grid_manager.update_grid_for_view("tileset")
 
     def load_tilemap(self, tilemap_data, tileset_path, preview_path=None):
-        from PIL import Image as PilImage
         self.tilemap_data = tilemap_data
         self.tileset_img = PilImage.open(tileset_path)
         self.tiles_per_row = self.tileset_img.width // 8
         if preview_path:
             try:
                 preview_img = PilImage.open(preview_path)
-                if preview_img.size == (240, 160):
-                    self.tilemap_width = 30
-                    self.tilemap_height = 20
+                self.tilemap_width = preview_img.width // 8
+                self.tilemap_height = preview_img.height // 8
+            except:
+                total_tiles = len(tilemap_data) // 2
+                if total_tiles == 256:
+                    self.tilemap_width = 16
+                    self.tilemap_height = 16
+                elif total_tiles == 1024:
+                    self.tilemap_width = 32
+                    self.tilemap_height = 32
                 else:
                     self.tilemap_width = 32
-                    self.tilemap_height = (len(tilemap_data) // 2 + 31) // 32
-            except:
-                self.tilemap_width = 32
-                self.tilemap_height = (len(tilemap_data) // 2 + 31) // 32
+                    self.tilemap_height = (total_tiles + 31) // 32
         else:
-            self.tilemap_width = 32
-            self.tilemap_height = (len(tilemap_data) // 2 + 31) // 32
+            total_tiles = len(tilemap_data) // 2
+            
+            if total_tiles == 256:
+                self.tilemap_width = 16
+                self.tilemap_height = 16
+            elif total_tiles == 1024:
+                self.tilemap_width = 32
+                self.tilemap_height = 32
+            else:
+                self.tilemap_width = 32
+                self.tilemap_height = (total_tiles + 31) // 32
 
         w = self.tilemap_width * 8
         h = self.tilemap_height * 8
