@@ -9,10 +9,10 @@ from PySide6.QtCore import Qt
 
 from PIL import Image as PilImage
 from core.image_utils import pil_to_qimage
+from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 
 
 class PaletteGridView(QGraphicsView):
-    """4x4 grid of 8x8 tiles with colored squares and hex labels (no border)"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setStyleSheet("QGraphicsView { border: none; background: transparent; }")
@@ -90,7 +90,6 @@ class PaletteGridView(QGraphicsView):
             self.highlight_selected_palette(*self.selected_palette_pos)
 
     def paintSelectionOverlay(self, event):
-        """Método para pintar el borde de selección en el overlay"""
         if self.selected_palette_pos == (-1, -1):
             return
             
@@ -102,86 +101,13 @@ class PaletteGridView(QGraphicsView):
         painter.drawRect(0.5, 0.5, self.selection_overlay.width() - 1, self.selection_overlay.height() - 1)
 
 
-class CustomGraphicsView(QGraphicsView):
-    """Vista personalizada para habilitar dibujo continuo en el tilemap"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setMouseTracking(True)
-        self._is_drawing = False
-        self.on_tile_drawing = None
-        self.on_tile_selected = None
-        self.on_tile_hover = None
-        self.on_tile_leave = None
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._is_drawing = True
-            pos = self.mapToScene(event.pos())
-            if self.scene() and self.scene().sceneRect().isValid():
-                tile_x = max(0, min(int(pos.x()) // 8, int(self.sceneRect().width()) // 8 - 1))
-                tile_y = max(0, min(int(pos.y()) // 8, int(self.sceneRect().height()) // 8 - 1))
-                if self.on_tile_drawing:
-                    self.on_tile_drawing(tile_x, tile_y)
-            event.accept()
-        elif event.button() == Qt.RightButton:
-            pos = self.mapToScene(event.pos())
-            if self.scene() and self.scene().sceneRect().isValid():
-                tile_x = max(0, min(int(pos.x()) // 8, int(self.sceneRect().width()) // 8 - 1))
-                tile_y = max(0, min(int(pos.y()) // 8, int(self.sceneRect().height()) // 8 - 1))
-                if self.on_tile_selected:
-                    self.on_tile_selected(tile_x, tile_y)
-            event.accept()
-        else:
-            super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        pos = self.mapToScene(event.pos())
-        if not self.scene() or not pos or not self.scene().sceneRect().isValid():
-            if self.on_tile_leave:
-                self.on_tile_leave()
-            super().mouseMoveEvent(event)
-            return
-
-        tile_x = max(0, min(int(pos.x()) // 8, int(self.sceneRect().width()) // 8 - 1))
-        tile_y = max(0, min(int(pos.y()) // 8, int(self.sceneRect().height()) // 8 - 1))
-
-        scene_rect = self.scene().sceneRect()
-        if (tile_x < 0 or tile_y < 0 or 
-            tile_x >= scene_rect.width() // 8 or 
-            tile_y >= scene_rect.height() // 8):
-            if self.on_tile_leave:
-                self.on_tile_leave()
-            super().mouseMoveEvent(event)
-            return
-
-        if self.on_tile_hover:
-            self.on_tile_hover(tile_x, tile_y)
-
-        if self._is_drawing and (event.buttons() & Qt.LeftButton) and self.on_tile_drawing:
-            self.on_tile_drawing(tile_x, tile_y)
-            event.accept()
-        else:
-            event.accept()
-            super().mouseMoveEvent(event)
-
-    def leaveEvent(self, event):
-        if self.on_tile_leave:
-            self.on_tile_leave()
-        super().leaveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._is_drawing = False
-        super().mouseReleaseEvent(event)
-
-
 class EditPalettesTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent
         self.selected_palette_id = 0
         self.last_palette_pos = (-1, -1)
-        self.last_hover_pos = (0, 0)
+        self.last_hover_pos = (-1, -1)
         self.tilemap_width = 0
         self.tilemap_height = 0
         self.tilemap_data = None
@@ -223,9 +149,13 @@ class EditPalettesTab(QWidget):
         top_layout.setSpacing(0)
 
         self.grid_view = PaletteGridView()
-        self.grid_view.mousePressEvent = self.on_palette_grid_click
         top_layout.addWidget(self.grid_view, 0, Qt.AlignLeft | Qt.AlignTop)
         top_layout.addStretch()
+
+        self.grid_view.setMouseTracking(True)
+        self.grid_view.mouseMoveEvent = self.on_palette_grid_hover
+        self.grid_view.leaveEvent = self.on_palette_grid_leave
+        self.grid_view.mousePressEvent = self.on_palette_grid_click
 
         palettes_layout.addWidget(height_container)
 
@@ -271,6 +201,8 @@ class EditPalettesTab(QWidget):
 
         self.setup_tilemap_interaction()
         self.highlight_selected_palette(0, 0)
+      
+        self.update_status_bar(-1, -1)
 
     def setup_tilemap_interaction(self):
         self.edit_tilemap2_view.on_tile_drawing = self.on_tilemap_drawing
@@ -281,15 +213,36 @@ class EditPalettesTab(QWidget):
     def on_palette_grid_click(self, event):
         if event.button() == Qt.LeftButton:
             pos = self.grid_view.mapToScene(event.pos())
+            
+            if not (0 <= pos.x() < 32 and 0 <= pos.y() < 32):
+                return
+            
             palette_x = max(0, min(int(pos.x()) // 8, 3))
             palette_y = max(0, min(int(pos.y()) // 8, 3))
             self.selected_palette_id = palette_y * 4 + palette_x
             self.highlight_selected_palette(palette_x, palette_y)
-            if self.main_window:
-                # Mostrar en hexadecimal
-                palette_hex = f"{self.selected_palette_id:X}"
-            # Actualizar status bar con la selección actual
-            self.update_status_bar(self.last_hover_pos[0], self.last_hover_pos[1])
+            self.update_status_bar(self.last_hover_pos[0], self.last_hover_pos[1], palette_id=self.selected_palette_id)
+
+    def on_palette_grid_hover(self, event):
+        super(QGraphicsView, self.grid_view).mouseMoveEvent(event)
+        
+        pos = self.grid_view.mapToScene(event.pos())
+        
+        if (0 <= pos.x() < 32 and 0 <= pos.y() < 32):
+            palette_x = max(0, min(int(pos.x()) // 8, 3))
+            palette_y = max(0, min(int(pos.y()) // 8, 3))
+            palette_id = palette_y * 4 + palette_x
+            self.update_status_bar(-1, -1, palette_id=palette_id)
+        else:
+            self.update_status_bar(-1, -1, palette_id=self.selected_palette_id)
+
+    def on_palette_grid_leave(self, event):
+        QGraphicsView.leaveEvent(self.grid_view, event)
+        
+        if hasattr(self, 'last_hover_pos') and self.last_hover_pos != (-1, -1):
+            self.update_status_bar(*self.last_hover_pos)
+        else:
+            self.update_status_bar(-1, -1, palette_id=self.selected_palette_id)
 
     def highlight_selected_palette(self, palette_x, palette_y):
         self.grid_view.highlight_selected_palette(palette_x, palette_y)
@@ -297,13 +250,21 @@ class EditPalettesTab(QWidget):
     def on_tilemap_leave(self):
         self.main_window.hover_manager.hide_hover(self.edit_tilemap2_view)
         self.last_hover_pos = (-1, -1)
+        self.update_status_bar(-1, -1)
 
     def on_tilemap_hover(self, tile_x, tile_y):
-        if (tile_x, tile_y) == self.last_hover_pos:
-            return
-        self.last_hover_pos = (tile_x, tile_y)
-        self.main_window.hover_manager.update_hover(tile_x, tile_y, self.edit_tilemap2_view)
-        self.update_status_bar(tile_x, tile_y)
+        scene_rect = self.edit_tilemap2_scene.sceneRect()
+        max_tile_x = int(scene_rect.width()) // 8 - 1
+        max_tile_y = int(scene_rect.height()) // 8 - 1
+        
+        if (0 <= tile_x <= max_tile_x and 0 <= tile_y <= max_tile_y):
+            self.last_hover_pos = (tile_x, tile_y)
+            self.main_window.hover_manager.update_hover(tile_x, tile_y, self.edit_tilemap2_view)
+            self.update_status_bar(tile_x, tile_y)
+        else:
+            self.last_hover_pos = (-1, -1)
+            self.main_window.hover_manager.hide_hover(self.edit_tilemap2_view)
+            self.update_status_bar(-1, -1)
 
     def on_tilemap_drawing(self, tile_x, tile_y):
         if self.selected_palette_id is None or not self.tilemap_data:
@@ -323,7 +284,6 @@ class EditPalettesTab(QWidget):
             py = (palette_id // 4)
             self.highlight_selected_palette(px, py)
         self.on_tilemap_hover(tile_x, tile_y)
-        self.update_status_bar(tile_x, tile_y)
 
     def edit_palette_at(self, tile_x, tile_y):
         if not self.tilemap_data:
@@ -357,17 +317,11 @@ class EditPalettesTab(QWidget):
 
         self.update_palette_overlay_for_tile(tile_x, tile_y, self.selected_palette_id)
         
-        # SINCRONIZAR CON EDITOR DE TILES
         if self.main_window and hasattr(self.main_window, 'edit_tiles_tab'):
             self.main_window.edit_tiles_tab.tilemap_data = self.tilemap_data
-            # Actualizar visualización del tile en editor de tiles
             self.main_window.edit_tiles_tab.update_single_tile_visual(tile_x, tile_y)
-        
-        if self.main_window:
-            palette_hex = f"{self.selected_palette_id:X}"
 
     def update_palette_overlay_for_tile(self, tile_x, tile_y, palette_id):
-        """Actualiza solo el overlay de paleta para un tile específico"""
         x = tile_x * 8
         y = tile_y * 8
         
@@ -412,7 +366,6 @@ class EditPalettesTab(QWidget):
         return pixmap.scaled(8, 8, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
 
     def display_tilemap_replica(self, source_scene):
-        """Copia el tilemap base (una vez)"""
         self.edit_tilemap2_scene.clear()
         self.overlay_items.clear()
         if source_scene.items():
@@ -426,7 +379,6 @@ class EditPalettesTab(QWidget):
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
 
     def update_palette_overlay(self, source_scene, tilemap_data, tile_width, tile_height):
-        """Dibuja el overlay de paletas completo (solo al cargar)"""
         if not source_scene.items() or not tilemap_data:
             return
 
@@ -465,7 +417,6 @@ class EditPalettesTab(QWidget):
         x_pos = tile_x * 8
         y_pos = tile_y * 8
         
-        # Buscar el tile actualizado en el editor de tiles
         new_pixmap = None
         for item in source_scene.items():
             if isinstance(item, QGraphicsPixmapItem):
@@ -476,7 +427,6 @@ class EditPalettesTab(QWidget):
         if not new_pixmap:
             return
         
-        # Remover el tile viejo
         for item in self.edit_tilemap2_scene.items():
             if (isinstance(item, QGraphicsPixmapItem) and 
                 int(item.x()) == x_pos and 
@@ -485,12 +435,10 @@ class EditPalettesTab(QWidget):
                 self.edit_tilemap2_scene.removeItem(item)
                 break
         
-        # Añadir el tile nuevo
         pixmap_item = self.edit_tilemap2_scene.addPixmap(new_pixmap)
         pixmap_item.setPos(x_pos, y_pos)
         pixmap_item.setZValue(0)
 
-        # Actualizar overlay de paleta
         if hasattr(self, 'tilemap_data') and self.tilemap_data:
             tile_index = tile_y * self.tilemap_width + tile_x
             if tile_index < len(self.tilemap_data) // 2:
@@ -514,90 +462,16 @@ class EditPalettesTab(QWidget):
                 self.main_window.grid_manager.update_grid_for_view("palettes")
 
     def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
-        """Actualiza la status bar con la información del tile bajo el cursor - VISTA PALETAS"""
-        if not hasattr(self, 'main_window') or not self.main_window:
-            return
-        
-        # Siempre mostrar "Palette Selected" en esta vista
-        selection_type = "Palette"
-        selection_id = self.selected_palette_id
-        
-        # Obtener información del tile bajo el cursor (si no se proporciona)
-        if tile_id is None:
-            tile_id = 0
-            if hasattr(self, 'tilemap_data') and self.tilemap_data:
-                tile_index = tile_y * self.tilemap_width + tile_x
-                if 0 <= tile_index < len(self.tilemap_data) // 2:
-                    entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-                    tile_id = entry & 0x3FF
-        
-        if palette_id is None:
-            palette_id = self.selected_palette_id
-        
-        if flip_state is None and hasattr(self, 'tilemap_data') and self.tilemap_data:
-            tile_index = tile_y * self.tilemap_width + tile_x
-            if 0 <= tile_index < len(self.tilemap_data) // 2:
-                entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-                # Determinar flip state
-                h_flip = bool(entry & (1 << 10))
-                v_flip = bool(entry & (1 << 11))
-                if h_flip and v_flip:
-                    flip_state = "XY"
-                elif h_flip:
-                    flip_state = "X"
-                elif v_flip:
-                    flip_state = "Y"
-                else:
-                    flip_state = "None"
-        
-        if flip_state is None:
-            flip_state = "None"
-        
-        # Obtener el nivel de zoom actual
-        zoom_level = int(self.main_window.zoom_level)
-        
-        self.main_window.custom_status_bar.update_status(
-            selection_type=selection_type,
-            selection_id=selection_id,
-            tilemap_pos=(tile_x, tile_y),
+        update_status_bar_shared(
+            main_window=self.main_window,
+            selection_type="Palette",
+            selection_id=self.selected_palette_id,
+            tile_x=tile_x,
+            tile_y=tile_y,
+            tilemap_data=self.tilemap_data if hasattr(self, 'tilemap_data') else None,
+            tilemap_width=self.tilemap_width if hasattr(self, 'tilemap_width') else 0,
+            tilemap_height=self.tilemap_height if hasattr(self, 'tilemap_height') else 0,
             tile_id=tile_id,
             palette_id=palette_id,
-            flip_state=flip_state,
-            zoom_level=zoom_level
+            flip_state=flip_state
         )
-
-    def setup_tilemap_interaction(self):
-        self.edit_tilemap2_view.on_tile_drawing = self.on_tilemap_drawing
-        self.edit_tilemap2_view.on_tile_selected = self.on_tilemap_right_click
-        self.edit_tilemap2_view.on_tile_hover = self.on_tilemap_hover
-        self.edit_tilemap2_view.on_tile_leave = self.on_tilemap_leave
-        
-        # Añadir hover a la grid de paletas
-        self.grid_view.mouseMoveEvent = self.on_palette_grid_hover
-        self.grid_view.leaveEvent = self.on_palette_grid_leave
-
-    def on_palette_grid_hover(self, event):
-        """Maneja el hover sobre la grid de paletas"""
-        pos = self.grid_view.mapToScene(event.pos())
-        palette_x = max(0, min(int(pos.x()) // 8, 3))
-        palette_y = max(0, min(int(pos.y()) // 8, 3))
-        palette_id = palette_y * 4 + palette_x
-        
-        # Actualizar status bar con la paleta bajo el cursor
-        self.update_status_bar(0, 0, palette_id=palette_id)
-
-    def on_palette_grid_leave(self, event):
-        """Maneja cuando el cursor sale de la grid de paletas"""
-        # Restaurar información del tilemap al salir de la grid
-        if hasattr(self, 'last_hover_pos'):
-            self.update_status_bar(*self.last_hover_pos)
-
-    def on_palette_grid_click(self, event):
-        if event.button() == Qt.LeftButton:
-            pos = self.grid_view.mapToScene(event.pos())
-            palette_x = max(0, min(int(pos.x()) // 8, 3))
-            palette_y = max(0, min(int(pos.y()) // 8, 3))
-            self.selected_palette_id = palette_y * 4 + palette_x
-            self.highlight_selected_palette(palette_x, palette_y)
-            # Actualizar status bar con la selección
-            self.update_status_bar(self.last_hover_pos[0], self.last_hover_pos[1], palette_id=self.selected_palette_id)

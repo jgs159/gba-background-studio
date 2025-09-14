@@ -86,10 +86,10 @@ class GBABackgroundStudio(QMainWindow):
 
         self.custom_status_bar.update_status(
             selection_type="Tile",
-            selection_id=0,
-            tilemap_pos=(0, 0),
-            tile_id=0,
-            palette_id=0,
+            selection_id="-",
+            tilemap_pos=(-1, -1),
+            tile_id="-",
+            palette_id="-",
             flip_state="None",
             zoom_level=100
         )
@@ -131,18 +131,14 @@ class GBABackgroundStudio(QMainWindow):
             print(f"Error setting window icon: {e}")
 
     def sync_between_editors(self):
-        """Sincroniza cambios entre los editores de tiles y paletas"""
         if hasattr(self, 'edit_tiles_tab') and hasattr(self, 'edit_palettes_tab'):
-            # Sincronizar tilemap data entre ambos editores
             if hasattr(self.edit_tiles_tab, 'tilemap_data'):
                 self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
             
             if hasattr(self.edit_palettes_tab, 'tilemap_data'):
                 self.edit_tiles_tab.tilemap_data = self.edit_palettes_tab.tilemap_data
             
-            # Forzar redibujado de ambos editores
             if hasattr(self.edit_tiles_tab, 'tilemap_data') and self.edit_tiles_tab.tilemap_data:
-                # Reconstruir la visualización del editor de tiles
                 self.edit_tiles_tab.load_tilemap(
                     self.edit_tiles_tab.tilemap_data,
                     "output/tiles.png" if hasattr(self.edit_tiles_tab, 'tileset_img') and self.edit_tiles_tab.tileset_img else None,
@@ -150,7 +146,6 @@ class GBABackgroundStudio(QMainWindow):
                 )
             
             if hasattr(self.edit_palettes_tab, 'tilemap_data') and self.edit_palettes_tab.tilemap_data:
-                # Reconstruir la visualización del editor de paletas
                 self.edit_palettes_tab.update_palette_overlay(
                     self.edit_tiles_tab.edit_tilemap_scene,
                     self.edit_palettes_tab.tilemap_data,

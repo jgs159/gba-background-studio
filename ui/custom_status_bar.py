@@ -4,7 +4,6 @@ from PySide6.QtCore import Qt
 
 
 class CustomStatusBar(QWidget):
-    """Custom status bar widget that displays at the bottom of the main window"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(24)
@@ -19,7 +18,6 @@ class CustomStatusBar(QWidget):
         layout.setContentsMargins(8, 2, 8, 2)
         layout.setSpacing(12)
         
-        # Campos de información
         self.selection_label = QLabel("Tile Selected: 0")
         self.tilemap_label = QLabel("Tilemap: (0, 0)")
         self.tile_label = QLabel("Tile: 0")
@@ -27,7 +25,6 @@ class CustomStatusBar(QWidget):
         self.flip_label = QLabel("Flip: None")
         self.zoom_label = QLabel("Zoom: 100%")
         
-        # Añadir todos los labels al layout
         layout.addWidget(self.selection_label)
         layout.addWidget(self.tilemap_label)
         layout.addWidget(self.tile_label)
@@ -36,21 +33,14 @@ class CustomStatusBar(QWidget):
         layout.addWidget(self.zoom_label)
         layout.addStretch()
         
-    def update_status(self, selection_type="Tile", selection_id=0, tilemap_pos=(0, 0), 
-                     tile_id=0, palette_id=0, flip_state="None", zoom_level=100):
-        """Actualiza toda la información de la status bar"""
-        # Convertir palette_id a hexadecimal
-        palette_hex = f"{palette_id:X}"  # Convierte a hexadecimal en mayúsculas
+    def update_status(self, selection_type="Tile", selection_id="-", tilemap_pos=(-1, -1), 
+                     tile_id="-", palette_id="-", flip_state="None", zoom_level=100):
+        self.selection_label.setText(f"{selection_type} Selected: {selection_id}")
         
-        # Convertir selection_id a hexadecimal si es una paleta
-        if selection_type == "Palette":
-            selection_display = f"{selection_id:X}"  # Hexadecimal para paletas
-        else:
-            selection_display = str(selection_id)    # Decimal para tiles
+        tilemap_display = f"({tilemap_pos[0]}, {tilemap_pos[1]})" if tilemap_pos != (-1, -1) else "(-, -)"
+        self.tilemap_label.setText(f"Tilemap: {tilemap_display}")
         
-        self.selection_label.setText(f"{selection_type} Selected: {selection_display}")
-        self.tilemap_label.setText(f"Tilemap: ({tilemap_pos[0]}, {tilemap_pos[1]})")
         self.tile_label.setText(f"Tile: {tile_id}")
-        self.palette_label.setText(f"Palette: {palette_hex}")
+        self.palette_label.setText(f"Palette: {palette_id}")
         self.flip_label.setText(f"Flip: {flip_state}")
         self.zoom_label.setText(f"Zoom: {zoom_level}%")

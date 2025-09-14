@@ -16,19 +16,17 @@ def on_tab_changed(main_window, index):
     
     if current_tab == main_window.edit_tiles_tab:
         update_hover_from_current_cursor(main_window)
+        main_window.edit_tiles_tab.update_status_bar(-1, -1)
     elif current_tab == main_window.edit_palettes_tab:
         update_hover_from_current_cursor(main_window)
-    if current_tab == main_window.edit_tiles_tab:
-        main_window.edit_tiles_tab.update_status_bar(0, 0)
-    elif current_tab == main_window.edit_palettes_tab:
-        main_window.edit_palettes_tab.update_status_bar(0, 0)
+        main_window.edit_palettes_tab.update_status_bar(-1, -1)
     elif current_tab == main_window.preview_tab:
         main_window.custom_status_bar.update_status(
             selection_type="Tile",
-            selection_id=0,
-            tilemap_pos=(0, 0),
-            tile_id=0,
-            palette_id=0,
+            selection_id="-",
+            tilemap_pos=(-1, -1),
+            tile_id="-",
+            palette_id="-",
             flip_state="None",
             zoom_level=main_window.zoom_level
         )
