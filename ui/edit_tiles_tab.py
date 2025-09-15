@@ -219,6 +219,17 @@ class EditTilesTab(QWidget):
         if tile_index >= len(self.tilemap_data) // 2:
             return
 
+        old_entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
+        old_state = {
+            'tile_x': tile_x,
+            'tile_y': tile_y,
+            'old_tile_id': old_entry & 0x3FF,
+            'old_palette_id': (old_entry >> 12) & 0xF,
+            'old_h_flip': bool(old_entry & (1 << 10)),
+            'old_v_flip': bool(old_entry & (1 << 11)),
+            'new_tile_id': self.selected_tile_id
+        }
+
         current_entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
         current_tile_id = current_entry & 0x3FF
 
@@ -232,6 +243,14 @@ class EditTilesTab(QWidget):
         tilemap_data[tile_index * 2] = new_entry & 0xFF
         tilemap_data[tile_index * 2 + 1] = (new_entry >> 8) & 0xFF
         self.tilemap_data = bytes(tilemap_data)
+
+        if self.main_window and hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='tile_change',
+                editor_type='tiles',
+                data=old_state,
+                description=f"Tile changed at ({tile_x}, {tile_y})"
+            )
 
         self.update_single_tile_visual(tile_x, tile_y)
         

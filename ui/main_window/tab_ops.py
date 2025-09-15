@@ -93,6 +93,9 @@ def load_conversion_results(main_window):
         main_window.edit_palettes_tab.tilemap_width = main_window.edit_tiles_tab.tilemap_width
         main_window.edit_palettes_tab.tilemap_height = main_window.edit_tiles_tab.tilemap_height
 
+    if hasattr(main_window, 'history_manager'):
+        main_window.history_manager.clear()
+
     if os.path.exists(preview_path):
         preview_img = PilImage.open(preview_path)
         preview_qimg = pil_to_qimage(preview_img)

@@ -13,6 +13,8 @@ from utils.translator import Translator
 from core.config_manager import ConfigManager
 from ..hover_manager import HoverManager
 from ..grid_manager import GridManager
+from ..history_manager import HistoryManager
+
 
 class GBABackgroundStudio(QMainWindow):
     def __init__(self):
@@ -53,6 +55,8 @@ class GBABackgroundStudio(QMainWindow):
 
         self.setup_ui()
 
+        self.history_manager = HistoryManager()
+        self.history_manager.history_changed.connect(self.update_undo_redo_actions)
         self.main_tabs.currentChanged.connect(self.on_tab_changed)
 
         from .config import setup_grids
@@ -104,6 +108,44 @@ class GBABackgroundStudio(QMainWindow):
 
         self.hover_manager.register_view(self.edit_tiles_tab.edit_tilemap_view)
         self.hover_manager.register_view(self.edit_palettes_tab.edit_tilemap2_view)
+        self.update_undo_redo_actions()
+
+        if hasattr(self, 'history_manager'):
+            self.history_manager.history_changed.connect(self.update_undo_redo_actions)
+        
+        self.update_undo_redo_actions()
+
+    def keyPressEvent(self, event):
+        if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Z:
+            self.undo()
+            event.accept()
+            return
+            
+        elif event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Y:
+            self.redo()
+            event.accept()
+            return
+            
+        elif (event.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier) and 
+              event.key() == Qt.Key_Z):
+            self.redo()
+            event.accept()
+            return
+            
+        super().keyPressEvent(event)
+
+    def update_undo_redo_actions(self):
+        if not hasattr(self, 'menu_bar') or not hasattr(self, 'history_manager'):
+            return
+        
+        can_undo = self.history_manager.can_undo()
+        can_redo = self.history_manager.can_redo()
+        
+        if hasattr(self.menu_bar, 'action_undo'):
+            self.menu_bar.action_undo.setEnabled(can_undo)
+        
+        if hasattr(self.menu_bar, 'action_redo'):
+            self.menu_bar.action_redo.setEnabled(can_redo)
 
     def set_window_icon(self):
         try:
@@ -129,6 +171,112 @@ class GBABackgroundStudio(QMainWindow):
                 
         except Exception as e:
             print(f"Error setting window icon: {e}")
+
+    def undo(self):
+        if hasattr(self, 'history_manager'):
+            state = self.history_manager.undo()
+            if state:
+                self.apply_history_state(state, is_undo=True)
+
+    def redo(self):
+        if hasattr(self, 'history_manager'):
+            state = self.history_manager.redo()
+            if state:
+                self.apply_history_state(state, is_undo=False)
+
+    def apply_history_state(self, state, is_undo=True):
+        try:
+            if state['type'] == 'tile_change':
+                self.apply_tile_change(state, is_undo)
+            elif state['type'] == 'palette_change':
+                self.apply_palette_change(state, is_undo)
+                
+        except Exception as e:
+            print(f"Error applying history state: {e}")
+
+    def apply_tile_change(self, state, is_undo):
+        if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tilemap_data:
+            return
+        
+        if hasattr(self, 'history_manager'):
+            self.history_manager.is_undoing = True
+        
+        try:
+            tile_x = state['data']['tile_x']
+            tile_y = state['data']['tile_y']
+            
+            if is_undo:
+                tile_id = state['data']['old_tile_id']
+                palette_id = state['data']['old_palette_id']
+                h_flip = state['data']['old_h_flip']
+                v_flip = state['data']['old_v_flip']
+            else:
+                tile_id = state['data']['new_tile_id']
+                tile_index = tile_y * self.edit_tiles_tab.tilemap_width + tile_x
+                current_entry = self.edit_tiles_tab.tilemap_data[tile_index * 2] | (self.edit_tiles_tab.tilemap_data[tile_index * 2 + 1] << 8)
+                palette_id = (current_entry >> 12) & 0xF
+                h_flip = bool(current_entry & (1 << 10))
+                v_flip = bool(current_entry & (1 << 11))
+            
+            new_entry = tile_id
+            if h_flip:
+                new_entry |= (1 << 10)
+            if v_flip:
+                new_entry |= (1 << 11)
+            new_entry |= (palette_id << 12)
+
+            tilemap_data = bytearray(self.edit_tiles_tab.tilemap_data)
+            tile_index = tile_y * self.edit_tiles_tab.tilemap_width + tile_x
+            tilemap_data[tile_index * 2] = new_entry & 0xFF
+            tilemap_data[tile_index * 2 + 1] = (new_entry >> 8) & 0xFF
+            
+            self.edit_tiles_tab.tilemap_data = bytes(tilemap_data)
+            self.edit_tiles_tab.update_single_tile_visual(tile_x, tile_y)
+            
+            if hasattr(self, 'edit_palettes_tab'):
+                self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
+                self.edit_palettes_tab.update_palette_overlay_for_tile(tile_x, tile_y, palette_id)
+                
+        finally:
+            if hasattr(self, 'history_manager'):
+                self.history_manager.is_undoing = False
+
+    def apply_palette_change(self, state, is_undo):
+        if not hasattr(self, 'edit_palettes_tab') or not self.edit_palettes_tab.tilemap_data:
+            return
+            
+        tile_x = state['data']['tile_x']
+        tile_y = state['data']['tile_y']
+        
+        if is_undo:
+            palette_id = state['data']['old_palette_id']
+        else:
+            palette_id = state['data']['new_palette_id']
+        
+        tile_index = tile_y * self.edit_palettes_tab.tilemap_width + tile_x
+        current_entry = self.edit_palettes_tab.tilemap_data[tile_index * 2] | (self.edit_palettes_tab.tilemap_data[tile_index * 2 + 1] << 8)
+        
+        tile_id = current_entry & 0x3FF
+        h_flip = bool(current_entry & (1 << 10))
+        v_flip = bool(current_entry & (1 << 11))
+        
+        new_entry = tile_id
+        if h_flip:
+            new_entry |= (1 << 10)
+        if v_flip:
+            new_entry |= (1 << 11)
+        new_entry |= (palette_id << 12)
+
+        tilemap_data = bytearray(self.edit_palettes_tab.tilemap_data)
+        tilemap_data[tile_index * 2] = new_entry & 0xFF
+        tilemap_data[tile_index * 2 + 1] = (new_entry >> 8) & 0xFF
+        
+        self.edit_palettes_tab.tilemap_data = bytes(tilemap_data)
+        self.edit_palettes_tab.update_palette_overlay_for_tile(tile_x, tile_y, palette_id)
+        
+        if hasattr(self, 'edit_tiles_tab'):
+            self.edit_tiles_tab.tilemap_data = self.edit_palettes_tab.tilemap_data
+            self.edit_tiles_tab.update_single_tile_visual(tile_x, tile_y)
 
     def sync_between_editors(self):
         if hasattr(self, 'edit_tiles_tab') and hasattr(self, 'edit_palettes_tab'):

@@ -22,7 +22,10 @@ def load_last_output_files(main_window):
         with open(tilemap_path, 'rb') as f:
             tilemap_data = f.read()
         main_window.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path if os.path.exists(preview_path) else None)
-        
+
+        if hasattr(main_window, 'history_manager'):
+            main_window.history_manager.clear()
+
         if os.path.exists(preview_path):
             preview_img = PilImage.open(preview_path)
             preview_qimg = pil_to_qimage(preview_img)
@@ -99,6 +102,9 @@ def open_tileset(main_window):
         pil_img = PilImage.open(file_path)
         main_window.display_tileset(pil_img)
         
+        if hasattr(main_window, 'history_manager'):
+            main_window.history_manager.clear()
+        
         main_window.main_tabs.setCurrentIndex(1)
 
     except Exception as e:
@@ -112,7 +118,8 @@ def append_tiles(main_window):
     pass
 
 def open_tilemap(main_window):
-    pass
+    if hasattr(main_window, 'history_manager'):
+        main_window.history_manager.clear()
 
 def save_tilemap(main_window):
     pass

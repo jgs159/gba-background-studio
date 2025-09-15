@@ -80,12 +80,16 @@ class MenuBar:
 
         # Edit menu
         edit_menu = self.menu_bar.addMenu(self.main_window.translator.tr("edit_menu"))
-        action_undo = edit_menu.addAction(self.main_window.translator.tr("undo"))
-        action_undo.setShortcut("Ctrl+Z")
-        action_undo.setEnabled(False)
-        action_redo = edit_menu.addAction(self.main_window.translator.tr("redo"))
-        action_redo.setShortcut("Ctrl+Y")
-        action_redo.setEnabled(False)
+        
+        self.action_undo = edit_menu.addAction(self.main_window.translator.tr("undo"))
+        self.action_undo.setShortcut("Ctrl+Z")
+        self.action_undo.triggered.connect(self.main_window.undo)
+        self.action_undo.setEnabled(False)
+
+        self.action_redo = edit_menu.addAction(self.main_window.translator.tr("redo"))
+        self.action_redo.setShortcut("Ctrl+Y")
+        self.action_redo.triggered.connect(self.main_window.redo)
+        self.action_redo.setEnabled(False)
 
         # View menu
         view_menu = self.menu_bar.addMenu(self.main_window.translator.tr("view_menu"))

@@ -294,9 +294,18 @@ class EditPalettesTab(QWidget):
             return
 
         current_entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-        current_palette_id = (current_entry >> 12) & 0xF
+        old_palette_id = (current_entry >> 12) & 0xF
+        old_state = {
+            'tile_x': tile_x,
+            'tile_y': tile_y,
+            'old_palette_id': old_palette_id,
+            'new_palette_id': self.selected_palette_id,
+            'tile_id': current_entry & 0x3FF,
+            'h_flip': bool(current_entry & (1 << 10)),
+            'v_flip': bool(current_entry & (1 << 11))
+        }
 
-        if current_palette_id == self.selected_palette_id:
+        if old_palette_id == self.selected_palette_id:
             return
 
         tile_id = current_entry & 0x3FF
@@ -314,6 +323,14 @@ class EditPalettesTab(QWidget):
         tilemap_data[tile_index * 2] = new_entry & 0xFF
         tilemap_data[tile_index * 2 + 1] = (new_entry >> 8) & 0xFF
         self.tilemap_data = bytes(tilemap_data)
+
+        if self.main_window and hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='palette_change',
+                editor_type='palettes',
+                data=old_state,
+                description=f"Palette changed at ({tile_x}, {tile_y})"
+            )
 
         self.update_palette_overlay_for_tile(tile_x, tile_y, self.selected_palette_id)
         
