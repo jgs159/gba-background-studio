@@ -190,6 +190,14 @@ class GBABackgroundStudio(QMainWindow):
                 self.apply_tile_change(state, is_undo)
             elif state['type'] == 'palette_change':
                 self.apply_palette_change(state, is_undo)
+            elif state['type'] == 'color_edit' and state['editor'] == 'palettes':
+                data = state['data']
+                if is_undo:
+                    r, g, b = data['old_color']
+                else:
+                    r, g, b = data['new_color']
+                
+                self.edit_palettes_tab.apply_color_change(data['index'], r, g, b)
                 
         except Exception as e:
             print(f"Error applying history state: {e}")

@@ -14,6 +14,7 @@ class PreviewTab(QWidget):
         super().__init__(parent)
         self.parent = parent
         self.layout = QVBoxLayout(self)
+        self.palette_colors = [(0, 0, 0)] * 256
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         
@@ -162,8 +163,6 @@ class PreviewTab(QWidget):
                 brush
             )
             rect.setData(1, (r, g, b))
-            if self.parent:
-                rect.mousePressEvent = lambda e, r=r, g=g, b=b: self.parent.show_color_rgb(r, g, b)
 
     def load_gba_palette(self, pal_path):
         if not os.path.exists(pal_path):
@@ -185,14 +184,14 @@ class PreviewTab(QWidget):
             return [(0, 0, 0)] * 256
 
     def display_palette_colors(self, colors):
-        """Display palette colors in the preview palette section"""
+        self.palette_colors = [(r, g, b) for r, g, b in colors]
         self.preview_palette_scene.clear()
         tile_size = 12
         
-        for i, (r, g, b) in enumerate(colors):
+        for i, (r, g, b) in enumerate(self.palette_colors):
             if i >= 256:
                 break
-                
+
             row = i // 16
             col = i % 16
             from PySide6.QtGui import QColor, QBrush, QPen
@@ -208,12 +207,8 @@ class PreviewTab(QWidget):
                 brush
             )
             rect.setData(1, (r, g, b))
-            if self.parent:
-                rect.mousePressEvent = lambda event, r=r, g=g, b=b: self.parent.show_color_rgb(r, g, b)
 
     def resizeEvent(self, event):
-        """Handle resize events to ensure proper layout"""
         super().resizeEvent(event)
-        # Force update of the layout to ensure proper expansion
         if hasattr(self, 'main_layout'):
             self.main_layout.activate()

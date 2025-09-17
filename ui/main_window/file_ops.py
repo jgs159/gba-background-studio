@@ -54,10 +54,15 @@ def load_last_output_files(main_window):
                         palette_colors[i - 1] = (r, g, b)
                         
                 main_window.preview_tab.display_palette_colors(palette_colors)
+                if hasattr(main_window, 'edit_palettes_tab'):
+                    main_window.edit_palettes_tab.display_palette_colors(palette_colors)
+                    
             except Exception as e:
                 print(f"Error loading palette: {e}")
                 grayscale_colors = generate_grayscale_palette()
                 main_window.preview_tab.display_palette_colors(grayscale_colors)
+                if hasattr(main_window, 'edit_palettes_tab'):
+                    main_window.edit_palettes_tab.display_palette_colors(grayscale_colors)
         
         main_window.sync_palettes_tab()
         

@@ -51,7 +51,8 @@ def sync_palettes_tab(main_window):
     
     try:
         if hasattr(main_window, 'preview_tab') and hasattr(main_window.preview_tab, 'palette_colors'):
-            main_window.edit_palettes_tab.display_palette_colors(main_window.preview_tab.palette_colors)
+            colors_copy = [(r, g, b) for r, g, b in main_window.preview_tab.palette_colors]
+            main_window.edit_palettes_tab.display_palette_colors(colors_copy)
 
         if hasattr(main_window, 'edit_tiles_tab') and hasattr(main_window.edit_tiles_tab, 'edit_tilemap_scene'):
             main_window.edit_palettes_tab.display_tilemap_replica(main_window.edit_tiles_tab.edit_tilemap_scene)
@@ -123,11 +124,15 @@ def load_conversion_results(main_window):
                     palette_colors[i - 1] = (r, g, b)
                     
             main_window.preview_tab.display_palette_colors(palette_colors)
+            if hasattr(main_window, 'edit_palettes_tab'):
+                main_window.edit_palettes_tab.display_palette_colors(palette_colors)
 
         except Exception as e:
             print(f"Error loading palette: {e}")
             grayscale_colors = generate_grayscale_palette()
             main_window.preview_tab.display_palette_colors(grayscale_colors)
+            if hasattr(main_window, 'edit_palettes_tab'):
+                main_window.edit_palettes_tab.display_palette_colors(grayscale_colors)
   
     main_window.menu_bar.action_save_tileset.setEnabled(True)
     main_window.menu_bar.action_append_tiles.setEnabled(True)

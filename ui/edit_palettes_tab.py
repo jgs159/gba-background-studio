@@ -2,10 +2,10 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QSplitter, QGraphicsView, QGraphicsScene,
-    QHBoxLayout, QGraphicsPixmapItem
+    QHBoxLayout, QGraphicsPixmapItem, QFrame, QSlider, QSizePolicy, QGridLayout, QGraphicsRectItem
 )
 from PySide6.QtGui import QFont, QBrush, QPen, QColor, QPainter, QPixmap
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, QTimer
 
 from PIL import Image as PilImage
 from core.image_utils import pil_to_qimage
@@ -101,6 +101,138 @@ class PaletteGridView(QGraphicsView):
         painter.drawRect(0.5, 0.5, self.selection_overlay.width() - 1, self.selection_overlay.height() - 1)
 
 
+class ColorEditor(QWidget):
+    color_updated = Signal(int, int, int, int, bool)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.selected_color_index = -1
+        self.selected_color = QColor(0, 0, 0)
+        self.original_color = (0, 0, 0)
+        self.setup_ui()
+        
+    def on_color_changed(self):
+        r = self.red_slider.value() * 8
+        g = self.green_slider.value() * 8
+        b = self.blue_slider.value() * 8
+        
+        self.red_value.setText(str(self.red_slider.value()))
+        self.green_value.setText(str(self.green_slider.value()))
+        self.blue_value.setText(str(self.blue_slider.value()))
+        
+        self.selected_color = QColor(r, g, b)
+        self.color_preview.setStyleSheet(f"background-color: rgb({r}, {g}, {b}); border: 1px solid #000;")
+        
+        if self.selected_color_index >= 0:
+            self.color_updated.emit(self.selected_color_index, r, g, b, False)
+
+    def setup_ui(self):
+        layout = QGridLayout(self)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(4)
+
+        red_label = QLabel("R")
+        red_label.setFont(QFont("Arial", 8, QFont.Bold))
+        red_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(red_label, 1, 0)
+        
+        self.red_slider = QSlider(Qt.Horizontal)
+        self.red_slider.setRange(0, 31)
+        self.red_slider.setValue(0)
+        self.red_slider.setFixedWidth(120)
+        self.red_slider.valueChanged.connect(self.on_color_changed)
+        layout.addWidget(self.red_slider, 1, 1)
+        
+        self.red_value = QLabel("0")
+        self.red_value.setFont(QFont("Arial", 8))
+        self.red_value.setFixedWidth(15)
+        self.red_value.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.red_value, 1, 2)
+        
+        green_label = QLabel("G")
+        green_label.setFont(QFont("Arial", 8, QFont.Bold))
+        green_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(green_label, 2, 0)
+        
+        self.green_slider = QSlider(Qt.Horizontal)
+        self.green_slider.setRange(0, 31)
+        self.green_slider.setValue(0)
+        self.green_slider.setFixedWidth(120)
+        self.green_slider.valueChanged.connect(self.on_color_changed)
+        layout.addWidget(self.green_slider, 2, 1)
+        
+        self.green_value = QLabel("0")
+        self.green_value.setFont(QFont("Arial", 8))
+        self.green_value.setFixedWidth(15)
+        self.green_value.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.green_value, 2, 2)
+        
+        blue_label = QLabel("B")
+        blue_label.setFont(QFont("Arial", 8, QFont.Bold))
+        blue_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(blue_label, 3, 0)
+        
+        self.blue_slider = QSlider(Qt.Horizontal)
+        self.blue_slider.setRange(0, 31)
+        self.blue_slider.setValue(0)
+        self.blue_slider.setFixedWidth(120)
+        self.blue_slider.valueChanged.connect(self.on_color_changed)
+        layout.addWidget(self.blue_slider, 3, 1)
+        
+        self.blue_value = QLabel("0")
+        self.blue_value.setFont(QFont("Arial", 8))
+        self.blue_value.setFixedWidth(15)
+        self.blue_value.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.blue_value, 3, 2)
+        
+        self.color_preview = QLabel()
+        self.color_preview.setFixedSize(30, 30)
+        self.color_preview.setStyleSheet("background-color: black; border: 1px solid #000;")
+        layout.addWidget(self.color_preview, 1, 3, 3, 1, Qt.AlignCenter)
+
+    def set_color(self, index, r, g, b):
+        self.original_color = (r, g, b)
+        self.selected_color_index = index
+        
+        red_val = r // 8
+        green_val = g // 8
+        blue_val = b // 8
+        
+        try:
+            self.red_slider.valueChanged.disconnect()
+            self.green_slider.valueChanged.disconnect()
+            self.blue_slider.valueChanged.disconnect()
+        except:
+            pass
+            
+        self.red_slider.setValue(red_val)
+        self.green_slider.setValue(green_val)
+        self.blue_slider.setValue(blue_val)
+        
+        self.red_slider.valueChanged.connect(self.on_color_changed)
+        self.green_slider.valueChanged.connect(self.on_color_changed)
+        self.blue_slider.valueChanged.connect(self.on_color_changed)
+        
+        self.red_value.setText(str(red_val))
+        self.green_value.setText(str(green_val))
+        self.blue_value.setText(str(blue_val))
+        
+        self.selected_color = QColor(r, g, b)
+        self.color_preview.setStyleSheet(f"background-color: rgb({r}, {g}, {b}); border: 1px solid #000;")
+    
+    def get_current_color(self):
+        r = self.red_slider.value() * 8
+        g = self.green_slider.value() * 8
+        b = self.blue_slider.value() * 8
+        return (r, g, b)
+    
+    def has_changes(self):
+        if self.selected_color_index < 0:
+            return False
+        current_color = self.get_current_color()
+        return current_color != self.original_color
+
+
 class EditPalettesTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -112,6 +244,13 @@ class EditPalettesTab(QWidget):
         self.tilemap_height = 0
         self.tilemap_data = None
         self.overlay_items = {}
+        self.palette_colors = [(0, 0, 0)] * 256
+        self.selection_rect = None
+        self.palette_rects = []
+
+        self.last_edited_index = -1
+        self.last_edited_color = (0, 0, 0)
+        self.current_editing_index = -1
 
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
@@ -143,19 +282,62 @@ class EditPalettesTab(QWidget):
 
         # === Top Section: Fixed 256px height ===
         height_container = QWidget()
-        height_container.setFixedHeight(256)
+        height_container.setFixedHeight(280)
         top_layout = QHBoxLayout(height_container)
         top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.setSpacing(0)
+        top_layout.setSpacing(4)
 
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+        left_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        
         self.grid_view = PaletteGridView()
-        top_layout.addWidget(self.grid_view, 0, Qt.AlignLeft | Qt.AlignTop)
-        top_layout.addStretch()
-
         self.grid_view.setMouseTracking(True)
         self.grid_view.mouseMoveEvent = self.on_palette_grid_hover
         self.grid_view.leaveEvent = self.on_palette_grid_leave
         self.grid_view.mousePressEvent = self.on_palette_grid_click
+        left_layout.addWidget(self.grid_view)
+        
+        top_layout.addWidget(left_container)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.VLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background: #ccc;")
+        separator.setFixedWidth(1)
+        top_layout.addWidget(separator)
+        
+        right_container = QWidget()
+        right_layout = QVBoxLayout(right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+        right_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        
+        self.full_palette_view = QGraphicsView()
+        self.full_palette_scene = QGraphicsScene()
+        self.full_palette_view.setScene(self.full_palette_scene)
+        self.full_palette_view.setRenderHint(QPainter.Antialiasing, False)
+        self.full_palette_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
+        self.full_palette_view.setStyleSheet("QGraphicsView { background: #f9f9f9; border: 1px solid #ccc; }")
+        self.full_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.full_palette_view.setFixedSize(195, 195)
+        right_layout.addWidget(self.full_palette_view)
+        
+        editor_container = QWidget()
+        editor_container.setFixedSize(195, 80)
+        editor_layout = QVBoxLayout(editor_container)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
+
+        self.color_editor = ColorEditor(self)
+        editor_layout.addWidget(self.color_editor)
+        self.color_editor.color_updated.connect(lambda index, r, g, b, record: self.update_selected_color(index, r, g, b, record))
+
+        right_layout.addWidget(editor_container)
+        
+        top_layout.addWidget(right_container)
 
         palettes_layout.addWidget(height_container)
 
@@ -202,7 +384,24 @@ class EditPalettesTab(QWidget):
         self.setup_tilemap_interaction()
         self.highlight_selected_palette(0, 0)
       
+        QTimer.singleShot(100, lambda: self.draw_selection_rectangle(0))
+        QTimer.singleShot(100, self.connect_tab_signals)
+        QTimer.singleShot(100, self.initialize_color_editor)
+
         self.update_status_bar(-1, -1)
+
+    def initialize_color_editor(self):
+        if (hasattr(self, 'palette_colors') and 
+            len(self.palette_colors) > 0 and
+            hasattr(self, 'color_editor')):
+            
+            r, g, b = self.palette_colors[0]
+            self.color_editor.set_color(0, r, g, b)
+            self.draw_selection_rectangle(0)
+            
+            self.current_editing_index = 0
+            self.last_edited_index = -1
+            self.last_edited_color = (r, g, b)
 
     def setup_tilemap_interaction(self):
         self.edit_tilemap2_view.on_tile_drawing = self.on_tilemap_drawing
@@ -211,6 +410,7 @@ class EditPalettesTab(QWidget):
         self.edit_tilemap2_view.on_tile_leave = self.on_tilemap_leave
 
     def on_palette_grid_click(self, event):
+        self.finalize_color_editing()
         if event.button() == Qt.LeftButton:
             pos = self.grid_view.mapToScene(event.pos())
             
@@ -245,6 +445,7 @@ class EditPalettesTab(QWidget):
             self.update_status_bar(-1, -1, palette_id=self.selected_palette_id)
 
     def highlight_selected_palette(self, palette_x, palette_y):
+        self.finalize_color_editing()
         self.grid_view.highlight_selected_palette(palette_x, palette_y)
 
     def on_tilemap_leave(self):
@@ -267,12 +468,14 @@ class EditPalettesTab(QWidget):
             self.update_status_bar(-1, -1)
 
     def on_tilemap_drawing(self, tile_x, tile_y):
+        self.finalize_color_editing()
         if self.selected_palette_id is None or not self.tilemap_data:
             return
         self.on_tilemap_hover(tile_x, tile_y)
         self.edit_palette_at(tile_x, tile_y)
 
     def on_tilemap_right_click(self, tile_x, tile_y):
+        self.finalize_color_editing()
         if not self.tilemap_data:
             return
         tile_index = tile_y * self.tilemap_width + tile_x
@@ -284,6 +487,19 @@ class EditPalettesTab(QWidget):
             py = (palette_id // 4)
             self.highlight_selected_palette(px, py)
         self.on_tilemap_hover(tile_x, tile_y)
+
+    def focusOutEvent(self, event):
+        self.finalize_color_editing()
+        super().focusOutEvent(event)
+
+    def connect_tab_signals(self):
+        if self.main_window and hasattr(self.main_window, 'main_tabs'):
+            self.main_window.main_tabs.currentChanged.connect(self.on_tab_changed)
+
+    def on_tab_changed(self, index):
+        current_tab = self.main_window.main_tabs.widget(index)
+        if current_tab != self:
+            self.finalize_color_editing()
 
     def edit_palette_at(self, tile_x, tile_y):
         if not self.tilemap_data:
@@ -468,15 +684,146 @@ class EditPalettesTab(QWidget):
         self.edit_tilemap2_view.resetTransform()
         self.edit_tilemap2_view.scale(factor, factor)
 
-    def display_palette_colors(self, colors):
-        self.colors = colors
-        self.grid_view.colors = colors
-        self.grid_view.draw_grid()
-        self.highlight_selected_palette(self.selected_palette_id % 4, self.selected_palette_id // 4)
+    def display_palette_colors(self, colors):        
+        self.palette_colors = [(r, g, b) for r, g, b in colors]
+        self.draw_full_palette(self.palette_colors)
         
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("palettes")
+
+    def draw_full_palette(self, colors):
+        self.full_palette_scene.clear()
+        tile_size = 12
+        self.palette_rects = []
+        self.selection_rect = None
+        
+        for i, (r, g, b) in enumerate(colors):
+            if i >= 256:
+                break
+                
+            row = i // 16
+            col = i % 16
+            
+            rect = QGraphicsRectItem(col * tile_size, row * tile_size, tile_size, tile_size)
+            rect.setPen(QPen(Qt.gray, 0.5))
+            rect.setBrush(QBrush(QColor(r, g, b)))
+            
+            rect.setAcceptHoverEvents(True)
+            rect.setAcceptedMouseButtons(Qt.LeftButton)
+            
+            def make_handler(idx, red, green, blue):
+                def handler(event):
+                    self.on_palette_color_clicked(idx, red, green, blue)
+                    if idx < len(self.palette_rects):
+                        QGraphicsRectItem.mousePressEvent(self.palette_rects[idx], event)
+                    event.accept()
+                return handler
+            rect.mousePressEvent = make_handler(i, r, g, b)
+            
+            self.full_palette_scene.addItem(rect)
+            self.palette_rects.append(rect)
+            
+            def make_click_handler(idx, red, green, blue):
+                def handler(event):
+                    self.on_palette_color_clicked(idx, red, green, blue)
+                return handler
+            
+            rect.mousePressEvent = make_click_handler(i, r, g, b)
+
+    def on_palette_color_clicked(self, index, r, g, b):
+        self.finalize_color_editing()
+        
+        current_r, current_g, current_b = self.palette_colors[index]
+        
+        self.current_editing_index = index
+        self.color_editor.set_color(index, current_r, current_g, current_b)
+        self.draw_selection_rectangle(index)
+
+
+    def finalize_color_editing(self):
+        if (self.color_editor.has_changes() and 
+            self.current_editing_index >= 0 and
+            self.current_editing_index < len(self.palette_colors)):
+            
+            current_color = self.color_editor.get_current_color()
+            original_color = self.color_editor.original_color
+            
+            if self.main_window and hasattr(self.main_window, 'history_manager'):
+                self.main_window.history_manager.record_state(
+                    state_type='color_edit',
+                    editor_type='palettes',
+                    data={
+                        'index': self.current_editing_index,
+                        'old_color': original_color,
+                        'new_color': current_color
+                    },
+                    description=f"Color {self.current_editing_index} edited: RGB{original_color} → RGB{current_color}"
+                )
+            
+            self.color_editor.original_color = current_color
+            self.palette_colors[self.current_editing_index] = current_color
+            
+            rect = self.palette_rects[self.current_editing_index]
+            rect.setBrush(QBrush(QColor(*current_color)))
+            
+            if (self.main_window and hasattr(self.main_window, 'preview_tab')):
+                if hasattr(self.main_window.preview_tab, 'palette_colors'):
+                    self.main_window.preview_tab.palette_colors[self.current_editing_index] = current_color
+                
+                self.main_window.preview_tab.display_palette_colors(self.main_window.preview_tab.palette_colors)
+
+    def draw_selection_rectangle(self, index):
+        if self.selection_rect:
+            self.full_palette_scene.removeItem(self.selection_rect)
+        
+        if index < 0 or index >= len(self.palette_rects):
+            return
+            
+        rect = self.palette_rects[index]
+        
+        self.selection_rect = self.full_palette_scene.addRect(
+            rect.rect().x(),
+            rect.rect().y(),
+            rect.rect().width(),
+            rect.rect().height(),
+            QPen(QColor(255, 255, 0), 1),
+            Qt.NoBrush
+        )
+        self.selection_rect.setZValue(1)
+
+    def update_selected_color(self, index, r, g, b, record_history=False):
+        if index < 0 or index >= len(self.palette_rects):
+            return
+        
+        rect = self.palette_rects[index]
+        rect.setBrush(QBrush(QColor(r, g, b)))
+        
+        self.palette_colors[index] = (r, g, b)
+        
+        if (self.main_window and hasattr(self.main_window, 'preview_tab')):
+            if hasattr(self.main_window.preview_tab, 'palette_colors'):
+                self.main_window.preview_tab.palette_colors[index] = (r, g, b)
+            
+            self.main_window.preview_tab.display_palette_colors(self.main_window.preview_tab.palette_colors)
+
+    def apply_color_change(self, index, r, g, b):
+        if index < 0 or index >= len(self.palette_rects):
+            return
+        
+        rect = self.palette_rects[index]
+        rect.setBrush(QBrush(QColor(r, g, b)))
+        
+        self.palette_colors[index] = (r, g, b)
+        
+        if index == self.current_editing_index:
+            self.color_editor.set_color(index, r, g, b)
+        
+        if (self.main_window and hasattr(self.main_window, 'preview_tab')):
+            if hasattr(self.main_window.preview_tab, 'palette_colors'):
+                self.main_window.preview_tab.palette_colors[index] = (r, g, b)
+            
+            self.main_window.preview_tab.display_palette_colors(self.main_window.preview_tab.palette_colors)
 
     def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
         update_status_bar_shared(

@@ -6,7 +6,7 @@ import copy
 class HistoryManager(QObject):
     history_changed = Signal()
     
-    def __init__(self, max_history=100):
+    def __init__(self, max_history=1000):
         super().__init__()
         self.max_history = max_history
         self.undo_stack = deque(maxlen=max_history)
