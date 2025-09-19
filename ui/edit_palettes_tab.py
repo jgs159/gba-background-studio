@@ -1,5 +1,4 @@
 # ui/edit_palettes_tab.py
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QSplitter, QGraphicsView, QGraphicsScene,
     QHBoxLayout, QGraphicsPixmapItem, QFrame, QSlider, QSizePolicy, QGridLayout,
@@ -11,364 +10,8 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from PIL import Image as PilImage
 from core.image_utils import pil_to_qimage
 from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
-
-
-class PaletteGridView(QGraphicsView):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet("QGraphicsView { border: none; background: transparent; }")
-        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scene = QGraphicsScene(0, 0, 32, 32)
-        self.setScene(self.scene)
-        self.colors = [
-            QColor(238, 136, 116), QColor(248, 210, 144), QColor(160, 218, 228), QColor(244, 156, 178),
-            QColor(190, 180, 223), QColor(164, 248, 140), QColor(224, 154, 102), QColor(246, 230, 175),
-            QColor(190, 228, 226), QColor(232, 180, 190), QColor(220, 200, 240), QColor(134, 200, 120),
-            QColor(246, 188, 104), QColor(148, 196, 218), QColor(248, 146, 198), QColor(180, 160, 200)
-        ]
-        
-        self.selection_overlay = QWidget(self.viewport())
-        self.selection_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.selection_overlay.hide()
-        
-        self.selection_pen = QPen(QColor(0, 0, 0), 1.0)
-        self.selection_pen.setCosmetic(True)
-        
-        self.draw_grid()
-        self.selected_palette_pos = (-1, -1)
-
-        self.selection_overlay.paintEvent = self.paintSelectionOverlay
-
-    def draw_grid(self):
-        self.scene.clear()
-        font = QFont("Arial", 5, QFont.Normal)
-        for i in range(4):
-            for j in range(4):
-                idx = i * 4 + j
-                x = j * 8
-                y = i * 8
-                self.scene.addRect(x, y, 8, 8, pen=QPen(Qt.NoPen), brush=QBrush(self.colors[idx]))
-                
-                text = self.scene.addText(f"{idx:X}")
-                text.setDefaultTextColor(Qt.black)
-                text.setFont(font)
-                rect = text.boundingRect()
-                cx = x + (8 - rect.width()) / 2
-                cy = y + (8 - rect.height()) * 0.5
-                text.setPos(cx, cy)
-
-    def highlight_selected_palette(self, palette_x, palette_y):
-        self.selected_palette_pos = (palette_x, palette_y)
-        
-        if palette_x == -1 or palette_y == -1:
-            self.selection_overlay.hide()
-            return
-            
-        zoom_factor = self.transform().m11()
-        x = palette_x * 8 * zoom_factor
-        y = palette_y * 8 * zoom_factor
-        size = 8 * zoom_factor
-        
-        self.selection_overlay.setGeometry(int(x), int(y), int(size), int(size))
-        self.selection_overlay.show()
-        self.selection_overlay.update()
-
-    def set_zoom_factor(self, factor):
-        self.resetTransform()
-        self.scale(factor, factor)
-        self.setFixedSize(32 * factor, 32 * factor)
-        
-        if self.selected_palette_pos != (-1, -1):
-            self.highlight_selected_palette(*self.selected_palette_pos)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.selection_overlay.resize(self.viewport().size())
-        
-        if self.selected_palette_pos != (-1, -1):
-            self.highlight_selected_palette(*self.selected_palette_pos)
-
-    def paintSelectionOverlay(self, event):
-        if self.selected_palette_pos == (-1, -1):
-            return
-            
-        painter = QPainter(self.selection_overlay)
-        painter.setRenderHint(QPainter.Antialiasing, False)
-        painter.setPen(self.selection_pen)
-        painter.setBrush(Qt.NoBrush)
-        
-        painter.drawRect(0.5, 0.5, self.selection_overlay.width() - 1, self.selection_overlay.height() - 1)
-
-
-class ColorEditor(QWidget):
-    color_updated = Signal(int, int, int, int, bool)
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.selected_color_index = -1
-        self.selected_color = QColor(0, 0, 0)
-        self.original_color = (0, 0, 0)
-        self.setup_ui()
-        self.updating_from_sliders = False
-        self.updating_from_text = False
-        
-    def on_color_changed(self):
-        if self.updating_from_text:
-            return
-            
-        self.updating_from_sliders = True
-        
-        r_slider = self.red_slider.value()
-        g_slider = self.green_slider.value()
-        b_slider = self.blue_slider.value()
-        
-        r = min((r_slider * 8 + 4) // 8 * 8, 248)
-        g = min((g_slider * 8 + 4) // 8 * 8, 248)
-        b = min((b_slider * 8 + 4) // 8 * 8, 248)
-        
-        self.red_value.setText(str(r_slider))
-        self.green_value.setText(str(g_slider))
-        self.blue_value.setText(str(b_slider))
-        
-        self.red_text.setText(str(r))
-        self.green_text.setText(str(g))
-        self.blue_text.setText(str(b))
-        
-        self.selected_color = QColor(r, g, b)
-        self.color_preview.setStyleSheet(f"background-color: rgb({r}, {g}, {b}); border: 1px solid #000;")
-        
-        if self.selected_color_index >= 0:
-            self.color_updated.emit(self.selected_color_index, r, g, b, False)
-            
-        self.updating_from_sliders = False
-
-    def on_text_changed(self):
-        if self.updating_from_sliders or self.updating_from_text:
-            return
-            
-        self.updating_from_text = True
-        
-        try:
-            r = int(self.red_text.text()) if self.red_text.text() else 0
-            g = int(self.green_text.text()) if self.green_text.text() else 0
-            b = int(self.blue_text.text()) if self.blue_text.text() else 0
-            
-            r = max(0, min(255, r))
-            g = max(0, min(255, g))
-            b = max(0, min(255, b))
-            
-            red_val = min((r + 4) // 8, 31)
-            green_val = min((g + 4) // 8, 31)
-            blue_val = min((b + 4) // 8, 31)
-            
-            self.red_slider.setValue(red_val)
-            self.green_slider.setValue(green_val)
-            self.blue_slider.setValue(blue_val)
-            
-            self.red_value.setText(str(red_val))
-            self.green_value.setText(str(green_val))
-            self.blue_value.setText(str(blue_val))
-            
-            r_rounded = min((red_val * 8 + 4) // 8 * 8, 248)
-            g_rounded = min((green_val * 8 + 4) // 8 * 8, 248)
-            b_rounded = min((blue_val * 8 + 4) // 8 * 8, 248)
-            
-            self.selected_color = QColor(r_rounded, g_rounded, b_rounded)
-            self.color_preview.setStyleSheet(f"background-color: rgb({r_rounded}, {g_rounded}, {b_rounded}); border: 1px solid #000;")
-            
-            if self.selected_color_index >= 0:
-                self.color_updated.emit(self.selected_color_index, r_rounded, g_rounded, b_rounded, False)
-                
-        except ValueError:
-            pass
-            
-        self.updating_from_text = False
-
-    def setup_ui(self):
-        layout = QGridLayout(self)
-        layout.setContentsMargins(1, 1, 1, 1)
-        layout.setSpacing(1)
-        layout.setVerticalSpacing(0)
-
-        red_label = QLabel("R")
-        red_label.setFont(QFont("Arial", 7, QFont.Bold))
-        red_label.setFixedWidth(8)
-        red_label.setFixedHeight(12)
-        layout.addWidget(red_label, 0, 0)
-        
-        self.red_slider = QSlider(Qt.Horizontal)
-        self.red_slider.setRange(0, 31)
-        self.red_slider.setValue(0)
-        self.red_slider.setFixedWidth(120)
-        self.red_slider.setFixedHeight(12)
-        self.red_slider.valueChanged.connect(self.on_color_changed)
-        layout.addWidget(self.red_slider, 0, 1)
-        
-        self.red_value = QLabel("0")
-        self.red_value.setFont(QFont("Arial", 7))
-        self.red_value.setFixedWidth(10)
-        self.red_value.setFixedHeight(12)
-        self.red_value.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.red_value, 0, 2)
-
-        green_label = QLabel("G")
-        green_label.setFont(QFont("Arial", 7, QFont.Bold))
-        green_label.setFixedWidth(8)
-        green_label.setFixedHeight(12)
-        layout.addWidget(green_label, 1, 0)
-        
-        self.green_slider = QSlider(Qt.Horizontal)
-        self.green_slider.setRange(0, 31)
-        self.green_slider.setValue(0)
-        self.green_slider.setFixedWidth(120)
-        self.green_slider.setFixedHeight(12)
-        self.green_slider.valueChanged.connect(self.on_color_changed)
-        layout.addWidget(self.green_slider, 1, 1)
-        
-        self.green_value = QLabel("0")
-        self.green_value.setFont(QFont("Arial", 7))
-        self.green_value.setFixedWidth(10)
-        self.green_value.setFixedHeight(12)
-        self.green_value.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.green_value, 1, 2)
-
-        blue_label = QLabel("B")
-        blue_label.setFont(QFont("Arial", 7, QFont.Bold))
-        blue_label.setFixedWidth(8)
-        blue_label.setFixedHeight(12)
-        layout.addWidget(blue_label, 2, 0)
-        
-        self.blue_slider = QSlider(Qt.Horizontal)
-        self.blue_slider.setRange(0, 31)
-        self.blue_slider.setValue(0)
-        self.blue_slider.setFixedWidth(120)
-        self.blue_slider.setFixedHeight(12)
-        self.blue_slider.valueChanged.connect(self.on_color_changed)
-        layout.addWidget(self.blue_slider, 2, 1)
-        
-        self.blue_value = QLabel("0")
-        self.blue_value.setFont(QFont("Arial", 7))
-        self.blue_value.setFixedWidth(10)
-        self.blue_value.setFixedHeight(12)
-        self.blue_value.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.blue_value, 2, 2)
-
-        self.color_preview = QLabel()
-        self.color_preview.setFixedSize(35, 35)
-        self.color_preview.setStyleSheet("background-color: black; border: 1px solid #000;")
-        layout.addWidget(self.color_preview, 0, 3, 3, 1, Qt.AlignCenter)
-
-        rgb_layout = QHBoxLayout()
-        rgb_layout.setContentsMargins(0, 0, 0, 0)
-        rgb_layout.setSpacing(3)
-        
-        r_label = QLabel("R:")
-        r_label.setFont(QFont("Arial", 7, QFont.Bold))
-        r_label.setFixedWidth(8)
-        r_label.setFixedHeight(12)
-        rgb_layout.addWidget(r_label)
-        
-        self.red_text = QLineEdit("0")
-        self.red_text.setFont(QFont("Arial", 7))
-        self.red_text.setFixedWidth(30)
-        self.red_text.setFixedHeight(16)
-        self.red_text.setValidator(QIntValidator(0, 255))
-        self.red_text.textChanged.connect(self.on_text_changed)
-        rgb_layout.addWidget(self.red_text)
-        
-        g_label = QLabel("G:")
-        g_label.setFont(QFont("Arial", 7, QFont.Bold))
-        g_label.setFixedWidth(8)
-        g_label.setFixedHeight(12)
-        rgb_layout.addWidget(g_label)
-        
-        self.green_text = QLineEdit("0")
-        self.green_text.setFont(QFont("Arial", 7))
-        self.green_text.setFixedWidth(30)
-        self.green_text.setFixedHeight(16)
-        self.green_text.setValidator(QIntValidator(0, 255))
-        self.green_text.textChanged.connect(self.on_text_changed)
-        rgb_layout.addWidget(self.green_text)
-        
-        b_label = QLabel("B:")
-        b_label.setFont(QFont("Arial", 7, QFont.Bold))
-        b_label.setFixedWidth(8)
-        b_label.setFixedHeight(12)
-        rgb_layout.addWidget(b_label)
-        
-        self.blue_text = QLineEdit("0")
-        self.blue_text.setFont(QFont("Arial", 7))
-        self.blue_text.setFixedWidth(30)
-        self.blue_text.setFixedHeight(16)
-        self.blue_text.setValidator(QIntValidator(0, 255))
-        self.blue_text.textChanged.connect(self.on_text_changed)
-        rgb_layout.addWidget(self.blue_text)
-        
-        layout.addLayout(rgb_layout, 3, 0, 1, 4)
-
-    def set_color(self, index, r, g, b):
-        self.original_color = (r, g, b)
-        self.selected_color_index = index
-        
-        red_val = min((r + 4) // 8, 31)
-        green_val = min((g + 4) // 8, 31)
-        blue_val = min((b + 4) // 8, 31)
-        
-        r_rounded = min((red_val * 8 + 4) // 8 * 8, 248)
-        g_rounded = min((green_val * 8 + 4) // 8 * 8, 248)
-        b_rounded = min((blue_val * 8 + 4) // 8 * 8, 248)
-        
-        try:
-            self.red_slider.valueChanged.disconnect()
-            self.green_slider.valueChanged.disconnect()
-            self.blue_slider.valueChanged.disconnect()
-            self.red_text.textChanged.disconnect()
-            self.green_text.textChanged.disconnect()
-            self.blue_text.textChanged.disconnect()
-        except:
-            pass
-            
-        self.red_slider.setValue(red_val)
-        self.green_slider.setValue(green_val)
-        self.blue_slider.setValue(blue_val)
-        
-        self.red_value.setText(str(red_val))
-        self.green_value.setText(str(green_val))
-        self.blue_value.setText(str(blue_val))
-        
-        self.red_text.setText(str(r_rounded))
-        self.green_text.setText(str(g_rounded))
-        self.blue_text.setText(str(b_rounded))
-        
-        self.red_slider.valueChanged.connect(self.on_color_changed)
-        self.green_slider.valueChanged.connect(self.on_color_changed)
-        self.blue_slider.valueChanged.connect(self.on_color_changed)
-        self.red_text.textChanged.connect(self.on_text_changed)
-        self.green_text.textChanged.connect(self.on_text_changed)
-        self.blue_text.textChanged.connect(self.on_text_changed)
-        
-        self.selected_color = QColor(r_rounded, g_rounded, b_rounded)
-        self.color_preview.setStyleSheet(f"background-color: rgb({r_rounded}, {g_rounded}, {b_rounded}); border: 1px solid #000;")
-    
-    def get_current_color(self):
-        try:
-            r = int(self.red_text.text()) if self.red_text.text() else 0
-            g = int(self.green_text.text()) if self.green_text.text() else 0
-            b = int(self.blue_text.text()) if self.blue_text.text() else 0
-            return (r, g, b)
-        except ValueError:
-            r = self.red_slider.value() * 8
-            g = self.green_slider.value() * 8
-            b = self.blue_slider.value() * 8
-            return (r, g, b)
-    
-    def has_changes(self):
-        if self.selected_color_index < 0:
-            return False
-        current_color = self.get_current_color()
-        return current_color != self.original_color
+from ui.palette_grid_view import PaletteGridView
+from ui.color_editor import ColorEditor
 
 
 class EditPalettesTab(QWidget):
@@ -390,6 +33,17 @@ class EditPalettesTab(QWidget):
         self.last_edited_color = (0, 0, 0)
         self.current_editing_index = -1
 
+        self.setup_ui()
+        self.setup_tilemap_interaction()
+        self.highlight_selected_palette(0, 0)
+      
+        QTimer.singleShot(100, lambda: self.draw_selection_rectangle(0))
+        QTimer.singleShot(100, self.connect_tab_signals)
+        QTimer.singleShot(100, self.initialize_color_editor)
+
+        self.update_status_bar(-1, -1)
+
+    def setup_ui(self):
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
@@ -405,15 +59,28 @@ class EditPalettesTab(QWidget):
         main_splitter.setChildrenCollapsible(False)
         main_splitter.setHandleWidth(6)
 
-        palettes_container = QWidget()
-        palettes_layout = QVBoxLayout(palettes_container)
-        palettes_layout.setContentsMargins(4, 4, 4, 4)
-        palettes_layout.setSpacing(4)
+        palettes_container = self.create_palettes_container()
+        main_splitter.addWidget(palettes_container)
+
+        tilemap_container = self.create_tilemap_container()
+        main_splitter.addWidget(tilemap_container)
+        
+        main_splitter.setSizes([500, 500])
+        self.layout.addWidget(main_splitter)
+
+        self.colors = self.grid_view.colors
+        self._pixmap_item = None
+
+    def create_palettes_container(self):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
 
         palettes_label = QLabel("Palettes")
         palettes_label.setFont(QFont("Arial", 9, QFont.Bold))
         palettes_label.setAlignment(Qt.AlignCenter)
-        palettes_layout.addWidget(palettes_label)
+        layout.addWidget(palettes_label)
 
         height_container = QWidget()
         height_container.setFixedHeight(260)
@@ -421,19 +88,7 @@ class EditPalettesTab(QWidget):
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(4)
 
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
-        left_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        
-        self.grid_view = PaletteGridView()
-        self.grid_view.setMouseTracking(True)
-        self.grid_view.mouseMoveEvent = self.on_palette_grid_hover
-        self.grid_view.leaveEvent = self.on_palette_grid_leave
-        self.grid_view.mousePressEvent = self.on_palette_grid_click
-        left_layout.addWidget(self.grid_view)
-        
+        left_container = self.create_left_palette_container()
         top_layout.addWidget(left_container)
 
         separator = QFrame()
@@ -443,11 +98,44 @@ class EditPalettesTab(QWidget):
         separator.setFixedWidth(1)
         top_layout.addWidget(separator)
         
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(4)
-        right_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        right_container = self.create_right_palette_container()
+        top_layout.addWidget(right_container)
+
+        layout.addWidget(height_container)
+
+        self.edit_palettes_view = QGraphicsView()
+        self.edit_palettes_scene = QGraphicsScene()
+        self.edit_palettes_view.setScene(self.edit_palettes_scene)
+        self.edit_palettes_view.setRenderHint(QPainter.Antialiasing, False)
+        self.edit_palettes_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
+        self.edit_palettes_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
+        self.edit_palettes_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        layout.addWidget(self.edit_palettes_view)
+
+        return container
+
+    def create_left_palette_container(self):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        
+        self.grid_view = PaletteGridView()
+        self.grid_view.setMouseTracking(True)
+        self.grid_view.mouseMoveEvent = self.on_palette_grid_hover
+        self.grid_view.leaveEvent = self.on_palette_grid_leave
+        self.grid_view.mousePressEvent = self.on_palette_grid_click
+        layout.addWidget(self.grid_view)
+        
+        return container
+
+    def create_right_palette_container(self):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
         
         self.full_palette_view = QGraphicsView()
         self.full_palette_scene = QGraphicsScene()
@@ -457,7 +145,7 @@ class EditPalettesTab(QWidget):
         self.full_palette_view.setStyleSheet("QGraphicsView { background: #f9f9f9; border: 1px solid #ccc; }")
         self.full_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.full_palette_view.setFixedSize(195, 195)
-        right_layout.addWidget(self.full_palette_view)
+        layout.addWidget(self.full_palette_view)
         
         editor_container = QWidget()
         editor_container.setFixedSize(195, 65)
@@ -469,32 +157,20 @@ class EditPalettesTab(QWidget):
         editor_layout.addWidget(self.color_editor)
         self.color_editor.color_updated.connect(lambda index, r, g, b, record: self.update_selected_color(index, r, g, b, record))
 
-        right_layout.addWidget(editor_container)
+        layout.addWidget(editor_container)
         
-        top_layout.addWidget(right_container)
+        return container
 
-        palettes_layout.addWidget(height_container)
-
-        self.edit_palettes_view = QGraphicsView()
-        self.edit_palettes_scene = QGraphicsScene()
-        self.edit_palettes_view.setScene(self.edit_palettes_scene)
-        self.edit_palettes_view.setRenderHint(QPainter.Antialiasing, False)
-        self.edit_palettes_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.edit_palettes_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
-        self.edit_palettes_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        palettes_layout.addWidget(self.edit_palettes_view)
-
-        main_splitter.addWidget(palettes_container)
-
-        tilemap_container = QWidget()
-        tilemap_layout = QVBoxLayout(tilemap_container)
-        tilemap_layout.setContentsMargins(4, 4, 4, 4)
-        tilemap_layout.setSpacing(4)
+    def create_tilemap_container(self):
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
 
         tilemap_label = QLabel("Tilemap")
         tilemap_label.setFont(QFont("Arial", 9, QFont.Bold))
         tilemap_label.setAlignment(Qt.AlignCenter)
-        tilemap_layout.addWidget(tilemap_label)
+        layout.addWidget(tilemap_label)
 
         self.edit_tilemap2_view = CustomGraphicsView()
         self.edit_tilemap2_scene = QGraphicsScene()
@@ -504,23 +180,9 @@ class EditPalettesTab(QWidget):
         self.edit_tilemap2_view.setStyleSheet("QGraphicsView { background: #e0e0e0; border: 1px solid #ccc; }")
         self.edit_tilemap2_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.edit_tilemap2_view.setMouseTracking(True)
-        tilemap_layout.addWidget(self.edit_tilemap2_view)
+        layout.addWidget(self.edit_tilemap2_view)
 
-        main_splitter.addWidget(tilemap_container)
-        main_splitter.setSizes([500, 500])
-        self.layout.addWidget(main_splitter)
-
-        self.colors = self.grid_view.colors
-        self._pixmap_item = None
-
-        self.setup_tilemap_interaction()
-        self.highlight_selected_palette(0, 0)
-      
-        QTimer.singleShot(100, lambda: self.draw_selection_rectangle(0))
-        QTimer.singleShot(100, self.connect_tab_signals)
-        QTimer.singleShot(100, self.initialize_color_editor)
-
-        self.update_status_bar(-1, -1)
+        return container
 
     def initialize_color_editor(self):
         if (hasattr(self, 'palette_colors') and 
@@ -820,6 +482,12 @@ class EditPalettesTab(QWidget):
         self.palette_colors = [(r, g, b) for r, g, b in colors]
         self.draw_full_palette(self.palette_colors)
         
+        self.current_editing_index = 0
+        if len(self.palette_colors) > 0:
+            r, g, b = self.palette_colors[0]
+            self.color_editor.set_color(0, r, g, b)
+            self.draw_selection_rectangle(0)
+        
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("palettes")
@@ -871,7 +539,6 @@ class EditPalettesTab(QWidget):
         self.current_editing_index = index
         self.color_editor.set_color(index, current_r, current_g, current_b)
         self.draw_selection_rectangle(index)
-
 
     def finalize_color_editing(self):
         if (self.color_editor.has_changes() and 

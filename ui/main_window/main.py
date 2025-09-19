@@ -116,6 +116,23 @@ class GBABackgroundStudio(QMainWindow):
         self.update_undo_redo_actions()
 
     def keyPressEvent(self, event):
+        focused_widget = self.focusWidget()
+        is_color_edit_field = False
+        
+        if focused_widget:
+            widget = focused_widget
+            while widget:
+                if hasattr(widget, 'parent') and hasattr(widget.parent(), '__class__'):
+                    if widget.parent().__class__.__name__ == 'ColorEditor':
+                        is_color_edit_field = True
+                        break
+                widget = widget.parent()
+        
+        if is_color_edit_field and event.modifiers() & Qt.ControlModifier:
+            if event.key() in [Qt.Key_Z, Qt.Key_Y]:
+                event.ignore()
+                return
+        
         if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Z:
             self.undo()
             event.accept()
