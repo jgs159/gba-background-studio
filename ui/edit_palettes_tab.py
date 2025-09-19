@@ -2,9 +2,10 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QSplitter, QGraphicsView, QGraphicsScene,
-    QHBoxLayout, QGraphicsPixmapItem, QFrame, QSlider, QSizePolicy, QGridLayout, QGraphicsRectItem
+    QHBoxLayout, QGraphicsPixmapItem, QFrame, QSlider, QSizePolicy, QGridLayout,
+    QGraphicsRectItem, QLineEdit
 )
-from PySide6.QtGui import QFont, QBrush, QPen, QColor, QPainter, QPixmap
+from PySide6.QtGui import QFont, QBrush, QPen, QColor, QPainter, QPixmap, QIntValidator
 from PySide6.QtCore import Qt, Signal, QTimer
 
 from PIL import Image as PilImage
@@ -110,98 +111,222 @@ class ColorEditor(QWidget):
         self.selected_color = QColor(0, 0, 0)
         self.original_color = (0, 0, 0)
         self.setup_ui()
+        self.updating_from_sliders = False
+        self.updating_from_text = False
         
     def on_color_changed(self):
-        r = self.red_slider.value() * 8
-        g = self.green_slider.value() * 8
-        b = self.blue_slider.value() * 8
+        if self.updating_from_text:
+            return
+            
+        self.updating_from_sliders = True
         
-        self.red_value.setText(str(self.red_slider.value()))
-        self.green_value.setText(str(self.green_slider.value()))
-        self.blue_value.setText(str(self.blue_slider.value()))
+        r_slider = self.red_slider.value()
+        g_slider = self.green_slider.value()
+        b_slider = self.blue_slider.value()
+        
+        r = min((r_slider * 8 + 4) // 8 * 8, 248)
+        g = min((g_slider * 8 + 4) // 8 * 8, 248)
+        b = min((b_slider * 8 + 4) // 8 * 8, 248)
+        
+        self.red_value.setText(str(r_slider))
+        self.green_value.setText(str(g_slider))
+        self.blue_value.setText(str(b_slider))
+        
+        self.red_text.setText(str(r))
+        self.green_text.setText(str(g))
+        self.blue_text.setText(str(b))
         
         self.selected_color = QColor(r, g, b)
         self.color_preview.setStyleSheet(f"background-color: rgb({r}, {g}, {b}); border: 1px solid #000;")
         
         if self.selected_color_index >= 0:
             self.color_updated.emit(self.selected_color_index, r, g, b, False)
+            
+        self.updating_from_sliders = False
+
+    def on_text_changed(self):
+        if self.updating_from_sliders or self.updating_from_text:
+            return
+            
+        self.updating_from_text = True
+        
+        try:
+            r = int(self.red_text.text()) if self.red_text.text() else 0
+            g = int(self.green_text.text()) if self.green_text.text() else 0
+            b = int(self.blue_text.text()) if self.blue_text.text() else 0
+            
+            r = max(0, min(255, r))
+            g = max(0, min(255, g))
+            b = max(0, min(255, b))
+            
+            red_val = min((r + 4) // 8, 31)
+            green_val = min((g + 4) // 8, 31)
+            blue_val = min((b + 4) // 8, 31)
+            
+            self.red_slider.setValue(red_val)
+            self.green_slider.setValue(green_val)
+            self.blue_slider.setValue(blue_val)
+            
+            self.red_value.setText(str(red_val))
+            self.green_value.setText(str(green_val))
+            self.blue_value.setText(str(blue_val))
+            
+            r_rounded = min((red_val * 8 + 4) // 8 * 8, 248)
+            g_rounded = min((green_val * 8 + 4) // 8 * 8, 248)
+            b_rounded = min((blue_val * 8 + 4) // 8 * 8, 248)
+            
+            self.selected_color = QColor(r_rounded, g_rounded, b_rounded)
+            self.color_preview.setStyleSheet(f"background-color: rgb({r_rounded}, {g_rounded}, {b_rounded}); border: 1px solid #000;")
+            
+            if self.selected_color_index >= 0:
+                self.color_updated.emit(self.selected_color_index, r_rounded, g_rounded, b_rounded, False)
+                
+        except ValueError:
+            pass
+            
+        self.updating_from_text = False
 
     def setup_ui(self):
         layout = QGridLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2)
-        layout.setSpacing(4)
+        layout.setContentsMargins(1, 1, 1, 1)
+        layout.setSpacing(1)
+        layout.setVerticalSpacing(0)
 
         red_label = QLabel("R")
-        red_label.setFont(QFont("Arial", 8, QFont.Bold))
-        red_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(red_label, 1, 0)
+        red_label.setFont(QFont("Arial", 7, QFont.Bold))
+        red_label.setFixedWidth(8)
+        red_label.setFixedHeight(12)
+        layout.addWidget(red_label, 0, 0)
         
         self.red_slider = QSlider(Qt.Horizontal)
         self.red_slider.setRange(0, 31)
         self.red_slider.setValue(0)
         self.red_slider.setFixedWidth(120)
+        self.red_slider.setFixedHeight(12)
         self.red_slider.valueChanged.connect(self.on_color_changed)
-        layout.addWidget(self.red_slider, 1, 1)
+        layout.addWidget(self.red_slider, 0, 1)
         
         self.red_value = QLabel("0")
-        self.red_value.setFont(QFont("Arial", 8))
-        self.red_value.setFixedWidth(15)
+        self.red_value.setFont(QFont("Arial", 7))
+        self.red_value.setFixedWidth(10)
+        self.red_value.setFixedHeight(12)
         self.red_value.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.red_value, 1, 2)
-        
+        layout.addWidget(self.red_value, 0, 2)
+
         green_label = QLabel("G")
-        green_label.setFont(QFont("Arial", 8, QFont.Bold))
-        green_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(green_label, 2, 0)
+        green_label.setFont(QFont("Arial", 7, QFont.Bold))
+        green_label.setFixedWidth(8)
+        green_label.setFixedHeight(12)
+        layout.addWidget(green_label, 1, 0)
         
         self.green_slider = QSlider(Qt.Horizontal)
         self.green_slider.setRange(0, 31)
         self.green_slider.setValue(0)
         self.green_slider.setFixedWidth(120)
+        self.green_slider.setFixedHeight(12)
         self.green_slider.valueChanged.connect(self.on_color_changed)
-        layout.addWidget(self.green_slider, 2, 1)
+        layout.addWidget(self.green_slider, 1, 1)
         
         self.green_value = QLabel("0")
-        self.green_value.setFont(QFont("Arial", 8))
-        self.green_value.setFixedWidth(15)
+        self.green_value.setFont(QFont("Arial", 7))
+        self.green_value.setFixedWidth(10)
+        self.green_value.setFixedHeight(12)
         self.green_value.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.green_value, 2, 2)
-        
+        layout.addWidget(self.green_value, 1, 2)
+
         blue_label = QLabel("B")
-        blue_label.setFont(QFont("Arial", 8, QFont.Bold))
-        blue_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(blue_label, 3, 0)
+        blue_label.setFont(QFont("Arial", 7, QFont.Bold))
+        blue_label.setFixedWidth(8)
+        blue_label.setFixedHeight(12)
+        layout.addWidget(blue_label, 2, 0)
         
         self.blue_slider = QSlider(Qt.Horizontal)
         self.blue_slider.setRange(0, 31)
         self.blue_slider.setValue(0)
         self.blue_slider.setFixedWidth(120)
+        self.blue_slider.setFixedHeight(12)
         self.blue_slider.valueChanged.connect(self.on_color_changed)
-        layout.addWidget(self.blue_slider, 3, 1)
+        layout.addWidget(self.blue_slider, 2, 1)
         
         self.blue_value = QLabel("0")
-        self.blue_value.setFont(QFont("Arial", 8))
-        self.blue_value.setFixedWidth(15)
+        self.blue_value.setFont(QFont("Arial", 7))
+        self.blue_value.setFixedWidth(10)
+        self.blue_value.setFixedHeight(12)
         self.blue_value.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.blue_value, 3, 2)
-        
+        layout.addWidget(self.blue_value, 2, 2)
+
         self.color_preview = QLabel()
-        self.color_preview.setFixedSize(30, 30)
+        self.color_preview.setFixedSize(35, 35)
         self.color_preview.setStyleSheet("background-color: black; border: 1px solid #000;")
-        layout.addWidget(self.color_preview, 1, 3, 3, 1, Qt.AlignCenter)
+        layout.addWidget(self.color_preview, 0, 3, 3, 1, Qt.AlignCenter)
+
+        rgb_layout = QHBoxLayout()
+        rgb_layout.setContentsMargins(0, 0, 0, 0)
+        rgb_layout.setSpacing(3)
+        
+        r_label = QLabel("R:")
+        r_label.setFont(QFont("Arial", 7, QFont.Bold))
+        r_label.setFixedWidth(8)
+        r_label.setFixedHeight(12)
+        rgb_layout.addWidget(r_label)
+        
+        self.red_text = QLineEdit("0")
+        self.red_text.setFont(QFont("Arial", 7))
+        self.red_text.setFixedWidth(30)
+        self.red_text.setFixedHeight(16)
+        self.red_text.setValidator(QIntValidator(0, 255))
+        self.red_text.textChanged.connect(self.on_text_changed)
+        rgb_layout.addWidget(self.red_text)
+        
+        g_label = QLabel("G:")
+        g_label.setFont(QFont("Arial", 7, QFont.Bold))
+        g_label.setFixedWidth(8)
+        g_label.setFixedHeight(12)
+        rgb_layout.addWidget(g_label)
+        
+        self.green_text = QLineEdit("0")
+        self.green_text.setFont(QFont("Arial", 7))
+        self.green_text.setFixedWidth(30)
+        self.green_text.setFixedHeight(16)
+        self.green_text.setValidator(QIntValidator(0, 255))
+        self.green_text.textChanged.connect(self.on_text_changed)
+        rgb_layout.addWidget(self.green_text)
+        
+        b_label = QLabel("B:")
+        b_label.setFont(QFont("Arial", 7, QFont.Bold))
+        b_label.setFixedWidth(8)
+        b_label.setFixedHeight(12)
+        rgb_layout.addWidget(b_label)
+        
+        self.blue_text = QLineEdit("0")
+        self.blue_text.setFont(QFont("Arial", 7))
+        self.blue_text.setFixedWidth(30)
+        self.blue_text.setFixedHeight(16)
+        self.blue_text.setValidator(QIntValidator(0, 255))
+        self.blue_text.textChanged.connect(self.on_text_changed)
+        rgb_layout.addWidget(self.blue_text)
+        
+        layout.addLayout(rgb_layout, 3, 0, 1, 4)
 
     def set_color(self, index, r, g, b):
         self.original_color = (r, g, b)
         self.selected_color_index = index
         
-        red_val = r // 8
-        green_val = g // 8
-        blue_val = b // 8
+        red_val = min((r + 4) // 8, 31)
+        green_val = min((g + 4) // 8, 31)
+        blue_val = min((b + 4) // 8, 31)
+        
+        r_rounded = min((red_val * 8 + 4) // 8 * 8, 248)
+        g_rounded = min((green_val * 8 + 4) // 8 * 8, 248)
+        b_rounded = min((blue_val * 8 + 4) // 8 * 8, 248)
         
         try:
             self.red_slider.valueChanged.disconnect()
             self.green_slider.valueChanged.disconnect()
             self.blue_slider.valueChanged.disconnect()
+            self.red_text.textChanged.disconnect()
+            self.green_text.textChanged.disconnect()
+            self.blue_text.textChanged.disconnect()
         except:
             pass
             
@@ -209,22 +334,35 @@ class ColorEditor(QWidget):
         self.green_slider.setValue(green_val)
         self.blue_slider.setValue(blue_val)
         
-        self.red_slider.valueChanged.connect(self.on_color_changed)
-        self.green_slider.valueChanged.connect(self.on_color_changed)
-        self.blue_slider.valueChanged.connect(self.on_color_changed)
-        
         self.red_value.setText(str(red_val))
         self.green_value.setText(str(green_val))
         self.blue_value.setText(str(blue_val))
         
-        self.selected_color = QColor(r, g, b)
-        self.color_preview.setStyleSheet(f"background-color: rgb({r}, {g}, {b}); border: 1px solid #000;")
+        self.red_text.setText(str(r_rounded))
+        self.green_text.setText(str(g_rounded))
+        self.blue_text.setText(str(b_rounded))
+        
+        self.red_slider.valueChanged.connect(self.on_color_changed)
+        self.green_slider.valueChanged.connect(self.on_color_changed)
+        self.blue_slider.valueChanged.connect(self.on_color_changed)
+        self.red_text.textChanged.connect(self.on_text_changed)
+        self.green_text.textChanged.connect(self.on_text_changed)
+        self.blue_text.textChanged.connect(self.on_text_changed)
+        
+        self.selected_color = QColor(r_rounded, g_rounded, b_rounded)
+        self.color_preview.setStyleSheet(f"background-color: rgb({r_rounded}, {g_rounded}, {b_rounded}); border: 1px solid #000;")
     
     def get_current_color(self):
-        r = self.red_slider.value() * 8
-        g = self.green_slider.value() * 8
-        b = self.blue_slider.value() * 8
-        return (r, g, b)
+        try:
+            r = int(self.red_text.text()) if self.red_text.text() else 0
+            g = int(self.green_text.text()) if self.green_text.text() else 0
+            b = int(self.blue_text.text()) if self.blue_text.text() else 0
+            return (r, g, b)
+        except ValueError:
+            r = self.red_slider.value() * 8
+            g = self.green_slider.value() * 8
+            b = self.blue_slider.value() * 8
+            return (r, g, b)
     
     def has_changes(self):
         if self.selected_color_index < 0:
@@ -256,7 +394,6 @@ class EditPalettesTab(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        # Header
         header = QLabel("Edit Palettes")
         header.setFont(QFont("Arial", 10, QFont.Bold))
         header.setStyleSheet("QLabel { background: #555; color: white; padding: 4px; border-radius: 4px; }")
@@ -264,12 +401,10 @@ class EditPalettesTab(QWidget):
         header.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(header)
 
-        # Main splitter
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setChildrenCollapsible(False)
         main_splitter.setHandleWidth(6)
 
-        # === LEFT: Palettes ===
         palettes_container = QWidget()
         palettes_layout = QVBoxLayout(palettes_container)
         palettes_layout.setContentsMargins(4, 4, 4, 4)
@@ -280,9 +415,8 @@ class EditPalettesTab(QWidget):
         palettes_label.setAlignment(Qt.AlignCenter)
         palettes_layout.addWidget(palettes_label)
 
-        # === Top Section: Fixed 256px height ===
         height_container = QWidget()
-        height_container.setFixedHeight(280)
+        height_container.setFixedHeight(260)
         top_layout = QHBoxLayout(height_container)
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(4)
@@ -326,7 +460,7 @@ class EditPalettesTab(QWidget):
         right_layout.addWidget(self.full_palette_view)
         
         editor_container = QWidget()
-        editor_container.setFixedSize(195, 80)
+        editor_container.setFixedSize(195, 65)
         editor_layout = QVBoxLayout(editor_container)
         editor_layout.setContentsMargins(0, 0, 0, 0)
         editor_layout.setSpacing(0)
@@ -341,7 +475,6 @@ class EditPalettesTab(QWidget):
 
         palettes_layout.addWidget(height_container)
 
-        # Bottom: Reserved
         self.edit_palettes_view = QGraphicsView()
         self.edit_palettes_scene = QGraphicsScene()
         self.edit_palettes_view.setScene(self.edit_palettes_scene)
@@ -353,7 +486,6 @@ class EditPalettesTab(QWidget):
 
         main_splitter.addWidget(palettes_container)
 
-        # === RIGHT: Tilemap Replica ===
         tilemap_container = QWidget()
         tilemap_layout = QVBoxLayout(tilemap_container)
         tilemap_layout.setContentsMargins(4, 4, 4, 4)
