@@ -121,12 +121,30 @@ class GBABackgroundStudio(QMainWindow):
         
         if focused_widget:
             widget = focused_widget
-            while widget:
-                if hasattr(widget, 'parent') and hasattr(widget.parent(), '__class__'):
-                    if widget.parent().__class__.__name__ == 'ColorEditor':
+            for _ in range(10):
+                if widget is None:
+                    break
+                try:
+                    if (hasattr(widget, '__class__') and 
+                        widget.__class__.__name__ == 'ColorEditor'):
                         is_color_edit_field = True
                         break
-                widget = widget.parent()
+                        
+                    if (hasattr(widget, 'parent') and 
+                        callable(getattr(widget, 'parent', None))):
+                        parent = widget.parent()
+                        if (parent is not None and 
+                            hasattr(parent, '__class__') and 
+                            parent.__class__.__name__ == 'ColorEditor'):
+                            is_color_edit_field = True
+                            break
+                            
+                    if hasattr(widget, 'parent') and callable(getattr(widget, 'parent', None)):
+                        widget = widget.parent()
+                    else:
+                        break
+                except:
+                    break
         
         if is_color_edit_field and event.modifiers() & Qt.ControlModifier:
             if event.key() in [Qt.Key_Z, Qt.Key_Y]:
@@ -222,14 +240,14 @@ class GBABackgroundStudio(QMainWindow):
     def apply_tile_change(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tilemap_data:
             return
-        
+
         if hasattr(self, 'history_manager'):
             self.history_manager.is_undoing = True
         
         try:
             tile_x = state['data']['tile_x']
             tile_y = state['data']['tile_y']
-            
+
             if is_undo:
                 tile_id = state['data']['old_tile_id']
                 palette_id = state['data']['old_palette_id']
@@ -237,31 +255,35 @@ class GBABackgroundStudio(QMainWindow):
                 v_flip = state['data']['old_v_flip']
             else:
                 tile_id = state['data']['new_tile_id']
+                h_flip = state['data']['new_h_flip']
+                v_flip = state['data']['new_v_flip']
+                
                 tile_index = tile_y * self.edit_tiles_tab.tilemap_width + tile_x
                 current_entry = self.edit_tiles_tab.tilemap_data[tile_index * 2] | (self.edit_tiles_tab.tilemap_data[tile_index * 2 + 1] << 8)
                 palette_id = (current_entry >> 12) & 0xF
-                h_flip = bool(current_entry & (1 << 10))
-                v_flip = bool(current_entry & (1 << 11))
-            
+
             new_entry = tile_id
+
             if h_flip:
                 new_entry |= (1 << 10)
+
             if v_flip:
                 new_entry |= (1 << 11)
+
             new_entry |= (palette_id << 12)
 
             tilemap_data = bytearray(self.edit_tiles_tab.tilemap_data)
             tile_index = tile_y * self.edit_tiles_tab.tilemap_width + tile_x
             tilemap_data[tile_index * 2] = new_entry & 0xFF
             tilemap_data[tile_index * 2 + 1] = (new_entry >> 8) & 0xFF
-            
             self.edit_tiles_tab.tilemap_data = bytes(tilemap_data)
+
             self.edit_tiles_tab.update_single_tile_visual(tile_x, tile_y)
-            
+
             if hasattr(self, 'edit_palettes_tab'):
                 self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
                 self.edit_palettes_tab.update_palette_overlay_for_tile(tile_x, tile_y, palette_id)
-                
+
         finally:
             if hasattr(self, 'history_manager'):
                 self.history_manager.is_undoing = False

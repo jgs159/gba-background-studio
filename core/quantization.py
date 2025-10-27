@@ -13,72 +13,120 @@ from core.config import MARKER_COLOR
 from utils.translator import Translator
 translator = Translator()
 
-def get_irfanview_path():
-    if sys.platform != "win32":
-        return "wine ~/.wine/drive_c/Program Files/IrfanView/i_view64.exe"
 
-    is_64bit = platform.machine().endswith('64')
-    
-    if is_64bit:
-        paths = [
-            os.path.expandvars("%ProgramFiles%\\IrfanView\\i_view64.exe"),
-            "C:\\Program Files\\IrfanView\\i_view64.exe"
-        ]
-    else:
-        paths = [
-            os.path.expandvars("%ProgramFiles%\\IrfanView\\i_view32.exe"),
-            "C:\\Program Files\\IrfanView\\i_view32.exe"
-        ]
-    
-    paths.extend([
-        os.path.expandvars("%ProgramFiles(x86)%\\IrfanView\\i_view32.exe"),
-        "C:\\Program Files (x86)\\IrfanView\\i_view32.exe"
-    ])
-
-    for path in paths:
-        if os.path.exists(path):
-            return path
-
-    raise FileNotFoundError(f"IrfanView not found. Please install the {'64' if is_64bit else '32'}-bit version from irfanview.info")
-
-def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=None, transparent_color=(0,0,0), keep_transparent=False):
+def quantize_with_irfanview(groups_dir, selected_palettes=None, transparent_color=(0,0,0), keep_transparent=False):
     indexed_dir = os.path.join(groups_dir, "01_indexed")
     reindexed_dir = os.path.join(groups_dir, "02_reindexed")
     os.makedirs(indexed_dir, exist_ok=True)
     os.makedirs(reindexed_dir, exist_ok=True)
-    if irfanview_path is None:
-        irfanview_path = get_irfanview_path()
 
-    # Pre-calculate values
     transparent_color_gba = rgb_to_gba_rounded(transparent_color)
     final_color_0 = transparent_color_gba if keep_transparent else (0, 0, 0)
     marker_gba = rgb_to_gba_rounded(MARKER_COLOR)
-
-    print(translator.tr("applying_gba_palette"), flush=True)
+    
     for i in range(16):
         input_path = os.path.abspath(os.path.join(groups_dir, f"group_{i}.png"))
         if not os.path.exists(input_path):
             continue
 
         output_1 = os.path.abspath(os.path.join(indexed_dir, f"group_{i}_indexed.png"))
-        cmd1 = [
-            irfanview_path,
-            input_path,
-            "/bpp=4",
-            "/dither=0",
-            f"/convert={output_1}"
-        ]
-        result = subprocess.run(cmd1)
-        if result.returncode != 0:
-            continue
+        output_2 = os.path.abspath(os.path.join(reindexed_dir, f"group_{i}_indexed.png"))
 
         try:
-            img = Image.open(output_1)
-            if img.mode != 'P':
-                shutil.copy2(output_1, os.path.join(reindexed_dir, f"group_{i}_indexed.png"))
+            img = Image.open(input_path)
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            arr = np.array(img)
+            h, w, _ = arr.shape
+
+            alpha = arr[:, :, 3]
+            opaque_mask = alpha > 128
+            transparent_mask = alpha <= 128
+            
+            opaque_pixels = arr[opaque_mask][:, :3]
+            
+            if len(opaque_pixels) == 0:
+                indexed_img = Image.new("P", (w, h))
+                flat_palette = [0] * 768
+                indexed_img.putpalette(flat_palette)
+                indexed_img.save(output_1)
+                indexed_img.save(output_2)
                 continue
 
-            palette = img.getpalette()
+            mask_marker = (arr[:, :, 0] == MARKER_COLOR[0]) & \
+                         (arr[:, :, 1] == MARKER_COLOR[1]) & \
+                         (arr[:, :, 2] == MARKER_COLOR[2]) & \
+                         (opaque_mask)
+            has_marker = np.any(mask_marker)
+            
+            cluster_pixels = opaque_pixels.copy()
+            if has_marker:
+                not_marker = ~((opaque_pixels[:, 0] == MARKER_COLOR[0]) & 
+                              (opaque_pixels[:, 1] == MARKER_COLOR[1]) & 
+                              (opaque_pixels[:, 2] == MARKER_COLOR[2]))
+                cluster_pixels = opaque_pixels[not_marker]
+
+            n_clusters = min(15, len(cluster_pixels))
+            
+            if n_clusters > 0:
+                if len(cluster_pixels) > 5000:
+                    np.random.seed(42)
+                    
+                    sample_size = min(5000, len(cluster_pixels))
+                    indices = np.random.choice(len(cluster_pixels), sample_size, replace=False)
+                    sample_pixels = cluster_pixels[indices]
+                    
+                    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10, max_iter=30, tol=1e-5)
+                    kmeans.fit(sample_pixels)
+                    
+                    labels = kmeans.predict(cluster_pixels)
+                    cluster_centers = kmeans.cluster_centers_.round().astype(int)
+                else:
+                    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10, max_iter=30, tol=1e-5)
+                    labels = kmeans.fit_predict(cluster_pixels)
+                    cluster_centers = kmeans.cluster_centers_.round().astype(int)
+                
+                initial_palette = [final_color_0]
+                for center in cluster_centers:
+                    initial_palette.append(tuple(center))
+                
+                while len(initial_palette) < 16:
+                    gray_idx = len(initial_palette)
+                    gray_value = max(1, (255 // 15) * gray_idx)
+                    new_color = (gray_value, gray_value, gray_value)
+                    
+                    if new_color != MARKER_COLOR and new_color not in initial_palette:
+                        initial_palette.append(new_color)
+                    else:
+                        alt_color = (gray_value, max(1, gray_value-10), min(255, gray_value+10))
+                        initial_palette.append(alt_color)
+            else:
+                initial_palette = [final_color_0] + [(1, 1, 1)] * 15
+
+            indexed_data = np.zeros((h, w), dtype=np.uint8)
+            indexed_data[transparent_mask] = 0
+            
+            if n_clusters > 0:
+                opaque_indices = labels + 1
+                
+                opaque_non_marker = opaque_mask & ~mask_marker
+                indexed_data[opaque_non_marker] = opaque_indices
+                
+                indexed_data[mask_marker] = 0
+            else:
+                indexed_data[mask_marker] = 0
+
+            indexed_img = Image.fromarray(indexed_data, mode="P")
+            flat_palette_1 = []
+            for color in initial_palette:
+                flat_palette_1.extend(color)
+            while len(flat_palette_1) < 768:
+                flat_palette_1.append(0)
+            indexed_img.putpalette(flat_palette_1)
+            indexed_img.save(output_1)
+
+            palette = indexed_img.getpalette()
             rgb_palette = []
             for j in range(16):
                 r = palette[j*3]
@@ -86,34 +134,41 @@ def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=N
                 b = palette[j*3+2]
                 rgb_palette.append((r, g, b))
 
-            work = rgb_palette[1:]
-            indexed_colors = [(idx, color) for idx, color in enumerate(work)]
-            indexed_colors.sort(key=lambda x: (calculate_relative_luminance(x[1]), x[1][0], x[1][1], x[1][2]))
+            work_colors = rgb_palette[1:]
+            
+            work_colors = [color for color in work_colors if color != MARKER_COLOR]
+            
+            while len(work_colors) < 15:
+                gray_val = (len(work_colors) + 1) * 16
+                new_color = (gray_val, gray_val, gray_val)
+                if new_color != MARKER_COLOR and new_color not in work_colors:
+                    work_colors.append(new_color)
+            
+            work_colors_sorted = sorted(work_colors, key=lambda x: (
+                calculate_relative_luminance(x),
+                x[0], x[1], x[2]
+            ))
+            reordered_rgb = [rgb_palette[0]] + work_colors_sorted
 
-            reordered_rgb = [rgb_palette[0]]
-            for old_idx, color in indexed_colors:
-                reordered_rgb.append(color)
+            for i in range(1, 16):
+                if reordered_rgb[i] == MARKER_COLOR:
+                    reordered_rgb[i] = (
+                        (MARKER_COLOR[0] + 1) % 256,
+                        (MARKER_COLOR[1] + 1) % 256, 
+                        (MARKER_COLOR[2] + 1) % 256
+                    )
 
-            gba_palette = [rgb_to_gba_rounded(c) for c in reordered_rgb]
-            marker_indices = [j for j, c in enumerate(gba_palette) if c == marker_gba]
-
-            if marker_indices:
-                marker_idx = marker_indices[0]
-                if marker_idx != 0:
-                    reordered_rgb[0] = MARKER_COLOR
-                    reordered_rgb[marker_idx] = rgb_palette[0]
-                else:
-                    reordered_rgb[0] = MARKER_COLOR
-            else:
-                reordered_rgb[0] = MARKER_COLOR
-
+            reordered_rgb[0] = MARKER_COLOR
+            
+            print(translator.tr("applying_gba_palette"), flush=True)
+            
             if keep_transparent:
                 reordered_rgb[0] = transparent_color_gba
             else:
                 reordered_rgb[0] = (0, 0, 0)
 
-            img_data = np.array(img)
-            new_img = Image.new("P", img.size)
+            img_data = np.array(indexed_img)
+            new_img = Image.new("P", indexed_img.size)
 
             flat_palette = []
             for color in reordered_rgb:
@@ -140,12 +195,18 @@ def quantize_with_irfanview(groups_dir, irfanview_path=None, selected_palettes=N
             new_flat = np.array([old_to_new.get(idx, 0) for idx in img_flat])
             new_img.putdata(new_flat.tolist())
 
-            output_2 = os.path.abspath(os.path.join(reindexed_dir, f"group_{i}_indexed.png"))
             new_img.save(output_2)
 
         except Exception as e:
             print(translator.tr("error_ensure_gba", e=e))
-            shutil.copy2(output_1, os.path.join(reindexed_dir, f"group_{i}_indexed.png"))
+            try:
+                default_img = Image.new("P", (w, h))
+                flat_palette = [0] * 768
+                default_img.putpalette(flat_palette)
+                default_img.save(output_1)
+                default_img.save(output_2)
+            except:
+                pass
 
     return reindexed_dir
 
@@ -183,9 +244,22 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
     if n_clusters <= 0:
         n_clusters = 1
 
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
-    labels = kmeans.fit_predict(cluster_pixels)
-    cluster_centers = kmeans.cluster_centers_.round(0).astype(int)
+    if len(cluster_pixels) > 5000:
+        np.random.seed(42)
+        
+        sample_size = min(5000, len(cluster_pixels))
+        indices = np.random.choice(len(cluster_pixels), sample_size, replace=False)
+        sample_pixels = cluster_pixels[indices]
+        
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10, max_iter=30, tol=1e-5)
+        kmeans.fit(sample_pixels)
+        
+        labels = kmeans.predict(cluster_pixels)
+        cluster_centers = kmeans.cluster_centers_.round(0).astype(int)
+    else:
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10, max_iter=30, tol=1e-5)
+        labels = kmeans.fit_predict(cluster_pixels)
+        cluster_centers = kmeans.cluster_centers_.round(0).astype(int)
 
     reduced_palette = []
     if start_index == 0:
@@ -210,7 +284,7 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
     if start_index == 0:
         indexed_colors = [(i, color) for i, color in enumerate(reduced_palette)]
         indexed_colors.sort(key=lambda x: (calculate_relative_luminance(x[1]), x[1][0], x[1][1], x[1][2]))
-        reordered_palette = [final_color_0]  # Índice 0
+        reordered_palette = [final_color_0]
         reordered_palette.extend((r, g, b) for _, (r, g, b) in indexed_colors)
     else:
         indexed_colors = [(i, color) for i, color in enumerate(reduced_palette)]
@@ -226,20 +300,26 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
 
     indices = np.zeros((h, w), dtype=np.uint8)
 
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = arr[y, x]
-            if a <= 128 or (r, g, b) == MARKER_COLOR:
-                indices[y, x] = 0
-                continue
+    valid_mask = opaque & ~(
+        (arr[:, :, 0] == MARKER_COLOR[0]) & 
+        (arr[:, :, 1] == MARKER_COLOR[1]) & 
+        (arr[:, :, 2] == MARKER_COLOR[2])
+    )
+    
+    valid_coords = np.argwhere(valid_mask)
+    if len(valid_coords) > 0:
+        valid_pixels = arr[valid_mask][:, :3]
+        
+        distances = np.sum((valid_pixels[:, np.newaxis] - palette_rgb) ** 2, axis=2)
+        closest_indices = np.argmin(distances, axis=1)
+        
+        if start_index == 0:
+            indices[valid_mask] = closest_indices + 1
+        else:
+            indices[valid_mask] = start_index + closest_indices
 
-            distances = np.sum((palette_rgb - [r, g, b])**2, axis=1)
-            closest_idx = np.argmin(distances)
-
-            if start_index == 0:
-                indices[y, x] = closest_idx + 1
-            else:
-                indices[y, x] = start_index + closest_idx
+    indices[alpha <= 128] = 0
+    indices[mask_marker] = 0
 
     full_palette_gba = [(255, 255, 255)] * 256 
 

@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QSplitter, QGraphicsView, QGraphicsScene,
     QHBoxLayout, QGraphicsPixmapItem, QFrame, QSlider, QSizePolicy, QGridLayout,
-    QGraphicsRectItem, QLineEdit
+    QGraphicsRectItem, QLineEdit, QSpinBox, QPushButton, QCheckBox
 )
 from PySide6.QtGui import QFont, QBrush, QPen, QColor, QPainter, QPixmap, QIntValidator
 from PySide6.QtCore import Qt, Signal, QTimer
@@ -73,6 +73,7 @@ class EditPalettesTab(QWidget):
 
     def create_palettes_container(self):
         container = QWidget()
+        container.setStyleSheet("QWidget { background-color: #f0f0f0; }")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
@@ -82,26 +83,28 @@ class EditPalettesTab(QWidget):
         palettes_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(palettes_label)
 
-        height_container = QWidget()
-        height_container.setFixedHeight(260)
-        top_layout = QHBoxLayout(height_container)
-        top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.setSpacing(4)
+        bordered_frame = QFrame()
+        bordered_frame.setFrameShape(QFrame.StyledPanel)
+        bordered_frame.setFrameShadow(QFrame.Raised)
+        bordered_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+            }
+        """)
+        bordered_frame.setFixedHeight(271)
+
+        inner_layout = QHBoxLayout(bordered_frame)
+        inner_layout.setContentsMargins(4, 4, 4, 4)
+        inner_layout.setSpacing(4)
 
         left_container = self.create_left_palette_container()
-        top_layout.addWidget(left_container)
+        inner_layout.addWidget(left_container)
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        separator.setStyleSheet("background: #ccc;")
-        separator.setFixedWidth(1)
-        top_layout.addWidget(separator)
-        
         right_container = self.create_right_palette_container()
-        top_layout.addWidget(right_container)
+        inner_layout.addWidget(right_container)
 
-        layout.addWidget(height_container)
+        layout.addWidget(bordered_frame)
 
         self.edit_palettes_view = QGraphicsView()
         self.edit_palettes_scene = QGraphicsScene()
@@ -126,6 +129,7 @@ class EditPalettesTab(QWidget):
         self.grid_view.mouseMoveEvent = self.on_palette_grid_hover
         self.grid_view.leaveEvent = self.on_palette_grid_leave
         self.grid_view.mousePressEvent = self.on_palette_grid_click
+        self.grid_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: none; }")
         layout.addWidget(self.grid_view)
         
         return container
@@ -142,7 +146,7 @@ class EditPalettesTab(QWidget):
         self.full_palette_view.setScene(self.full_palette_scene)
         self.full_palette_view.setRenderHint(QPainter.Antialiasing, False)
         self.full_palette_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.full_palette_view.setStyleSheet("QGraphicsView { background: #f9f9f9; border: 1px solid #ccc; }")
+        self.full_palette_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: none; }")
         self.full_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.full_palette_view.setFixedSize(195, 195)
         layout.addWidget(self.full_palette_view)
@@ -172,17 +176,99 @@ class EditPalettesTab(QWidget):
         tilemap_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(tilemap_label)
 
+        tilemap_toolbar = self.create_tilemap_toolbar()
+        layout.addWidget(tilemap_toolbar)
+
         self.edit_tilemap2_view = CustomGraphicsView()
         self.edit_tilemap2_scene = QGraphicsScene()
         self.edit_tilemap2_view.setScene(self.edit_tilemap2_scene)
         self.edit_tilemap2_view.setRenderHint(QPainter.Antialiasing, False)
         self.edit_tilemap2_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.edit_tilemap2_view.setStyleSheet("QGraphicsView { background: #e0e0e0; border: 1px solid #ccc; }")
+        self.edit_tilemap2_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
         self.edit_tilemap2_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.edit_tilemap2_view.setMouseTracking(True)
         layout.addWidget(self.edit_tilemap2_view)
 
         return container
+
+    def create_tilemap_toolbar(self):
+        controls_frame = QFrame()
+        controls_frame.setFrameStyle(QFrame.StyledPanel)
+        controls_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border: 1px solid #ccc; }")
+        controls_frame.setFixedHeight(28)
+        controls_layout = QVBoxLayout(controls_frame)
+        controls_layout.setSpacing(1)
+        controls_layout.setContentsMargins(3, 3, 3, 3)
+
+        controls_main_layout = QHBoxLayout()
+        controls_main_layout.setSpacing(3)
+        controls_main_layout.setContentsMargins(0, 0, 0, 0)
+        controls_main_layout.setAlignment(Qt.AlignLeft)
+
+        width_label = QLabel("Width:")
+        width_label.setStyleSheet("QLabel { border: none; }")
+        controls_main_layout.addWidget(width_label)
+        self.tilemap_width_spin = QSpinBox()
+        self.tilemap_width_spin.setRange(1, 999)
+        self.tilemap_width_spin.setValue(32)
+        self.tilemap_width_spin.setFixedWidth(45)
+        self.tilemap_width_spin.setFixedHeight(18)
+        self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
+        controls_main_layout.addWidget(self.tilemap_width_spin)
+
+        height_label = QLabel("Height:")
+        height_label.setStyleSheet("QLabel { border: none; }")
+        controls_main_layout.addWidget(height_label)
+        self.tilemap_height_spin = QSpinBox()
+        self.tilemap_height_spin.setRange(1, 999)
+        self.tilemap_height_spin.setValue(32)
+        self.tilemap_height_spin.setFixedWidth(45)
+        self.tilemap_height_spin.setFixedHeight(18)
+        self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
+        controls_main_layout.addWidget(self.tilemap_height_spin)
+
+        self.resize_button = QPushButton("Resize")
+        self.resize_button.setFixedWidth(50)
+        self.resize_button.setFixedHeight(20)
+        self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
+        self.resize_button.clicked.connect(self.on_tilemap_resize)
+        controls_main_layout.addWidget(self.resize_button)
+
+        self.btn_up = QPushButton("↑")
+        self.btn_left = QPushButton("←")
+        self.btn_right = QPushButton("→")
+        self.btn_down = QPushButton("↓")
+        self.move_label = QLabel("Move")
+        self.move_label.setStyleSheet("QLabel { border: none; }")
+
+        for btn in [self.btn_up, self.btn_left, self.btn_right, self.btn_down]:
+            btn.setFixedSize(20, 20)
+            btn.setStyleSheet("""
+                QPushButton {
+                    font-weight: bold;
+                    padding: 0px;
+                    font-size: 7pt;
+                }
+            """)
+
+        self.btn_up.clicked.connect(lambda: self.on_tilemap_shift("up"))
+        self.btn_down.clicked.connect(lambda: self.on_tilemap_shift("down"))
+        self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
+        self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
+
+        controls_main_layout.addWidget(self.btn_left)
+        controls_main_layout.addWidget(self.btn_up)
+        controls_main_layout.addWidget(self.move_label)
+        controls_main_layout.addWidget(self.btn_down)
+        controls_main_layout.addWidget(self.btn_right)
+
+        self.cyclic_checkbox = QCheckBox("Cyclic Shift")
+        self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
+        self.cyclic_checkbox.setFixedHeight(18)
+        controls_main_layout.addWidget(self.cyclic_checkbox)
+
+        controls_layout.addLayout(controls_main_layout)
+        return controls_frame
 
     def initialize_color_editor(self):
         if (hasattr(self, 'palette_colors') and 
@@ -623,6 +709,20 @@ class EditPalettesTab(QWidget):
                 self.main_window.preview_tab.palette_colors[index] = (r, g, b)
             
             self.main_window.preview_tab.display_palette_colors(self.main_window.preview_tab.palette_colors)
+
+    def on_tilemap_shift(self, direction):
+        """Manejar desplazamiento del tilemap"""
+        is_cyclic = self.cyclic_checkbox.isChecked()
+        # Aquí va la lógica para desplazar el tilemap
+        # direction será: 'up', 'down', 'left', 'right'
+        pass
+
+    def on_tilemap_resize(self):
+        """Manejar redimensionamiento del tilemap"""
+        width = self.tilemap_width_spin.value()
+        height = self.tilemap_height_spin.value()
+        # Aquí va la lógica para redimensionar el tilemap
+        pass
 
     def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
         update_status_bar_shared(

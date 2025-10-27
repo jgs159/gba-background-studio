@@ -23,6 +23,7 @@ class PaletteGridView(QGraphicsView):
         self.selection_overlay = QWidget(self.viewport())
         self.selection_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.selection_overlay.hide()
+        self.selection_overlay.setStyleSheet("QWidget { background: transparent; }")
         
         self.selection_pen = QPen(QColor(0, 0, 0), 1.0)
         self.selection_pen.setCosmetic(True)

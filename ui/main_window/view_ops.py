@@ -51,14 +51,25 @@ def apply_zoom_to_all(main_window):
     apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, zoom_factor)
     apply_zoom_to_view(main_window, main_window.edit_tiles_tab.edit_tileset_view, zoom_factor)
     apply_zoom_to_view(main_window, main_window.edit_tiles_tab.edit_tilemap_view, zoom_factor)
-    
     main_window.edit_palettes_tab.apply_zoom(zoom_factor)
     apply_zoom_to_view(main_window, main_window.edit_palettes_tab.edit_tilemap2_view, zoom_factor)
 
     from .tab_ops import update_hover_from_current_cursor
     update_hover_from_current_cursor(main_window)
+
     current_tab = main_window.main_tabs.currentWidget()
-    if current_tab == main_window.edit_tiles_tab:
+
+    if current_tab == main_window.preview_tab:
+        main_window.custom_status_bar.update_status(
+            selection_type="Tile",
+            selection_id="-",
+            tilemap_pos=(-1, -1),
+            tile_id="-",
+            palette_id="-",
+            flip_state="None",
+            zoom_level=main_window.zoom_level
+        )
+    elif current_tab == main_window.edit_tiles_tab:
         main_window.edit_tiles_tab.update_status_bar(*main_window.edit_tiles_tab.last_hover_pos)
     elif current_tab == main_window.edit_palettes_tab:
         main_window.edit_palettes_tab.update_status_bar(*main_window.edit_palettes_tab.last_hover_pos)

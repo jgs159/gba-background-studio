@@ -18,17 +18,14 @@ class PreviewTab(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         
-        # Header
         preview_header = self.create_header("Preview")
         self.layout.addWidget(preview_header)
         
-        # Main container with proper expansion
         main_container = QWidget()
         self.main_layout = QHBoxLayout(main_container)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
         
-        # Image section - WILL EXPAND to fill available space
         image_container = QWidget()
         image_container_layout = QVBoxLayout(image_container)
         image_container_layout.setContentsMargins(4, 4, 4, 4)
@@ -47,9 +44,8 @@ class PreviewTab(QWidget):
         self.preview_image_view.setAlignment(Qt.AlignCenter)
         image_container_layout.addWidget(self.preview_image_view)
         
-        # Palette section (fixed width, 150% size) - FIXED width
         palette_container = QWidget()
-        palette_container.setFixedWidth(204)  # Fixed width for palette
+        palette_container.setFixedWidth(204)
         palette_container_layout = QVBoxLayout(palette_container)
         palette_container_layout.setContentsMargins(4, 4, 4, 4)
         palette_container_layout.setSpacing(4)
@@ -64,11 +60,10 @@ class PreviewTab(QWidget):
         self.preview_palette_view.setScene(self.preview_palette_scene)
         self.preview_palette_view.setRenderHint(QPainter.Antialiasing, False)
         self.preview_palette_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.preview_palette_view.setStyleSheet("QGraphicsView { background: #f9f9f9; border: 1px solid #ccc; }")
+        self.preview_palette_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
         self.preview_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         palette_container_layout.addWidget(self.preview_palette_view)
         
-        # Add Open Output Folder button at the bottom of palette section
         open_output_btn = QPushButton("📁 Open Output Folder")
         open_output_btn.setStyleSheet("""
             QPushButton {
@@ -90,13 +85,11 @@ class PreviewTab(QWidget):
         open_output_btn.setFixedHeight(30)
         palette_container_layout.addWidget(open_output_btn)
         
-        # Add both sections to main layout
-        self.main_layout.addWidget(image_container, 1)  # 1 = expand to fill available space
-        self.main_layout.addWidget(palette_container, 0)  # 0 = fixed size
+        self.main_layout.addWidget(image_container, 1)
+        self.main_layout.addWidget(palette_container, 0)
         
         self.layout.addWidget(main_container)
         
-        # Initialize palette
         self.init_palette_150()
 
     def create_header(self, text):
@@ -114,13 +107,12 @@ class PreviewTab(QWidget):
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             
-            # Open the directory in file explorer
-            if os.name == 'nt':  # Windows
+            if os.name == 'nt':
                 os.startfile(output_dir)
-            elif os.name == 'posix':  # macOS or Linux
-                if os.uname().sysname == 'Darwin':  # macOS
+            elif os.name == 'posix':
+                if os.uname().sysname == 'Darwin':
                     subprocess.run(['open', output_dir])
-                else:  # Linux
+                else:
                     subprocess.run(['xdg-open', output_dir])
 
         except Exception as e:
