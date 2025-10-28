@@ -72,6 +72,9 @@ def load_last_output_files(main_window):
         main_window.menu_bar.action_save_tilemap.setEnabled(True)
         main_window.menu_bar.action_save_selection.setEnabled(True)
 
+        if hasattr(main_window, 'output_loaded_for_zoom'):
+            main_window.output_loaded_for_zoom = True
+            
         return True
         
     except Exception as e:

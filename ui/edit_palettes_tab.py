@@ -193,18 +193,17 @@ class EditPalettesTab(QWidget):
 
     def create_tilemap_toolbar(self):
         controls_frame = QFrame()
+        self.palette_tilemap_controls_frame = controls_frame
         controls_frame.setFrameStyle(QFrame.StyledPanel)
         controls_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border: 1px solid #ccc; }")
         controls_frame.setFixedHeight(28)
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setSpacing(1)
         controls_layout.setContentsMargins(3, 3, 3, 3)
-
         controls_main_layout = QHBoxLayout()
         controls_main_layout.setSpacing(3)
         controls_main_layout.setContentsMargins(0, 0, 0, 0)
         controls_main_layout.setAlignment(Qt.AlignLeft)
-
         width_label = QLabel("Width:")
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
@@ -215,7 +214,6 @@ class EditPalettesTab(QWidget):
         self.tilemap_width_spin.setFixedHeight(18)
         self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tilemap_width_spin)
-
         height_label = QLabel("Height:")
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
@@ -226,21 +224,18 @@ class EditPalettesTab(QWidget):
         self.tilemap_height_spin.setFixedHeight(18)
         self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tilemap_height_spin)
-
         self.resize_button = QPushButton("Resize")
         self.resize_button.setFixedWidth(50)
         self.resize_button.setFixedHeight(20)
         self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
         self.resize_button.clicked.connect(self.on_tilemap_resize)
         controls_main_layout.addWidget(self.resize_button)
-
         self.btn_up = QPushButton("↑")
         self.btn_left = QPushButton("←")
         self.btn_right = QPushButton("→")
         self.btn_down = QPushButton("↓")
         self.move_label = QLabel("Move")
         self.move_label.setStyleSheet("QLabel { border: none; }")
-
         for btn in [self.btn_up, self.btn_left, self.btn_right, self.btn_down]:
             btn.setFixedSize(20, 20)
             btn.setStyleSheet("""
@@ -255,19 +250,26 @@ class EditPalettesTab(QWidget):
         self.btn_down.clicked.connect(lambda: self.on_tilemap_shift("down"))
         self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
         self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
-
         controls_main_layout.addWidget(self.btn_left)
         controls_main_layout.addWidget(self.btn_up)
         controls_main_layout.addWidget(self.move_label)
         controls_main_layout.addWidget(self.btn_down)
         controls_main_layout.addWidget(self.btn_right)
-
         self.cyclic_checkbox = QCheckBox("Cyclic Shift")
         self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.cyclic_checkbox.setFixedHeight(18)
         controls_main_layout.addWidget(self.cyclic_checkbox)
-
         controls_layout.addLayout(controls_main_layout)
+
+        self.tilemap_width_spin.setEnabled(False)
+        self.tilemap_height_spin.setEnabled(False)
+        self.resize_button.setEnabled(False)
+        self.btn_up.setEnabled(False)
+        self.btn_down.setEnabled(False)
+        self.btn_left.setEnabled(False)
+        self.btn_right.setEnabled(False)
+        self.cyclic_checkbox.setEnabled(False)
+
         return controls_frame
 
     def initialize_color_editor(self):
@@ -491,6 +493,17 @@ class EditPalettesTab(QWidget):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
 
+    def toggle_tilemap_controls_enabled(self, enabled):
+        if hasattr(self, 'tilemap_width_spin'):
+            self.tilemap_width_spin.setEnabled(enabled)
+            self.tilemap_height_spin.setEnabled(enabled)
+            self.resize_button.setEnabled(enabled)
+            self.btn_up.setEnabled(enabled)
+            self.btn_down.setEnabled(enabled)
+            self.btn_left.setEnabled(enabled)
+            self.btn_right.setEnabled(enabled)
+            self.cyclic_checkbox.setEnabled(enabled)
+
     def update_palette_overlay(self, source_scene, tilemap_data, tile_width, tile_height):
         if not source_scene.items() or not tilemap_data:
             return
@@ -518,9 +531,12 @@ class EditPalettesTab(QWidget):
                 palette_id = (entry >> 12) & 0xF
                 self.update_palette_overlay_for_tile(j, i, palette_id)
 
+        self.toggle_tilemap_controls_enabled(True) 
+
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
+
 
     def update_single_tile_replica(self, tile_x, tile_y):
         if not hasattr(self, 'main_window') or not hasattr(self.main_window, 'edit_tiles_tab'):
@@ -564,7 +580,7 @@ class EditPalettesTab(QWidget):
         self.edit_tilemap2_view.resetTransform()
         self.edit_tilemap2_view.scale(factor, factor)
 
-    def display_palette_colors(self, colors):        
+    def display_palette_colors(self, colors):
         self.palette_colors = [(r, g, b) for r, g, b in colors]
         self.draw_full_palette(self.palette_colors)
         
@@ -573,7 +589,9 @@ class EditPalettesTab(QWidget):
             r, g, b = self.palette_colors[0]
             self.color_editor.set_color(0, r, g, b)
             self.draw_selection_rectangle(0)
-        
+            
+            self.color_editor.toggle_controls_enabled(True)
+            
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("palettes")

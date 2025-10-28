@@ -140,5 +140,8 @@ def load_conversion_results(main_window):
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_selection.setEnabled(True)
     
+    if hasattr(main_window, 'output_loaded_for_zoom'):
+        main_window.output_loaded_for_zoom = True
+        
     main_window.main_tabs.setCurrentIndex(1)
     sync_palettes_tab(main_window)

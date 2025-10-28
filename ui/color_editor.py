@@ -41,7 +41,16 @@ class ColorEditor(QWidget):
         self.setup_ui()
         self.updating_from_sliders = False
         self.updating_from_text = False
-        
+        self.toggle_controls_enabled(False)
+
+    def toggle_controls_enabled(self, enabled):
+        self.red_slider.setEnabled(enabled)
+        self.green_slider.setEnabled(enabled)
+        self.blue_slider.setEnabled(enabled)
+        self.red_text.setEnabled(enabled)
+        self.green_text.setEnabled(enabled)
+        self.blue_text.setEnabled(enabled)
+
     def on_color_changed(self):
         if self.updating_from_text:
             return

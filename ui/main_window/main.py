@@ -35,6 +35,7 @@ class GBABackgroundStudio(QMainWindow):
         self.zoom_level = 100
         self.zoom_levels = [100, 200, 300, 400, 500, 600, 700, 800]
         self.current_zoom_index = 0
+        self.output_loaded_for_zoom = False
         self.selected_tile_id = 0
         self.selected_tile_image = None
         self.tileset_columns = 0

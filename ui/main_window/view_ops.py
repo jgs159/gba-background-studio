@@ -10,6 +10,10 @@ def setup_wheel_events(main_window):
     main_window.edit_palettes_tab.edit_tilemap2_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_palettes_tab.edit_tilemap2_view, event)
 
 def zoom_wheel_event(main_window, view, event):
+    if not main_window.output_loaded_for_zoom:
+        QGraphicsView.wheelEvent(view, event)
+        return
+    
     if event.modifiers() & Qt.ControlModifier:
         if event.angleDelta().y() > 0:
             zoom_in(main_window)
@@ -30,6 +34,8 @@ def reset_zoom(main_window):
     update_hover_from_current_cursor(main_window)
 
 def zoom_in(main_window):
+    if not main_window.output_loaded_for_zoom:
+        return
     if main_window.current_zoom_index < len(main_window.zoom_levels) - 1:
         main_window.current_zoom_index += 1
         main_window.zoom_level = main_window.zoom_levels[main_window.current_zoom_index]
@@ -38,6 +44,8 @@ def zoom_in(main_window):
         update_hover_from_current_cursor(main_window)
 
 def zoom_out(main_window):
+    if not main_window.output_loaded_for_zoom:
+        return
     if main_window.current_zoom_index > 0:
         main_window.current_zoom_index -= 1
         main_window.zoom_level = main_window.zoom_levels[main_window.current_zoom_index]

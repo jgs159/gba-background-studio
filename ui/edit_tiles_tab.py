@@ -85,11 +85,9 @@ class EditTilesTab(QWidget):
         controls_main_layout.setSpacing(3)
         controls_main_layout.setContentsMargins(0, 0, 0, 0)
         controls_main_layout.setAlignment(Qt.AlignLeft)
-
         width_label = QLabel("Width (tiles):")
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
-        
         self.tile_width_spin = QSpinBox()
         self.tile_width_spin.setRange(1, 64)
         self.tile_width_spin.setValue(8)
@@ -97,34 +95,31 @@ class EditTilesTab(QWidget):
         self.tile_width_spin.setFixedHeight(18)
         self.tile_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tile_width_spin)
-
         height_label = QLabel("Height (tiles):")
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
-        
         self.tileset_height_label = QLabel("0")
         self.tileset_height_label.setFixedWidth(45)
         self.tileset_height_label.setFixedHeight(18)
         self.tileset_height_label.setAlignment(Qt.AlignCenter)
         self.tileset_height_label.setStyleSheet("QLabel { font-size: 8pt; border: 1px solid #ccc; background: #eee; padding: 1px; }")
         controls_main_layout.addWidget(self.tileset_height_label)
-
         self.flip_h_checkbox = QCheckBox("Flip H")
         self.flip_h_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.flip_h_checkbox.setFixedHeight(18)
         self.flip_v_checkbox = QCheckBox("Flip V")
         self.flip_v_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.flip_v_checkbox.setFixedHeight(18)
-        
         controls_main_layout.addWidget(self.flip_h_checkbox)
         controls_main_layout.addWidget(self.flip_v_checkbox)
         controls_main_layout.addStretch()
-
         controls_layout.addLayout(controls_main_layout)
-        
         self.tile_width_spin.valueChanged.connect(self.on_tileset_width_changed)
-        
         container.layout().addWidget(controls_frame)
+
+        self.tile_width_spin.setEnabled(False)
+        self.flip_h_checkbox.setEnabled(False)
+        self.flip_v_checkbox.setEnabled(False)
 
     def setup_tileset_controls(self, container):
         controls_frame = QFrame()
@@ -138,11 +133,9 @@ class EditTilesTab(QWidget):
         controls_main_layout.setSpacing(3)
         controls_main_layout.setContentsMargins(0, 0, 0, 0)
         controls_main_layout.setAlignment(Qt.AlignLeft)
-
         width_label = QLabel("Width (tiles):")
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
-        
         self.tile_width_spin = QSpinBox()
         self.tile_width_spin.setRange(1, 64)
         self.tile_width_spin.setValue(8)
@@ -150,34 +143,31 @@ class EditTilesTab(QWidget):
         self.tile_width_spin.setFixedHeight(18)
         self.tile_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tile_width_spin)
-
         height_label = QLabel("Height (tiles):")
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
-        
         self.tileset_height_label = QLabel("0")
         self.tileset_height_label.setFixedWidth(45)
         self.tileset_height_label.setFixedHeight(18)
         self.tileset_height_label.setAlignment(Qt.AlignCenter)
         self.tileset_height_label.setStyleSheet("QLabel { font-size: 8pt; border: 1px solid #ccc; background: #eee; padding: 1px; }")
         controls_main_layout.addWidget(self.tileset_height_label)
-
         self.flip_h_checkbox = QCheckBox("Flip H")
         self.flip_h_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.flip_h_checkbox.setFixedHeight(18)
         self.flip_v_checkbox = QCheckBox("Flip V")
         self.flip_v_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.flip_v_checkbox.setFixedHeight(18)
-        
         controls_main_layout.addWidget(self.flip_h_checkbox)
         controls_main_layout.addWidget(self.flip_v_checkbox)
         controls_main_layout.addStretch()
-
         controls_layout.addLayout(controls_main_layout)
-        
         self.tile_width_spin.valueChanged.connect(self.on_tileset_width_changed)
-        
         container.layout().addWidget(controls_frame)
+        
+        self.tile_width_spin.setEnabled(False)
+        self.flip_h_checkbox.setEnabled(False)
+        self.flip_v_checkbox.setEnabled(False)
     
     def on_tileset_width_changed(self, new_width):
         if not hasattr(self, 'tileset_img_original') or not self.tileset_img_original:
@@ -262,12 +252,10 @@ class EditTilesTab(QWidget):
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setSpacing(1)
         controls_layout.setContentsMargins(3, 3, 3, 3)
-
         controls_main_layout = QHBoxLayout()
         controls_main_layout.setSpacing(3)
         controls_main_layout.setContentsMargins(0, 0, 0, 0)
         controls_main_layout.setAlignment(Qt.AlignLeft)
-
         width_label = QLabel("Width:")
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
@@ -278,7 +266,6 @@ class EditTilesTab(QWidget):
         self.tilemap_width_spin.setFixedHeight(18)
         self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tilemap_width_spin)
-
         height_label = QLabel("Height:")
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
@@ -289,21 +276,18 @@ class EditTilesTab(QWidget):
         self.tilemap_height_spin.setFixedHeight(18)
         self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tilemap_height_spin)
-
         self.resize_button = QPushButton("Resize")
         self.resize_button.setFixedWidth(50)
         self.resize_button.setFixedHeight(20)
         self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
         self.resize_button.clicked.connect(self.on_tilemap_resize)
         controls_main_layout.addWidget(self.resize_button)
-
         self.btn_up = QPushButton("↑")
         self.btn_left = QPushButton("←")
         self.btn_right = QPushButton("→")
         self.btn_down = QPushButton("↓")
         self.move_label = QLabel("Move")
         self.move_label.setStyleSheet("QLabel { border: none; }")
-
         for btn in [self.btn_up, self.btn_left, self.btn_right, self.btn_down]:
             btn.setFixedSize(20, 20)
             btn.setStyleSheet("""
@@ -318,20 +302,26 @@ class EditTilesTab(QWidget):
         self.btn_down.clicked.connect(lambda: self.on_tilemap_shift("down"))
         self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
         self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
-
         controls_main_layout.addWidget(self.btn_left)
         controls_main_layout.addWidget(self.btn_up)
         controls_main_layout.addWidget(self.move_label)
         controls_main_layout.addWidget(self.btn_down)
         controls_main_layout.addWidget(self.btn_right)
-
         self.cyclic_checkbox = QCheckBox("Cyclic Shift")
         self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.cyclic_checkbox.setFixedHeight(18)
         controls_main_layout.addWidget(self.cyclic_checkbox)
-
         controls_layout.addLayout(controls_main_layout)
         container.layout().addWidget(controls_frame)
+        
+        self.tilemap_width_spin.setEnabled(False)
+        self.tilemap_height_spin.setEnabled(False)
+        self.resize_button.setEnabled(False)
+        self.btn_up.setEnabled(False)
+        self.btn_down.setEnabled(False)
+        self.btn_left.setEnabled(False)
+        self.btn_right.setEnabled(False)
+        self.cyclic_checkbox.setEnabled(False)
 
     def create_tileset_reserved_container(self):
         container = QWidget()
@@ -618,20 +608,19 @@ class EditTilesTab(QWidget):
 
     def display_tileset(self, pil_img):
         self.edit_tileset_scene.clear()
-        
         self.tileset_img_original = pil_img
-        
         original_w_px = pil_img.width
-        
         initial_width = original_w_px // 8
-        
         if hasattr(self, 'tile_width_spin'):
             self.tile_width_spin.setValue(initial_width)
-            
         self.on_tileset_width_changed(initial_width)
-        
         self.highlight_selected_tile(0, 0)
         
+        if hasattr(self, 'tile_width_spin'):
+            self.tile_width_spin.setEnabled(True)
+            self.flip_h_checkbox.setEnabled(True)
+            self.flip_v_checkbox.setEnabled(True)
+            
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tileset")
@@ -663,7 +652,6 @@ class EditTilesTab(QWidget):
             else:
                 self.tilemap_width = 32
                 self.tilemap_height = (total_tiles + 31) // 32
-
         w = self.tilemap_width * 8
         h = self.tilemap_height * 8
         img = PilImage.new('RGBA', (w, h), (0, 0, 0, 0))
@@ -687,15 +675,22 @@ class EditTilesTab(QWidget):
         self.edit_tilemap_scene.clear()
         self.edit_tilemap_scene.addPixmap(pixmap)
         self.edit_tilemap_scene.setSceneRect(0, 0, w, h)
-
         if self.last_hover_pos != (-1, -1):
             x, y = self.last_hover_pos
             if 0 <= x < self.tilemap_width and 0 <= y < self.tilemap_height:
                 self.on_tilemap_hover(x, y)
-
+        
+        self.tilemap_width_spin.setEnabled(True)
+        self.tilemap_height_spin.setEnabled(True)
+        self.resize_button.setEnabled(True)
+        self.btn_up.setEnabled(True)
+        self.btn_down.setEnabled(True)
+        self.btn_left.setEnabled(True)
+        self.btn_right.setEnabled(True)
+        self.cyclic_checkbox.setEnabled(True)
+        
         if hasattr(self.main_window, 'sync_palettes_tab'):
             self.main_window.sync_palettes_tab()
-
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
