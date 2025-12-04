@@ -235,9 +235,51 @@ class GBABackgroundStudio(QMainWindow):
                 
                 self.edit_palettes_tab.apply_color_change(data['index'], r, g, b)
                 
+            elif state['type'] == 'tilemap_resize':
+                self.apply_tilemap_resize(state, is_undo)
         except Exception as e:
             print(f"Error applying history state: {e}")
 
+    def apply_tilemap_resize(self, state, is_undo):
+        if not hasattr(self, 'edit_tiles_tab'):
+            return
+
+        data = state['data']
+        
+        if is_undo:
+            new_data = data['old_data']
+            new_w = data['old_w']
+            new_h = data['old_h']
+        else:
+            new_data = data['new_data']
+            new_w = data['new_w']
+            new_h = data['new_h']
+            
+        self.edit_tiles_tab.tilemap_data = new_data
+        self.edit_tiles_tab.tilemap_width = new_w
+        self.edit_tiles_tab.tilemap_height = new_h
+        self.edit_tiles_tab.tilemap_width_spin.setValue(new_w)
+        self.edit_tiles_tab.tilemap_height_spin.setValue(new_h)
+
+        if hasattr(self.edit_tiles_tab, 'render_tilemap_visual'):
+            self.edit_tiles_tab.render_tilemap_visual()
+        
+        if hasattr(self, 'edit_palettes_tab'):
+            self.edit_palettes_tab.tilemap_data = new_data
+            self.edit_palettes_tab.tilemap_width = new_w
+            self.edit_palettes_tab.tilemap_height = new_h
+            
+            self.edit_palettes_tab.tilemap_width_spin.setValue(new_w)
+            self.edit_palettes_tab.tilemap_height_spin.setValue(new_h)
+            
+            if hasattr(self.edit_tiles_tab, 'edit_tilemap_scene') and self.edit_tiles_tab.edit_tilemap_scene.sceneRect().isValid():
+                self.edit_palettes_tab.update_palette_overlay(
+                    self.edit_tiles_tab.edit_tilemap_scene,
+                    new_data,
+                    new_w,
+                    new_h
+                )
+    
     def apply_tile_change(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tilemap_data:
             return

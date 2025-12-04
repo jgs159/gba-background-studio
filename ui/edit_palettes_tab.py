@@ -13,6 +13,7 @@ from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 from ui.palette_grid_view import PaletteGridView
 from ui.color_editor import ColorEditor
 
+EMPTY_TILE_ENTRY = b'\x00\x00'
 
 class EditPalettesTab(QWidget):
     def __init__(self, parent=None):
@@ -512,11 +513,21 @@ class EditPalettesTab(QWidget):
         self.tilemap_width = tile_width
         self.tilemap_height = tile_height
         self.overlay_items.clear()
+        self.tilemap_width_spin.setValue(tile_width)
+        self.tilemap_height_spin.setValue(tile_height)
 
+        self.overlay_items.clear()
         self.edit_tilemap2_scene.clear()
+
+        pixmap_item = None
         if source_scene.items():
-            item = source_scene.items()[0]
-            pixmap = item.pixmap()
+            for item in source_scene.items():
+                if isinstance(item, QGraphicsPixmapItem):
+                    pixmap_item = item
+                    break
+        
+        if pixmap_item:
+            pixmap = pixmap_item.pixmap()
             self._pixmap_item = self.edit_tilemap2_scene.addPixmap(pixmap)
             self.edit_tilemap2_scene.setSceneRect(pixmap.rect())
             self._pixmap_item.setZValue(0)
@@ -536,7 +547,6 @@ class EditPalettesTab(QWidget):
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
-
 
     def update_single_tile_replica(self, tile_x, tile_y):
         if not hasattr(self, 'main_window') or not hasattr(self.main_window, 'edit_tiles_tab'):
@@ -736,11 +746,72 @@ class EditPalettesTab(QWidget):
         pass
 
     def on_tilemap_resize(self):
-        """Manejar redimensionamiento del tilemap"""
-        width = self.tilemap_width_spin.value()
-        height = self.tilemap_height_spin.value()
-        # Aquí va la lógica para redimensionar el tilemap
-        pass
+        new_w = self.tilemap_width_spin.value()
+        new_h = self.tilemap_height_spin.value()
+
+        if not self.tilemap_data or (new_w == self.tilemap_width and new_h == self.tilemap_height):
+            return
+
+        old_w = self.tilemap_width
+        old_h = self.tilemap_height
+        old_data = self.tilemap_data
+        
+        min_w = min(new_w, old_w)
+        min_h = min(new_h, old_h)
+        
+        new_data = bytearray()
+        
+        for y in range(min_h):
+            start_index = y * old_w * 2
+            new_data.extend(old_data[start_index : start_index + min_w * 2])
+            
+            if new_w > old_w:
+                padding_needed = new_w - old_w
+                new_data.extend(EMPTY_TILE_ENTRY * padding_needed)
+
+        if new_h > old_h:
+            empty_data = EMPTY_TILE_ENTRY * new_w
+            padding_needed_rows = new_h - old_h
+            new_data.extend(empty_data * padding_needed_rows)
+
+        self.tilemap_data = bytes(new_data)
+        self.tilemap_width = new_w
+        self.tilemap_height = new_h
+        
+        self.tilemap_width_spin.setValue(new_w)
+        self.tilemap_height_spin.setValue(new_h)
+        
+        if hasattr(self.main_window, 'edit_tiles_tab'):
+            tiles_tab = self.main_window.edit_tiles_tab
+            tiles_tab.tilemap_data = self.tilemap_data
+            tiles_tab.tilemap_width = new_w
+            tiles_tab.tilemap_height = new_h
+            
+            if hasattr(tiles_tab, 'render_tilemap_visual'):
+                tiles_tab.render_tilemap_visual()
+            
+            if hasattr(self.main_window, 'history_manager'):
+                self.main_window.history_manager.record_state(
+                    state_type='tilemap_resize',
+                    editor_type='palettes',
+                    data={
+                        'old_w': old_w, 
+                        'old_h': old_h, 
+                        'new_w': new_w, 
+                        'new_h': new_h, 
+                        'old_data': old_data, 
+                        'new_data': self.tilemap_data
+                    },
+                    description=f"Tilemap resized from {old_w}x{old_h} to {new_w}x{new_h}"
+                )
+
+            if hasattr(tiles_tab, 'edit_tilemap_scene'):
+                 self.update_palette_overlay(
+                     tiles_tab.edit_tilemap_scene,
+                     self.tilemap_data,
+                     self.tilemap_width,
+                     self.tilemap_height
+                 )
 
     def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
         update_status_bar_shared(

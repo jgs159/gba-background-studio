@@ -12,6 +12,8 @@ from core.image_utils import pil_to_qimage
 from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 
 
+EMPTY_TILE_ENTRY = b'\x00\x00'
+
 class EditTilesTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -606,6 +608,58 @@ class EditTilesTab(QWidget):
 
         self.on_tilemap_hover(tile_x, tile_y)
 
+    def render_tilemap_visual(self):
+        if not self.tilemap_data or not self.tileset_img:
+            self.edit_tilemap_scene.clear()
+            self.edit_tilemap_scene.setSceneRect(0, 0, 0, 0)
+            return
+
+        w = self.tilemap_width * 8
+        h = self.tilemap_height * 8
+        
+        img = PilImage.new('RGBA', (w, h), (0, 0, 0, 0))
+        
+        total_map_size = self.tilemap_width * self.tilemap_height
+        max_read_tiles = len(self.tilemap_data) // 2
+        
+        for i in range(min(total_map_size, max_read_tiles)):
+            entry = self.tilemap_data[i * 2] | (self.tilemap_data[i * 2 + 1] << 8)
+            tile_id = entry & 0x3FF
+            h_flip = bool(entry & (1 << 10))
+            v_flip = bool(entry & (1 << 11))
+            
+            if self.tiles_per_row > 0:
+                tx = (tile_id % self.tiles_per_row) * 8
+                ty = (tile_id // self.tiles_per_row) * 8
+                
+                if tx + 8 <= self.tileset_img.width and ty + 8 <= self.tileset_img.height:
+                    tile = self.tileset_img.crop((tx, ty, tx + 8, ty + 8))
+                    if h_flip:
+                        tile = tile.transpose(PilImage.FLIP_LEFT_RIGHT)
+                    if v_flip:
+                        tile = tile.transpose(PilImage.FLIP_TOP_BOTTOM)
+                    
+                    x = (i % self.tilemap_width) * 8
+                    y = (i // self.tilemap_width) * 8
+                    img.paste(tile, (x, y))
+
+        qimg = pil_to_qimage(img)
+        pixmap = QPixmap.fromImage(qimg)
+        self.edit_tilemap_scene.clear()
+        self.edit_tilemap_scene.addPixmap(pixmap)
+        self.edit_tilemap_scene.setSceneRect(0, 0, w, h)
+        
+        if self.main_window and hasattr(self.main_window, 'grid_manager'):
+            if self.main_window.grid_manager.is_grid_visible():
+                self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
+
+        if self.last_hover_pos != (-1, -1):
+            x, y = self.last_hover_pos
+            if 0 <= x < self.tilemap_width and 0 <= y < self.tilemap_height:
+                self.on_tilemap_hover(x, y)
+            else:
+                self.on_tilemap_leave()
+
     def display_tileset(self, pil_img):
         self.edit_tileset_scene.clear()
         self.tileset_img_original = pil_img
@@ -629,6 +683,7 @@ class EditTilesTab(QWidget):
         self.tilemap_data = tilemap_data
         self.tileset_img = PilImage.open(tileset_path)
         self.tiles_per_row = self.tileset_img.width // 8
+
         if preview_path:
             try:
                 preview_img = PilImage.open(preview_path)
@@ -652,34 +707,10 @@ class EditTilesTab(QWidget):
             else:
                 self.tilemap_width = 32
                 self.tilemap_height = (total_tiles + 31) // 32
-        w = self.tilemap_width * 8
-        h = self.tilemap_height * 8
-        img = PilImage.new('RGBA', (w, h), (0, 0, 0, 0))
-        for i in range(min(self.tilemap_width * self.tilemap_height, len(self.tilemap_data) // 2)):
-            entry = self.tilemap_data[i * 2] | (self.tilemap_data[i * 2 + 1] << 8)
-            tile_id = entry & 0x3FF
-            h_flip = bool(entry & (1 << 10))
-            v_flip = bool(entry & (1 << 11))
-            tx = (tile_id % self.tiles_per_row) * 8
-            ty = (tile_id // self.tiles_per_row) * 8
-            tile = self.tileset_img.crop((tx, ty, tx + 8, ty + 8))
-            if h_flip:
-                tile = tile.transpose(PilImage.FLIP_LEFT_RIGHT)
-            if v_flip:
-                tile = tile.transpose(PilImage.FLIP_TOP_BOTTOM)
-            x = (i % self.tilemap_width) * 8
-            y = (i // self.tilemap_width) * 8
-            img.paste(tile, (x, y))
-        qimg = pil_to_qimage(img)
-        pixmap = QPixmap.fromImage(qimg)
-        self.edit_tilemap_scene.clear()
-        self.edit_tilemap_scene.addPixmap(pixmap)
-        self.edit_tilemap_scene.setSceneRect(0, 0, w, h)
-        if self.last_hover_pos != (-1, -1):
-            x, y = self.last_hover_pos
-            if 0 <= x < self.tilemap_width and 0 <= y < self.tilemap_height:
-                self.on_tilemap_hover(x, y)
-        
+
+        self.tilemap_width_spin.setValue(self.tilemap_width)
+        self.tilemap_height_spin.setValue(self.tilemap_height)
+        self.render_tilemap_visual()
         self.tilemap_width_spin.setEnabled(True)
         self.tilemap_height_spin.setEnabled(True)
         self.resize_button.setEnabled(True)
@@ -735,8 +766,53 @@ class EditTilesTab(QWidget):
         pass
         
     def on_tilemap_resize(self):
-        """Manejar redimensionamiento del tilemap"""
-        width = self.tilemap_width_spin.value()
-        height = self.tilemap_height_spin.value()
-        # Aquí va la lógica para redimensionar el tilemap
-        pass
+        new_w = self.tilemap_width_spin.value()
+        new_h = self.tilemap_height_spin.value()
+
+        if not self.tilemap_data or (new_w == self.tilemap_width and new_h == self.tilemap_height):
+            return
+
+        old_w = self.tilemap_width
+        old_h = self.tilemap_height
+        old_data = self.tilemap_data
+        
+        min_w = min(new_w, old_w)
+        min_h = min(new_h, old_h)
+        
+        new_data = bytearray()
+        
+        for y in range(min_h):
+            start_index = y * old_w * 2
+            new_data.extend(old_data[start_index : start_index + min_w * 2])
+            
+            if new_w > old_w:
+                padding_needed = new_w - old_w
+                new_data.extend(EMPTY_TILE_ENTRY * padding_needed)
+
+        if new_h > old_h:
+            empty_data = EMPTY_TILE_ENTRY * new_w
+            padding_needed_rows = new_h - old_h
+            new_data.extend(empty_data * padding_needed_rows)
+
+        self.tilemap_data = bytes(new_data)
+        self.tilemap_width = new_w
+        self.tilemap_height = new_h
+        
+        if hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='tilemap_resize',
+                editor_type='tiles',
+                data={
+                    'old_w': old_w, 
+                    'old_h': old_h, 
+                    'new_w': new_w, 
+                    'new_h': new_h, 
+                    'old_data': old_data, 
+                    'new_data': self.tilemap_data
+                },
+                description=f"Tilemap resized from {old_w}x{old_h} to {new_w}x{new_h}"
+            )
+
+        self.render_tilemap_visual()
+        if hasattr(self.main_window, 'sync_palettes_tab'):
+            self.main_window.sync_palettes_tab()
