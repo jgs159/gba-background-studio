@@ -67,10 +67,10 @@ def load_last_output_files(main_window):
         main_window.sync_palettes_tab()
         
         main_window.menu_bar.action_save_tileset.setEnabled(True)
-        main_window.menu_bar.action_append_tiles.setEnabled(True)
         main_window.menu_bar.action_open_tilemap.setEnabled(True)
+        main_window.menu_bar.action_new_tilemap.setEnabled(True)
         main_window.menu_bar.action_save_tilemap.setEnabled(True)
-        main_window.menu_bar.action_save_selection.setEnabled(True)
+        main_window.menu_bar.action_save_selection.setEnabled(False)
 
         if hasattr(main_window, 'output_loaded_for_zoom'):
             main_window.output_loaded_for_zoom = True
@@ -122,12 +122,12 @@ def open_tileset(main_window):
 def save_tileset(main_window):
     pass
 
-def append_tiles(main_window):
-    pass
-
 def open_tilemap(main_window):
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
+
+def new_tilemap(main_window):
+    pass
 
 def save_tilemap(main_window):
     pass
