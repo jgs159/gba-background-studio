@@ -687,12 +687,8 @@ class EditTilesTab(QWidget):
         if preview_path:
             try:
                 preview_img = PilImage.open(preview_path)
-                if preview_img.size == (240, 160):
-                    self.tilemap_width = 30
-                    self.tilemap_height = 20
-                else:
-                    self.tilemap_width = 32
-                    self.tilemap_height = (len(tilemap_data) // 2 + 31) // 32
+                self.tilemap_width = preview_img.width // 8
+                self.tilemap_height = preview_img.height // 8
             except:
                 self.tilemap_width = 32
                 self.tilemap_height = (len(tilemap_data) // 2 + 31) // 32

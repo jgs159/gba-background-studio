@@ -14,7 +14,7 @@ from utils.translator import Translator
 translator = Translator()
 
 
-def quantize_with_irfanview(groups_dir, selected_palettes=None, transparent_color=(0,0,0), keep_transparent=False):
+def quantize_to_n_colors_4bpp(groups_dir, selected_palettes=None, transparent_color=(0,0,0), keep_transparent=False):
     indexed_dir = os.path.join(groups_dir, "01_indexed")
     reindexed_dir = os.path.join(groups_dir, "02_reindexed")
     os.makedirs(indexed_dir, exist_ok=True)
@@ -67,8 +67,10 @@ def quantize_with_irfanview(groups_dir, selected_palettes=None, transparent_colo
                               (opaque_pixels[:, 2] == MARKER_COLOR[2]))
                 cluster_pixels = opaque_pixels[not_marker]
 
-            n_clusters = min(15, len(cluster_pixels))
-            
+            unique_colors = np.unique(cluster_pixels, axis=0)
+            max_possible_clusters = min(15, len(unique_colors))
+            n_clusters = min(max_possible_clusters, len(cluster_pixels))
+
             if n_clusters > 0:
                 if len(cluster_pixels) > 5000:
                     np.random.seed(42)
@@ -92,17 +94,9 @@ def quantize_with_irfanview(groups_dir, selected_palettes=None, transparent_colo
                     initial_palette.append(tuple(center))
                 
                 while len(initial_palette) < 16:
-                    gray_idx = len(initial_palette)
-                    gray_value = max(1, (255 // 15) * gray_idx)
-                    new_color = (gray_value, gray_value, gray_value)
-                    
-                    if new_color != MARKER_COLOR and new_color not in initial_palette:
-                        initial_palette.append(new_color)
-                    else:
-                        alt_color = (gray_value, max(1, gray_value-10), min(255, gray_value+10))
-                        initial_palette.append(alt_color)
+                    initial_palette.append((0, 0, 0))
             else:
-                initial_palette = [final_color_0] + [(1, 1, 1)] * 15
+                initial_palette = [final_color_0] + [(0, 0, 0)] * 15
 
             indexed_data = np.zeros((h, w), dtype=np.uint8)
             indexed_data[transparent_mask] = 0
@@ -139,11 +133,8 @@ def quantize_with_irfanview(groups_dir, selected_palettes=None, transparent_colo
             work_colors = [color for color in work_colors if color != MARKER_COLOR]
             
             while len(work_colors) < 15:
-                gray_val = (len(work_colors) + 1) * 16
-                new_color = (gray_val, gray_val, gray_val)
-                if new_color != MARKER_COLOR and new_color not in work_colors:
-                    work_colors.append(new_color)
-            
+                work_colors.append((0, 0, 0))
+
             work_colors_sorted = sorted(work_colors, key=lambda x: (
                 calculate_relative_luminance(x),
                 x[0], x[1], x[2]
@@ -236,10 +227,14 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
                        (pixels[:, 2] == MARKER_COLOR[2]))
         cluster_pixels = pixels[not_marker]
 
+    unique_colors = np.unique(cluster_pixels, axis=0)
+
     if start_index == 0:
-        n_clusters = min(n_colors - 1, len(cluster_pixels)) if n_colors > 1 else 1
+        max_possible_clusters = min(n_colors - 1, len(unique_colors)) if n_colors > 1 else 1
+        n_clusters = min(max_possible_clusters, len(cluster_pixels))
     else:
-        n_clusters = min(n_colors, len(cluster_pixels))
+        max_possible_clusters = min(n_colors, len(unique_colors))
+        n_clusters = min(max_possible_clusters, len(cluster_pixels))
 
     if n_clusters <= 0:
         n_clusters = 1

@@ -15,7 +15,7 @@ from utils.translator import Translator
 from core.final_assets import generate_final_assets_4bpp, generate_final_assets_8bpp
 from core.tile_utils import split_into_groups, rebuild_final_image
 from core.image_utils import create_gbagfx_preview_4bpp, create_gbagfx_preview_8bpp
-from core.quantization import quantize_with_irfanview, quantize_to_n_colors_8bpp
+from core.quantization import quantize_to_n_colors_4bpp, quantize_to_n_colors_8bpp
 from core.palette_utils import apply_gba_palette_format, extract_palettes_from_indexed
 translator = Translator()
 
@@ -223,8 +223,8 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
         )
         final_pal_indices = pal_indices if use_tilemap else pal_indices_out
 
-        print(translator.tr("quantizing_irfanview"), flush=True)
-        indexed_dir = quantize_with_irfanview(
+        print(translator.tr("quantizing_4bpp"), flush=True)
+        indexed_dir = quantize_to_n_colors_4bpp(
             groups_dir,
             selected_palettes=selected_palettes,
             transparent_color=transparent_color,
