@@ -44,10 +44,6 @@ class MenuBar:
         self.action_save_tileset.triggered.connect(self.main_window.save_tileset)
         self.action_save_tileset.setEnabled(False)
         
-        self.action_append_tiles = tileset_menu.addAction(self.main_window.translator.tr("append_tiles"))
-        self.action_append_tiles.triggered.connect(self.main_window.append_tiles)
-        self.action_append_tiles.setEnabled(False)
-
         # Tilemap menu
         tilemap_menu = self.menu_bar.addMenu(self.main_window.translator.tr("tilemap_menu"))
         
@@ -55,6 +51,11 @@ class MenuBar:
         self.action_open_tilemap.setShortcut("Ctrl+Shift+O")
         self.action_open_tilemap.triggered.connect(self.main_window.open_tilemap)
         self.action_open_tilemap.setEnabled(False)
+        
+        self.action_new_tilemap = tilemap_menu.addAction(self.main_window.translator.tr("new_tilemap"))
+        self.action_new_tilemap.setShortcut("Ctrl+Shift+N")
+        self.action_new_tilemap.triggered.connect(self.main_window.new_tilemap)
+        self.action_new_tilemap.setEnabled(False)
         
         self.action_save_tilemap = tilemap_menu.addAction(self.main_window.translator.tr("save_tilemap"))
         self.action_save_tilemap.setShortcut("Ctrl+Shift+S")
@@ -71,12 +72,12 @@ class MenuBar:
         self.action_open_palette = palette_menu.addAction(self.main_window.translator.tr("open_palette"))
         self.action_open_palette.setShortcut("Ctrl+P")
         self.action_open_palette.triggered.connect(self.main_window.open_palette)
-        self.action_open_palette.setEnabled(False)
+        self.action_open_palette.setEnabled(True)
         
         self.action_save_palette = palette_menu.addAction(self.main_window.translator.tr("save_palette"))
         self.action_save_palette.setShortcut("Ctrl+Shift+P")
         self.action_save_palette.triggered.connect(self.main_window.save_palette)
-        self.action_save_palette.setEnabled(False)
+        self.action_save_palette.setEnabled(True)
 
         # Edit menu
         edit_menu = self.menu_bar.addMenu(self.main_window.translator.tr("edit_menu"))
@@ -205,18 +206,8 @@ class MenuBar:
         self.action_show_success_dialog.setCheckable(True)
         self.action_show_success_dialog.triggered.connect(self.main_window.toggle_show_success_dialog)
 
-        # Tools menu
-        tools_menu = self.menu_bar.addMenu(self.main_window.translator.tr("tools_menu"))
-        action_preview = tools_menu.addAction(self.main_window.translator.tr("preview_tool"))
-        action_preview.setEnabled(False)
-        action_export = tools_menu.addAction(self.main_window.translator.tr("export_tool"))
-        action_export.setEnabled(False)
-
         # Help menu
         help_menu = self.menu_bar.addMenu(self.main_window.translator.tr("help_menu"))
-        
-        action_show_logs = help_menu.addAction(self.main_window.translator.tr("show_logs"))
-        action_show_logs.triggered.connect(self.show_logs_in_explorer)
         
         action_about = help_menu.addAction(self.main_window.translator.tr("about"))
         action_about.triggered.connect(self.main_window.show_about)
@@ -257,26 +248,3 @@ class MenuBar:
         except Exception as e:
             error_msg = self.main_window.translator.tr("export_error").format(error=str(e))
             QMessageBox.warning(self.main_window, self.main_window.translator.tr("export_error_title"), error_msg)
-
-    def show_logs_in_explorer(self):
-        """Open logs directory in file explorer"""
-        logs_dir = "logs"
-        try:
-            if not os.path.exists(logs_dir):
-                os.makedirs(logs_dir)
-            
-            # Open the directory in file explorer
-            if os.name == 'nt':  # Windows
-                os.startfile(logs_dir)
-            elif os.name == 'posix':  # macOS or Linux
-                if os.uname().sysname == 'Darwin':  # macOS
-                    import subprocess
-                    subprocess.run(['open', logs_dir])
-                else:  # Linux
-                    import subprocess
-                    subprocess.run(['xdg-open', logs_dir])
-            
-            
-        except Exception as e:
-            QMessageBox.warning(self.main_window, self.main_window.translator.tr("error"), 
-                              self.main_window.translator.tr("could_not_open_logs").format(error=str(e)))

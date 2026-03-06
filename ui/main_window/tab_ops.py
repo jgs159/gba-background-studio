@@ -135,8 +135,8 @@ def load_conversion_results(main_window):
                 main_window.edit_palettes_tab.display_palette_colors(grayscale_colors)
   
     main_window.menu_bar.action_save_tileset.setEnabled(True)
-    main_window.menu_bar.action_append_tiles.setEnabled(True)
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
+    main_window.menu_bar.action_new_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_selection.setEnabled(True)
     

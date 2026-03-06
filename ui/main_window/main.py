@@ -431,13 +431,13 @@ class GBABackgroundStudio(QMainWindow):
         from .file_ops import save_tileset
         save_tileset(self)
     
-    def append_tiles(self):
-        from .file_ops import append_tiles
-        append_tiles(self)
-    
     def open_tilemap(self):
         from .file_ops import open_tilemap
         open_tilemap(self)
+    
+    def new_tilemap(self):
+        from .file_ops import new_tilemap
+        new_tilemap(self)
     
     def save_tilemap(self):
         from .file_ops import save_tilemap
