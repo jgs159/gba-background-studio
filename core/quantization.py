@@ -132,14 +132,23 @@ def quantize_to_n_colors_4bpp(groups_dir, selected_palettes=None, transparent_co
             
             work_colors = [color for color in work_colors if color != MARKER_COLOR]
             
-            while len(work_colors) < 15:
-                work_colors.append((0, 0, 0))
-
-            work_colors_sorted = sorted(work_colors, key=lambda x: (
+            unique_work_colors = []
+            filler_count = 0
+            for color in work_colors:
+                if color != (0, 0, 0):
+                    unique_work_colors.append(color)
+                else:
+                    filler_count += 1
+            
+            unique_work_colors_sorted = sorted(unique_work_colors, key=lambda x: (
                 calculate_relative_luminance(x),
                 x[0], x[1], x[2]
             ))
-            reordered_rgb = [rgb_palette[0]] + work_colors_sorted
+            
+            reordered_rgb = [rgb_palette[0]] + unique_work_colors_sorted
+            
+            while len(reordered_rgb) < 16:
+                reordered_rgb.append((0, 0, 0))
 
             for i in range(1, 16):
                 if reordered_rgb[i] == MARKER_COLOR:
@@ -277,14 +286,31 @@ def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0
     final_color_0 = transparent_color_gba if keep_transparent else (0, 0, 0)
 
     if start_index == 0:
-        indexed_colors = [(i, color) for i, color in enumerate(reduced_palette)]
-        indexed_colors.sort(key=lambda x: (calculate_relative_luminance(x[1]), x[1][0], x[1][1], x[1][2]))
+        unique_colors_list = [c for c in reduced_palette if c != (0, 0, 0)]
+        filler_count = len(reduced_palette) - len(unique_colors_list)
+        
+        indexed_unique = [(i, color) for i, color in enumerate(unique_colors_list)]
+        indexed_unique.sort(key=lambda x: (calculate_relative_luminance(x[1]), x[1][0], x[1][1], x[1][2]))
+        
         reordered_palette = [final_color_0]
-        reordered_palette.extend((r, g, b) for _, (r, g, b) in indexed_colors)
+        for _, color in indexed_unique:
+            reordered_palette.append(color)
+        
+        for _ in range(filler_count):
+            reordered_palette.append((0, 0, 0))
     else:
-        indexed_colors = [(i, color) for i, color in enumerate(reduced_palette)]
-        indexed_colors.sort(key=lambda x: (calculate_relative_luminance(x[1]), x[1][0], x[1][1], x[1][2]))
-        reordered_palette = [(r, g, b) for _, (r, g, b) in indexed_colors]
+        unique_colors_list = [c for c in reduced_palette if c != (0, 0, 0)]
+        filler_count = len(reduced_palette) - len(unique_colors_list)
+        
+        indexed_unique = [(i, color) for i, color in enumerate(unique_colors_list)]
+        indexed_unique.sort(key=lambda x: (calculate_relative_luminance(x[1]), x[1][0], x[1][1], x[1][2]))
+        
+        reordered_palette = []
+        for _, color in indexed_unique:
+            reordered_palette.append(color)
+        
+        for _ in range(filler_count):
+            reordered_palette.append((0, 0, 0))
 
     palette_rgb_list = reordered_palette[1:] if start_index == 0 else reordered_palette
 
