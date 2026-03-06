@@ -75,7 +75,7 @@ def sync_palettes_tab(main_window):
         if grid_was_visible:
             main_window.grid_manager.set_grid_visible(True)
 
-def load_conversion_results(main_window):    
+def load_conversion_results(main_window):
     tiles_path = "output/tiles.png"
     preview_path = "temp/preview/preview.png"
     palette_path = "temp/preview/palette.pal"
