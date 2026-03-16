@@ -87,65 +87,17 @@ class EditTilesTab(QWidget):
         controls_main_layout.setSpacing(3)
         controls_main_layout.setContentsMargins(0, 0, 0, 0)
         controls_main_layout.setAlignment(Qt.AlignLeft)
-        width_label = QLabel("Width (tiles):")
+        width_label = QLabel("Width:")
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
         self.tile_width_spin = QSpinBox()
-        self.tile_width_spin.setRange(1, 64)
-        self.tile_width_spin.setValue(8)
+        self.tile_width_spin.setRange(0, 64)
+        self.tile_width_spin.setValue(0)
         self.tile_width_spin.setFixedWidth(45)
         self.tile_width_spin.setFixedHeight(18)
         self.tile_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tile_width_spin)
-        height_label = QLabel("Height (tiles):")
-        height_label.setStyleSheet("QLabel { border: none; }")
-        controls_main_layout.addWidget(height_label)
-        self.tileset_height_label = QLabel("0")
-        self.tileset_height_label.setFixedWidth(45)
-        self.tileset_height_label.setFixedHeight(18)
-        self.tileset_height_label.setAlignment(Qt.AlignCenter)
-        self.tileset_height_label.setStyleSheet("QLabel { font-size: 8pt; border: 1px solid #ccc; background: #eee; padding: 1px; }")
-        controls_main_layout.addWidget(self.tileset_height_label)
-        self.flip_h_checkbox = QCheckBox("Flip H")
-        self.flip_h_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
-        self.flip_h_checkbox.setFixedHeight(18)
-        self.flip_v_checkbox = QCheckBox("Flip V")
-        self.flip_v_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
-        self.flip_v_checkbox.setFixedHeight(18)
-        controls_main_layout.addWidget(self.flip_h_checkbox)
-        controls_main_layout.addWidget(self.flip_v_checkbox)
-        controls_main_layout.addStretch()
-        controls_layout.addLayout(controls_main_layout)
-        self.tile_width_spin.valueChanged.connect(self.on_tileset_width_changed)
-        container.layout().addWidget(controls_frame)
-
-        self.tile_width_spin.setEnabled(False)
-        self.flip_h_checkbox.setEnabled(False)
-        self.flip_v_checkbox.setEnabled(False)
-
-    def setup_tileset_controls(self, container):
-        controls_frame = QFrame()
-        controls_frame.setFrameStyle(QFrame.StyledPanel)
-        controls_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border: 1px solid #ccc; }")
-        controls_frame.setFixedHeight(28)
-        controls_layout = QVBoxLayout(controls_frame)
-        controls_layout.setSpacing(1)
-        controls_layout.setContentsMargins(3, 3, 3, 3)
-        controls_main_layout = QHBoxLayout()
-        controls_main_layout.setSpacing(3)
-        controls_main_layout.setContentsMargins(0, 0, 0, 0)
-        controls_main_layout.setAlignment(Qt.AlignLeft)
-        width_label = QLabel("Width (tiles):")
-        width_label.setStyleSheet("QLabel { border: none; }")
-        controls_main_layout.addWidget(width_label)
-        self.tile_width_spin = QSpinBox()
-        self.tile_width_spin.setRange(1, 64)
-        self.tile_width_spin.setValue(8)
-        self.tile_width_spin.setFixedWidth(45)
-        self.tile_width_spin.setFixedHeight(18)
-        self.tile_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
-        controls_main_layout.addWidget(self.tile_width_spin)
-        height_label = QLabel("Height (tiles):")
+        height_label = QLabel("Height:")
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
         self.tileset_height_label = QLabel("0")
@@ -173,6 +125,9 @@ class EditTilesTab(QWidget):
     
     def on_tileset_width_changed(self, new_width):
         if not hasattr(self, 'tileset_img_original') or not self.tileset_img_original:
+            return
+        if new_width <= 0:
+            self.tileset_height_label.setText("0")
             return
 
         original_w_px = self.tileset_img_original.width
@@ -406,9 +361,9 @@ class EditTilesTab(QWidget):
             tile_y = max(0, min(int(pos.y()) // 8, max_tile_y))
             
             tile_id = tile_y * self.tiles_per_row + tile_x
-            self.update_status_bar(-1, -1, tile_id=tile_id)
+            self.update_status_bar(-1, -1, tile_id=self.selected_tile_id if self.tileset_img else None)
         else:
-            self.update_status_bar(-1, -1, tile_id=self.selected_tile_id)
+            self.update_status_bar(-1, -1, tile_id=self.selected_tile_id if self.tileset_img else None)
 
     def on_tileset_leave(self, event):
         super(QGraphicsView, self.edit_tileset_view).leaveEvent(event)
@@ -416,7 +371,7 @@ class EditTilesTab(QWidget):
         if hasattr(self, 'last_hover_pos') and self.last_hover_pos != (-1, -1):
             self.update_status_bar(*self.last_hover_pos)
         else:
-            self.update_status_bar(-1, -1, tile_id=self.selected_tile_id)
+            self.update_status_bar(-1, -1, tile_id=self.selected_tile_id if self.tileset_img else None)
 
     def highlight_selected_tile(self, tile_x, tile_y):
         self.selected_tile_pos = (tile_x, tile_y)
@@ -733,7 +688,7 @@ class EditTilesTab(QWidget):
         update_status_bar_shared(
             main_window=self.main_window,
             selection_type="Tile",
-            selection_id=self.selected_tile_id,
+            selection_id=self.selected_tile_id if self.tileset_img else None,
             tile_x=tile_x,
             tile_y=tile_y,
             tilemap_data=self.tilemap_data if hasattr(self, 'tilemap_data') else None,
@@ -793,6 +748,10 @@ class EditTilesTab(QWidget):
         self.tilemap_data = bytes(new_data)
         self.tilemap_width = new_w
         self.tilemap_height = new_h
+        
+        if hasattr(self.main_window, 'config_manager'):
+            self.main_window.config_manager.set('CONVERSION', 'tilemap_width', str(new_w))
+            self.main_window.config_manager.set('CONVERSION', 'tilemap_height', str(new_h))
         
         if hasattr(self.main_window, 'history_manager'):
             self.main_window.history_manager.record_state(

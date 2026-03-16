@@ -225,6 +225,7 @@ class ConversionDialogLogic:
             self.progress_bar.setFormat("Conversion completed.")
             QApplication.processEvents()
 
+            self.save_conversion_settings(params)
             if self.parent() and hasattr(self.parent(), 'load_conversion_results'):
                 self.parent().load_conversion_results()
             
@@ -232,7 +233,6 @@ class ConversionDialogLogic:
                 self.grid_was_visible):
                 self.parent().grid_manager.set_grid_visible(True)
             
-            self.save_conversion_settings(params)
             if self.parent() and self.parent().show_success_dialog:
                 show_success_dialog(self)
             time.sleep(0.3)

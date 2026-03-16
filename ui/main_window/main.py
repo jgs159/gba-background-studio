@@ -21,6 +21,7 @@ class GBABackgroundStudio(QMainWindow):
         super().__init__()
         self.config_manager = ConfigManager()
 
+        self.current_bpp = 4
         self.set_window_icon()
 
         from .config import load_configuration
@@ -63,6 +64,8 @@ class GBABackgroundStudio(QMainWindow):
         from .config import setup_grids
         setup_grids(self)
 
+        load_configuration(self)
+        
         if self.load_last_output:
             from .file_ops import load_last_output_files
             load_last_output_files(self)

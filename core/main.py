@@ -111,11 +111,8 @@ def apply_crop_and_resize(img, origin, end, output_size, img_w, img_h):
         cropped_img = img.crop((orig_x, orig_y, min(end_x, img_w), min(end_y, img_h)))
     elif output_size is not None:
         target_w, target_h = output_size
-        end_x = orig_x + target_w
-        end_y = orig_y + target_h
-        if end_x > img_w or end_y > img_h:
-            print(translator.tr("error_crop_exceeds", w=end_x, h=end_y, aw=img_w, ah=img_h))
-            return None
+        end_x = min(orig_x + target_w, img_w)
+        end_y = min(orig_y + target_h, img_h)
         cropped_img = img.crop((orig_x, orig_y, end_x, end_y))
     else:
         if img_w > 1024 or img_h > 2048:
@@ -328,10 +325,14 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
         )
 
     os.makedirs("temp/preview", exist_ok=True)
+    tw = cropped_img.width // 8
+    th = cropped_img.height // 8
     if bpp == 4:
-        create_gbagfx_preview_4bpp(selected_palettes=selected_palettes, save_preview=save_preview, transparent_color=transparent_color, keep_transparent=keep_transparent)
-    else:  # bpp == 8
-        create_gbagfx_preview_8bpp(save_preview=save_preview, transparent_color=transparent_color, keep_transparent=keep_transparent)
+        create_gbagfx_preview_4bpp(save_preview=save_preview, transparent_color=transparent_color, keep_transparent=keep_transparent, tilemap_width=tw, tilemap_height=th)
+    else:
+        create_gbagfx_preview_8bpp(save_preview=save_preview, transparent_color=transparent_color, keep_transparent=keep_transparent, quantized_img=quantized_img, tilemap_width=tw, tilemap_height=th)
+
+
     print(translator.tr("preview_generated", path="temp/preview/preview.png"), flush=True)
 
     # === 2. Clean temp/ (common) ===

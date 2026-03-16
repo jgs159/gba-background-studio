@@ -21,10 +21,8 @@ class ConfigManager:
                 'keep_temp_files': 'False',
                 'load_last_output': 'False',
                 'save_conversion_params': 'False',
-                'load_last_output': 'False',
-                'save_conversion_params': 'False',
                 'show_success_dialog': 'True'
-            },
+            }
             self.config['CONVERSION'] = {
                 'bpp': '4',
                 'use_palettes': 'True',
@@ -36,6 +34,8 @@ class ConfigManager:
                 'output_size': 'Original',
                 'custom_width': '32',
                 'custom_height': '20',
+                'tilemap_width': '32',
+                'tilemap_height': '20',
                 'start_index': '0',
                 'palette_size': '1'
             }

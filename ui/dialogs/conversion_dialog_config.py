@@ -15,10 +15,17 @@ class ConversionDialogConfig:
                     self.use_palettes_radio.setChecked(True)
                 else:
                     self.use_tilemap_radio.setChecked(True)
-                palettes_str = config.get('CONVERSION', 'selected_palettes', '0')
-                selected_palettes = list(map(int, palettes_str.split(',')))
+                palettes_str = config.get('CONVERSION', 'selected_palettes', '')
+
+                if palettes_str:
+                    selected_palettes = list(map(int, palettes_str.split(',')))
+                else:
+                    selected_palettes = [0]
+
                 for i, cb in enumerate(self.palette_checks):
+                    cb.blockSignals(True)
                     cb.setChecked(i in selected_palettes)
+                    cb.blockSignals(False)
             self.transparent_color.setText(config.get('CONVERSION', 'transparent_color', '0,0,0'))
             self.extra_transparent.setValue(int(config.get('CONVERSION', 'extra_transparent', '0')))
             self.tileset_width.setValue(int(config.get('CONVERSION', 'tileset_width', '0')))
@@ -33,12 +40,16 @@ class ConversionDialogConfig:
             custom_width_loaded = int(config.get('CONVERSION', 'custom_width', '32'))
             custom_height_loaded = int(config.get('CONVERSION', 'custom_height', '20'))
 
+            self.custom_width.blockSignals(True)
+            self.custom_height.blockSignals(True)
             if output_size == 'Original':
                 self.custom_width.setValue(self.img_width_tiles)
                 self.custom_height.setValue(self.img_height_tiles)
             else:
                 self.custom_width.setValue(custom_width_loaded)
                 self.custom_height.setValue(custom_height_loaded)
+            self.custom_width.blockSignals(False)
+            self.custom_height.blockSignals(False)
             
             self.start_index.setValue(int(config.get('CONVERSION', 'start_index', '0')))
             self.palette_size.setValue(int(config.get('CONVERSION', 'palette_size', '1')))
@@ -73,9 +84,12 @@ class ConversionDialogConfig:
             config.set('CONVERSION', 'output_size', self.output_combo.currentText())
             config.set('CONVERSION', 'custom_width', str(self.custom_width.value()))
             config.set('CONVERSION', 'custom_height', str(self.custom_height.value()))
+            config.set('CONVERSION', 'tilemap_width', str(self.output_width_tiles))
+            config.set('CONVERSION', 'tilemap_height', str(self.output_height_tiles))
             
             config.set('CONVERSION', 'start_index', str(self.start_index.value()))
             config.set('CONVERSION', 'palette_size', str(self.palette_size.value()))
+            config.set('CONVERSION', 'bpp', str(self.bpp_combo.currentIndex()))
             
         except Exception as e:
             print(f"Error saving conversion settings: {e}")
