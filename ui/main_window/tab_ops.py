@@ -81,18 +81,43 @@ def load_conversion_results(main_window):
     palette_path = "temp/preview/palette.pal"
     tilemap_path = "output/map.bin"
 
+    bpp_index = int(main_window.config_manager.get('CONVERSION', 'bpp', '0'))
+    main_window.current_bpp = 8 if bpp_index == 1 else 4
+    main_window.start_index = int(main_window.config_manager.get('CONVERSION', 'start_index', '0'))
+
     if os.path.exists(tiles_path):
         tiles_img = PilImage.open(tiles_path)
         display_tileset(main_window, tiles_img)
 
-    if os.path.exists(tilemap_path):
+    if os.path.exists(tilemap_path) and os.path.exists(preview_path):
         with open(tilemap_path, 'rb') as f:
             tilemap_data = f.read()
-        main_window.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path)
-        
+
+        preview_img = PilImage.open(preview_path)
+        tilemap_width = preview_img.width // 8
+        tilemap_height = preview_img.height // 8
+
+        main_window.edit_tiles_tab.tilemap_data = tilemap_data
+        main_window.edit_tiles_tab.tilemap_width = tilemap_width
+        main_window.edit_tiles_tab.tilemap_height = tilemap_height
+        main_window.edit_tiles_tab.tilemap_width_spin.blockSignals(True)
+        main_window.edit_tiles_tab.tilemap_height_spin.blockSignals(True)
+        main_window.edit_tiles_tab.tilemap_width_spin.setValue(tilemap_width)
+        main_window.edit_tiles_tab.tilemap_height_spin.setValue(tilemap_height)
+        main_window.edit_tiles_tab.tilemap_width_spin.blockSignals(False)
+        main_window.edit_tiles_tab.tilemap_height_spin.blockSignals(False)
+
         main_window.edit_palettes_tab.tilemap_data = tilemap_data
-        main_window.edit_palettes_tab.tilemap_width = main_window.edit_tiles_tab.tilemap_width
-        main_window.edit_palettes_tab.tilemap_height = main_window.edit_tiles_tab.tilemap_height
+        main_window.edit_palettes_tab.tilemap_width = tilemap_width
+        main_window.edit_palettes_tab.tilemap_height = tilemap_height
+
+        for ctrl in [main_window.edit_tiles_tab.tilemap_width_spin,
+                     main_window.edit_tiles_tab.tilemap_height_spin,
+                     main_window.edit_tiles_tab.resize_button,
+                     main_window.edit_tiles_tab.btn_up, main_window.edit_tiles_tab.btn_down,
+                     main_window.edit_tiles_tab.btn_left, main_window.edit_tiles_tab.btn_right,
+                     main_window.edit_tiles_tab.cyclic_checkbox]:
+            ctrl.setEnabled(True)
 
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
@@ -101,11 +126,15 @@ def load_conversion_results(main_window):
         preview_img = PilImage.open(preview_path)
         preview_qimg = pil_to_qimage(preview_img)
         preview_pixmap = QPixmap.fromImage(preview_qimg)
-        
+
         main_window.preview_tab.preview_image_scene.clear()
         main_window.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
         main_window.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
-        
+
+        main_window.edit_tiles_tab.edit_tilemap_scene.clear()
+        main_window.edit_tiles_tab.edit_tilemap_scene.addPixmap(preview_pixmap)
+        main_window.edit_tiles_tab.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
+
         from .view_ops import apply_zoom_to_view
         apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
         main_window.preview_tab.preview_image_view.centerOn(main_window.preview_tab.preview_image_scene.items()[0])
@@ -114,34 +143,31 @@ def load_conversion_results(main_window):
         palette_colors = [(0, 0, 0)] * 256
         try:
             with open(palette_path, 'r', encoding='utf-8') as f:
-                lines = [line.strip() for line in f 
+                lines = [line.strip() for line in f
                         if line.strip() and not line.startswith(("JASC-PAL", "0100"))]
-            
             if lines:
                 color_count = int(lines[0])
                 for i in range(1, min(1 + color_count, 257)):
                     r, g, b = map(int, lines[i].split())
                     palette_colors[i - 1] = (r, g, b)
-                    
             main_window.preview_tab.display_palette_colors(palette_colors)
             if hasattr(main_window, 'edit_palettes_tab'):
                 main_window.edit_palettes_tab.display_palette_colors(palette_colors)
-
         except Exception as e:
             print(f"Error loading palette: {e}")
             grayscale_colors = generate_grayscale_palette()
             main_window.preview_tab.display_palette_colors(grayscale_colors)
             if hasattr(main_window, 'edit_palettes_tab'):
                 main_window.edit_palettes_tab.display_palette_colors(grayscale_colors)
-  
+
     main_window.menu_bar.action_save_tileset.setEnabled(True)
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_selection.setEnabled(True)
-    
+
     if hasattr(main_window, 'output_loaded_for_zoom'):
         main_window.output_loaded_for_zoom = True
-        
+
     main_window.main_tabs.setCurrentIndex(1)
     sync_palettes_tab(main_window)

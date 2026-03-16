@@ -42,8 +42,14 @@ class Translator:
 
     def tr(self, key, **kwargs):
         text = self.translations.get(key, f"??{key}??")
-        try:
-            return text.format(**kwargs)
-        except Exception as e:
-            print(f"Error formatting translation '{key}': {e}")
-            return text
+        
+        if kwargs:
+            try:
+                text = text.format(**kwargs)
+            except Exception as e:
+                print(f"Error formatting translation '{key}': {e}")
+                return f"??{key}??"
+        
+        text = text.replace('\\n', '\n')
+        
+        return text

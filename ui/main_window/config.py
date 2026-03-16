@@ -6,7 +6,14 @@ def load_configuration(main_window):
     main_window.load_last_output = main_window.config_manager.getboolean('SETTINGS', 'load_last_output', True)
     main_window.show_success_dialog = main_window.config_manager.getboolean('SETTINGS', 'show_success_dialog', True)
     main_window.save_conversion_params = main_window.config_manager.getboolean('SETTINGS', 'save_conversion_params', True)
-
+    main_window.load_last_output = main_window.config_manager.getboolean('SETTINGS', 'load_last_output', True)
+    
+    if main_window.load_last_output:
+        bpp_index = int(main_window.config_manager.get('CONVERSION', 'bpp', '0'))
+        main_window.current_bpp = 8 if bpp_index == 1 else 4
+    else:
+        main_window.current_bpp = 4
+    
 def apply_configuration_to_menu(main_window):
     if hasattr(main_window, 'menu_bar'):
         main_window.menu_bar.action_save_preview.setChecked(main_window.save_preview_files)

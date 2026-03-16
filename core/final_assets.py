@@ -11,12 +11,10 @@ translator = Translator()
 
 
 def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transparent_tiles=0, tile_width=None):
-    """
-    Generates final files for 4bpp mode:
-        - output/tiles.png
-        - output/map.bin
-        - output/palette_xx.pal
-    """
+    import os
+    import numpy as np
+    from PIL import Image
+
     w, h = img.size
     tiles_p = extract_tiles_rgba(img)
     n_tiles = len(tiles_p)
@@ -34,7 +32,6 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         for local_idx, real_idx in enumerate(selected_palettes):
             palette_mapping[local_idx] = real_idx
 
-    # === Detection of unique tiles with H/V flip ===
     unique_tiles = []
     tile_map = []
     seen = {}
@@ -73,7 +70,6 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         t_vflip = np.flipud(t_original)
         t_hvflip = np.fliplr(t_vflip)
 
-        # === Prioritize: original → hflip → vflip → hvflip ===
         candidates = [
             (t_original, 0, 0),
             (t_hflip,    1, 0),
@@ -105,50 +101,33 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
 
-    all_used_real_palettes = set()
-    for tile_id, hflip, vflip, real_pal_idx in tile_map:
-        all_used_real_palettes.add(int(real_pal_idx))
-    
-    # === Save palettes (palette_XX.pal) ===
-    groups = group_consecutive_palettes(selected_palettes)
     marker_gba = rgb_to_gba_rounded(MARKER_COLOR)
-
     indexed_dir = os.path.join("temp", "02_reindexed")
-    for base_idx, count in groups:
-        combined_palette = []
-        for i in range(count):
-            real_pal_idx = base_idx + i
-            if real_pal_idx in selected_palettes:
-                group_idx = selected_palettes.index(real_pal_idx)
-                group_path = os.path.join(indexed_dir, f"group_{group_idx}_indexed.png")
-                
-                if os.path.exists(group_path):
-                    img = Image.open(group_path)
-                    pal = img.getpalette()
-                    for j in range(16):
-                        r = pal[j*3]
-                        g = pal[j*3+1]
-                        b = pal[j*3+2]
-                        r_gba, g_gba, b_gba = rgb_to_gba_rounded((r, g, b))
-                        combined_palette.append((r_gba, g_gba, b_gba))
-                else:
-                    combined_palette.extend([(0, 0, 0)] * 16)
-            else:
-                combined_palette.extend([(0, 0, 0)] * 16)
+
+    for local_idx, real_pal_idx in enumerate(selected_palettes):
+        group_path = os.path.join(indexed_dir, f"group_{local_idx}_indexed.png")
         
-        while len(combined_palette) < count * 16:
-            combined_palette.append((0, 0, 0))
-
-        for i in range(0, len(combined_palette), 16):
-            if combined_palette[i] == marker_gba:
-                combined_palette[i] = (0, 0, 0)
-
-        filename = f"palette_{base_idx:02d}.pal"
-        with open(os.path.join(output_dir, filename), "w") as f:
-            f.write("JASC-PAL\n0100\n")
-            f.write(f"{len(combined_palette)}\n")
-            for r, g, b in combined_palette:
-                f.write(f"{r} {g} {b}\n")
+        if os.path.exists(group_path):
+            img_group = Image.open(group_path)
+            pal = img_group.getpalette()
+            
+            slot_palette = []
+            for j in range(16):
+                r = pal[j*3]
+                g = pal[j*3+1]
+                b = pal[j*3+2]
+                r_gba, g_gba, b_gba = rgb_to_gba_rounded((r, g, b))
+                
+                if j == 0 and (r_gba, g_gba, b_gba) == marker_gba:
+                    slot_palette.append((0, 0, 0))
+                else:
+                    slot_palette.append((r_gba, g_gba, b_gba))
+            
+            filename = f"palette_{real_pal_idx:02d}.pal"
+            with open(os.path.join(output_dir, filename), "w") as f:
+                f.write("JASC-PAL\n0100\n16\n")
+                for r, g, b in slot_palette:
+                    f.write(f"{r} {g} {b}\n")
 
     print(translator.tr("palette_saved"))
 

@@ -38,24 +38,28 @@ def pil_to_qimage(pil_img):
         data = rgb_img.tobytes("raw", "RGB")
         return QImage(data, rgb_img.size[0], rgb_img.size[1], QImage.Format_RGB888)
 
-def create_gbagfx_preview_4bpp(save_preview=False, selected_palettes=None, transparent_color=(0, 0, 0), keep_transparent=False):
+def create_gbagfx_preview_4bpp(save_preview=False, selected_palettes=None, transparent_color=(0, 0, 0), keep_transparent=False, tilemap_width=32, tilemap_height=32):
     """
     Genera:
         - temp/preview/preview.png
         - temp/preview/palette.pal
     """
     try:
+        from shutil import copy2
+        import numpy as np
+        import os
+        from PIL import Image
+
         output_dir = "output"
-        indexed_dir = os.path.join("temp", "02_reindexed")
         preview_dir = os.path.join("temp", "preview")
         os.makedirs(preview_dir, exist_ok=True)
 
-        base_path = os.path.join(indexed_dir, "group_0_indexed.png")
-        if not os.path.exists(base_path):
-            print(translator.tr("error_preview_missing", path=base_path))
+        tiles_path = os.path.join(output_dir, "tiles.png")
+        map_path = os.path.join(output_dir, "map.bin")
+
+        if not os.path.exists(tiles_path) or not os.path.exists(map_path):
+            print(translator.tr("error_preview_missing_files"))
             return
-        sample_img = Image.open(base_path)
-        w, h = sample_img.size
 
         full_palette_gba = [(0, 0, 0)] * 256
 
@@ -76,7 +80,10 @@ def create_gbagfx_preview_4bpp(save_preview=False, selected_palettes=None, trans
                     r, g, b = map(int, line.split())
                     idx = base_idx * 16 + i
                     if idx < 256:
-                        full_palette_gba[idx] = (r, g, b)
+                        if i == 0 and not keep_transparent:
+                            full_palette_gba[idx] = (0, 0, 0)
+                        else:
+                            full_palette_gba[idx] = (r, g, b)
                 except (ValueError, IndexError):
                     continue
 
@@ -87,74 +94,61 @@ def create_gbagfx_preview_4bpp(save_preview=False, selected_palettes=None, trans
             for r, g, b in full_palette_gba:
                 f.write(f"{int(r)} {int(g)} {int(b)}\n")
 
-        unique_colors = []
-        for i in range(256):
-            r = (i * 57) % 256
-            g = (i * 113) % 256
-            b = (i * 197) % 256
-            unique_colors.append((r, g, b))
+        with Image.open(tiles_path) as ts_img:
+            tileset_data = np.array(ts_img)
+            ts_width, ts_height = ts_img.size
 
-        flat_unique = [c for color in unique_colors for c in color] + [0] * (768 - len(unique_colors) * 3)
-        result_img = Image.new("P", (w, h), 0)
-        result_img.putpalette(flat_unique)
-
-        for i, pal_idx in enumerate(selected_palettes):
-            group_path = os.path.join(indexed_dir, f"group_{i}_indexed.png")
-            if not os.path.exists(group_path):
-                continue
-
-            img = Image.open(group_path)
-            if img.mode != 'P':
-                continue
-
-            original_palette = img.getpalette()
-            if original_palette:
-                temp_img = Image.new("P", img.size, 0)
-                temp_img.putpalette(flat_unique)
-                
-                img_array = np.array(img)
-                temp_array = np.array(temp_img)
-                
-                for original_idx in range(16):
-                    target_idx = pal_idx * 16 + original_idx
-                    
-                    if original_idx != 0:
-                        mask = (img_array == original_idx)
-                        temp_array[mask] = target_idx
-                
-                img_with_color = Image.fromarray(temp_array, mode="P")
-                img_with_color.putpalette(flat_unique)
-                result_array = np.array(result_img)
-                group_array = np.array(img_with_color)
-                mask = (group_array != 0)
-                result_array[mask] = group_array[mask]
-                result_img = Image.fromarray(result_array, mode="P")
-                result_img.putpalette(flat_unique)
-
-        flat_gba = [c for color in full_palette_gba for c in color] + [0] * (768 - len(full_palette_gba) * 3)
+        with open(map_path, "rb") as f:
+            map_bytes = f.read()
         
-        final_img = Image.new("P", (w, h), 0)
-        final_img.putpalette(flat_gba)
+        num_entries = len(map_bytes) // 2
         
-        final_img.putdata(list(result_img.getdata()))
+        stride_tiles = tilemap_width
+        rows_tiles = tilemap_height
+        
+        preview_array = np.zeros((rows_tiles * 8, stride_tiles * 8), dtype=np.uint8)
 
+        for i in range(min(num_entries, stride_tiles * rows_tiles)):
+            entry = int.from_bytes(map_bytes[i*2:i*2+2], "little")
+            tile_idx = entry & 0x03FF
+            h_flip = (entry >> 10) & 1
+            v_flip = (entry >> 11) & 1
+            pal_slot = (entry >> 12) & 0xF
+            
+            tx = (tile_idx % (ts_width // 8)) * 8
+            ty = (tile_idx // (ts_width // 8)) * 8
+            
+            tile_data = tileset_data[ty:ty+8, tx:tx+8].copy()
+            if h_flip: 
+                tile_data = np.fliplr(tile_data)
+            if v_flip: 
+                tile_data = np.flipud(tile_data)
+            
+            px = (i % stride_tiles) * 8
+            py = (i // stride_tiles) * 8
+            preview_array[py:py+8, px:px+8] = (tile_data % 16) + (pal_slot * 16)
+
+        final_preview = Image.fromarray(preview_array, mode="P")
+        
+        flat_palette = []
+        for r, g, b in full_palette_gba:
+            flat_palette.extend([r, g, b])
+        
+        final_preview.putpalette(flat_palette)
         preview_path = os.path.join(preview_dir, "preview.png")
-        final_img.save(preview_path)
-    
+        final_preview.save(preview_path)
+
         if save_preview:
             os.makedirs("output", exist_ok=True)
             copy2(preview_path, os.path.join("output", "preview_image.png"))
             copy2(pal_output, os.path.join("output", "preview_palette.pal"))
 
+        print(translator.tr("preview_generated"))
+
     except Exception as e:
         print(translator.tr("error_preview", e=e))
 
-def create_gbagfx_preview_8bpp(save_preview=False, transparent_color=None, keep_transparent=False):
-    """
-    Genera:
-        - temp/preview/preview.png
-        - temp/preview/palette.pal
-    """
+def create_gbagfx_preview_8bpp(save_preview=False, transparent_color=None, keep_transparent=False, quantized_img=None, tilemap_width=32, tilemap_height=32):
     if transparent_color is None:
         transparent_color = (0, 0, 0)
 
@@ -190,50 +184,42 @@ def create_gbagfx_preview_8bpp(save_preview=False, transparent_color=None, keep_
             r, g, b = map(int, line.split())
             raw_palette.append((r, g, b))
 
-        full_palette = [(255, 255, 255)] * 256
-
-        transparent_color_gba = (int(transparent_color[0]), int(transparent_color[1]), int(transparent_color[2]))
+        full_palette = [(0, 0, 0)] * 256
         if keep_transparent:
-            full_palette[0] = transparent_color_gba
-        else:
-            full_palette[0] = (0, 0, 0)
+            full_palette[0] = (int(transparent_color[0]), int(transparent_color[1]), int(transparent_color[2]))
 
         for i, color in enumerate(raw_palette):
             idx = start_index + i
             if idx < 256:
                 full_palette[idx] = color
 
-        reconstructed_path = "temp/reconstructed.png"
-        if not os.path.exists(reconstructed_path):
-            print(translator.tr("error_preview_missing", path=reconstructed_path))
-            return
+        # Usar quantized_img en memoria si está disponible, si no leer del disco
+        if quantized_img is not None:
+            base_img = quantized_img
+        else:
+            reconstructed_path = os.path.join("temp", "reconstructed.png")
+            if not os.path.exists(reconstructed_path):
+                print(translator.tr("error_preview_missing", path=reconstructed_path))
+                return
+            base_img = Image.open(reconstructed_path)
 
-        base_img = Image.open(reconstructed_path)
         if base_img.mode != 'P':
-            raise ValueError("reconstructed.png must be in indexed mode")
+            raise ValueError("Image must be in indexed mode")
 
         orig_pal = base_img.getpalette()
         orig_rgb = []
         for i in range(256):
             if i * 3 + 2 < len(orig_pal):
-                r = orig_pal[i * 3]
-                g = orig_pal[i * 3 + 1]
-                b = orig_pal[i * 3 + 2]
+                r, g, b = orig_pal[i*3], orig_pal[i*3+1], orig_pal[i*3+2]
             else:
                 r = g = b = 0
             orig_rgb.append((r, g, b))
 
         orig_gba = [rgb_to_gba_rounded(color) for color in orig_rgb]
 
-        color_to_index = {}
-        for idx, color in enumerate(full_palette):
-            if color != (255, 255, 255):
-                color_to_index[color] = idx
+        color_to_index = {color: idx for idx, color in enumerate(full_palette) if color != (0, 0, 0)}
 
-        index_mapping = {}
-        for old_idx, color in enumerate(orig_gba):
-            new_idx = color_to_index.get(color, 0)
-            index_mapping[old_idx] = new_idx
+        index_mapping = {old_idx: color_to_index.get(color, 0) for old_idx, color in enumerate(orig_gba)}
 
         img_array = np.array(base_img)
         new_array = np.zeros_like(img_array)
@@ -241,15 +227,8 @@ def create_gbagfx_preview_8bpp(save_preview=False, transparent_color=None, keep_
             new_array[img_array == old_idx] = new_idx
         preview_img = Image.fromarray(new_array, mode="P")
 
-        final_palette = []
-        for color in full_palette:
-            if color == (255, 255, 255):
-                final_palette.append((0, 0, 0)) 
-            else:
-                final_palette.append(color)
-
         flat_palette = []
-        for r, g, b in final_palette:
+        for r, g, b in full_palette:
             flat_palette.extend([int(r), int(g), int(b)])
         while len(flat_palette) < 768:
             flat_palette.append(0)
@@ -257,18 +236,15 @@ def create_gbagfx_preview_8bpp(save_preview=False, transparent_color=None, keep_
 
         preview_dir = os.path.join("temp", "preview")
         os.makedirs(preview_dir, exist_ok=True)
-
         preview_path = os.path.join(preview_dir, "preview.png")
         preview_img.save(preview_path)
 
         pal_output = os.path.join(preview_dir, "palette.pal")
         with open(pal_output, "w") as f:
-            f.write("JASC-PAL\n")
-            f.write("0100\n")
-            f.write("256\n")
-            for r, g, b in final_palette:
+            f.write("JASC-PAL\n0100\n256\n")
+            for r, g, b in full_palette:
                 f.write(f"{int(r)} {int(g)} {int(b)}\n")
-        
+
         if save_preview:
             os.makedirs("output", exist_ok=True)
             copy2(preview_path, os.path.join("output", "preview_image.png"))
@@ -276,7 +252,4 @@ def create_gbagfx_preview_8bpp(save_preview=False, transparent_color=None, keep_
 
     except Exception as e:
         print(translator.tr("error_preview", e=e))
-        try:
-            copy2("temp/reconstructed.png", os.path.join("temp", "preview", "preview.png"))
-        except:
-            pass
+
