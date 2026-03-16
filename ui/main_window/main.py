@@ -240,8 +240,31 @@ class GBABackgroundStudio(QMainWindow):
                 
             elif state['type'] == 'tilemap_resize':
                 self.apply_tilemap_resize(state, is_undo)
+            elif state['type'] == 'tileset_reshape':
+                self.apply_tileset_reshape(state, is_undo)
         except Exception as e:
             print(f"Error applying history state: {e}")
+
+    def apply_tileset_reshape(self, state, is_undo):
+        if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tileset_img_original:
+            return
+
+        data = state['data']
+        target_width = data['old_width'] if is_undo else data['new_width']
+        target_height = data['old_height'] if is_undo else data['new_height']
+        total_tiles = (self.edit_tiles_tab.tileset_img_original.width // 8) * \
+                    (self.edit_tiles_tab.tileset_img_original.height // 8)
+
+        self.edit_tiles_tab.tile_width_spin.blockSignals(True)
+        self.edit_tiles_tab.tile_width_spin.setValue(target_width)
+        self.edit_tiles_tab.tile_width_spin.blockSignals(False)
+        self.edit_tiles_tab.tileset_height_label.setText(str(target_height))
+        self.edit_tiles_tab.tiles_per_row = target_width
+        self.edit_tiles_tab._tileset_width_before_edit = target_width
+        self.edit_tiles_tab.render_tileset_with_padding(target_width, target_height, total_tiles)
+
+        if self.edit_tiles_tab.tileset_img:
+            self.edit_tiles_tab.tileset_img.save("output/tiles.png")
 
     def apply_tilemap_resize(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab'):

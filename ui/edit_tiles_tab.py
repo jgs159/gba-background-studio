@@ -116,14 +116,16 @@ class EditTilesTab(QWidget):
         controls_main_layout.addWidget(self.flip_v_checkbox)
         controls_main_layout.addStretch()
         controls_layout.addLayout(controls_main_layout)
-        self.tile_width_spin.valueChanged.connect(self.on_tileset_width_changed)
+        self.tile_width_spin.valueChanged.connect(self._on_tileset_width_preview)
+        self.tile_width_spin.editingFinished.connect(self._on_tileset_width_commit)
+
         container.layout().addWidget(controls_frame)
         
         self.tile_width_spin.setEnabled(False)
         self.flip_h_checkbox.setEnabled(False)
         self.flip_v_checkbox.setEnabled(False)
     
-    def on_tileset_width_changed(self, new_width):
+    def _on_tileset_width_preview(self, new_width):
         if not hasattr(self, 'tileset_img_original') or not self.tileset_img_original:
             return
         if new_width <= 0:
@@ -139,15 +141,42 @@ class EditTilesTab(QWidget):
             self.tile_width_spin.setValue(1)
 
         new_height = (total_tiles_original + new_width - 1) // new_width
-        
-        if new_height > 64:
-            pass
-
         self.tileset_height_label.setText(str(new_height))
-        
         self.tiles_per_row = new_width
-
         self.render_tileset_with_padding(new_width, new_height, total_tiles_original)
+
+    def _on_tileset_width_commit(self):
+        if not hasattr(self, 'tileset_img_original') or not self.tileset_img_original:
+            return
+
+        new_width = self.tile_width_spin.value()
+        old_width = getattr(self, '_tileset_width_before_edit', new_width)
+
+        if new_width == old_width:
+            return
+
+        original_w_px = self.tileset_img_original.width
+        original_h_px = self.tileset_img_original.height
+        total_tiles = (original_w_px // 8) * (original_h_px // 8)
+        old_height = (total_tiles + old_width - 1) // old_width
+        new_height = (total_tiles + new_width - 1) // new_width
+
+        if self.tileset_img:
+            self.tileset_img.save("output/tiles.png")
+
+        if self.main_window and hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='tileset_reshape',
+                editor_type='tiles',
+                data={
+                    'old_width': old_width, 'old_height': old_height,
+                    'new_width': new_width, 'new_height': new_height,
+                },
+                description=f"Tileset reshaped from {old_width}x{old_height} to {new_width}x{new_height}"
+            )
+
+        self._tileset_width_before_edit = new_width
+
 
     def render_tileset_with_padding(self, width_tiles, height_tiles, total_tiles_original):
         if not self.tileset_img_original:
@@ -620,9 +649,10 @@ class EditTilesTab(QWidget):
         self.tileset_img_original = pil_img
         original_w_px = pil_img.width
         initial_width = original_w_px // 8
+        self._tileset_width_before_edit = initial_width
         if hasattr(self, 'tile_width_spin'):
             self.tile_width_spin.setValue(initial_width)
-        self.on_tileset_width_changed(initial_width)
+        self._on_tileset_width_preview(initial_width)
         self.highlight_selected_tile(0, 0)
         
         if hasattr(self, 'tile_width_spin'):

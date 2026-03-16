@@ -175,7 +175,44 @@ def open_tileset(main_window):
         QMessageBox.warning(main_window, main_window.translator.tr("error"), main_window.translator.tr("could_not_load_tileset").format(error=str(e)))
 
 def save_tileset(main_window):
-    pass
+    source_path = os.path.join("output", "tiles.png")
+
+    if not os.path.exists(source_path):
+        QMessageBox.information(
+            main_window,
+            main_window.translator.tr("save_tileset"),
+            main_window.translator.tr("no_tileset_to_save")
+        )
+        return
+
+    target_path, selected_filter = QFileDialog.getSaveFileName(
+        main_window,
+        main_window.translator.tr("save_tileset"),
+        "tiles",
+        "PNG Images (*.png);;BMP Images (*.bmp);;All Files (*)"
+    )
+
+    if not target_path:
+        return
+
+    try:
+        if "bmp" in selected_filter.lower() or target_path.lower().endswith(".bmp"):
+            img = PilImage.open(source_path)
+            img.save(target_path, format="BMP")
+        else:
+            shutil.copy2(source_path, target_path)
+
+        QMessageBox.information(
+            main_window,
+            main_window.translator.tr("save_tileset"),
+            main_window.translator.tr("tileset_exported", path=target_path)
+        )
+    except Exception as e:
+        QMessageBox.warning(
+            main_window,
+            main_window.translator.tr("save_tileset"),
+            main_window.translator.tr("error_saving_tileset", error=str(e))
+        )
 
 def open_tilemap(main_window):
     if hasattr(main_window, 'history_manager'):
@@ -271,7 +308,7 @@ def save_palette(main_window):
     output_dir = "output"
     
     palette_files = []
-    if self.main_window.current_bpp == 4:
+    if main_window.current_bpp == 4:
         for i in range(16):
             palette_path = os.path.join(output_dir, f"palette_{i:02d}.pal")
             if os.path.exists(palette_path):
