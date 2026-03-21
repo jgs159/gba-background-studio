@@ -10,12 +10,75 @@ from utils.translator import Translator
 translator = Translator()
 
 
+def reorganize_tilemap_for_gba_bg(tile_map, img_width, img_height):
+    width_tiles  = img_width  // 8
+    height_tiles = img_height // 8
+
+    if width_tiles <= 32:
+        return tile_map
+
+    if width_tiles % 32 != 0 or height_tiles % 32 != 0:
+        raise ValueError(
+            f"GBA BG wider than 32 tiles requires both dimensions to be multiples of 32. "
+            f"Got {width_tiles}x{height_tiles} tiles."
+        )
+
+    blocks_x = width_tiles  // 32
+    blocks_y = height_tiles // 32
+
+    reorganized = []
+    for by in range(blocks_y):
+        for bx in range(blocks_x):
+            for ty in range(32):
+                for tx in range(32):
+                    idx = (by * 32 + ty) * width_tiles + (bx * 32 + tx)
+                    reorganized.append(tile_map[idx] if idx < len(tile_map) else (0, 0, 0, 0))
+    return reorganized
+
+def revert_gba_tilemap_reorganization(tilemap_data, old_width_tiles, old_height_tiles, new_width_tiles, new_height_tiles):
+    if old_width_tiles <= 32:
+        return tilemap_data
+    
+    total_entries = len(tilemap_data) // 2
+    new_total_entries = new_width_tiles * new_height_tiles
+    
+    blocks_x = old_width_tiles // 32
+    blocks_y = old_height_tiles // 32
+    
+    reorganized_entries = [b'\x00\x00'] * new_total_entries
+    
+    for new_y in range(min(new_height_tiles, old_height_tiles)):
+        for new_x in range(min(new_width_tiles, old_width_tiles)):
+            block_x = new_x // 32
+            block_y = new_y // 32
+            
+            if block_x < blocks_x and block_y < blocks_y:
+                local_x = new_x % 32
+                local_y = new_y % 32
+                
+                block_index = block_y * blocks_x + block_x
+                local_index = local_y * 32 + local_x
+                original_index = block_index * 1024 + local_index
+                
+                if original_index < total_entries:
+                    start_byte = original_index * 2
+                    entry = tilemap_data[start_byte:start_byte + 2]
+                    
+                    new_index = new_y * new_width_tiles + new_x
+                    reorganized_entries[new_index] = entry
+    
+    new_data = bytearray()
+    for entry in reorganized_entries:
+        new_data.extend(entry)
+    
+    return bytes(new_data)
+
 def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transparent_tiles=0, tile_width=None):
     import os
     import numpy as np
     from PIL import Image
 
-    w, h = img.size
+    img_w, img_h = img.size
     tiles_p = extract_tiles_rgba(img)
     n_tiles = len(tiles_p)
 
@@ -95,8 +158,7 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
 
     total_tiles = len(unique_tiles)
     if total_tiles > 1024:
-        print(translator.tr("error_tileset_too_big", n=total_tiles))
-        sys.exit(1)
+        raise ValueError(translator.tr("error_tileset_too_big", n=total_tiles))
 
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
@@ -108,8 +170,8 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         group_path = os.path.join(indexed_dir, f"group_{local_idx}_indexed.png")
         
         if os.path.exists(group_path):
-            img_group = Image.open(group_path)
-            pal = img_group.getpalette()
+            with Image.open(group_path) as img_group:
+                pal = img_group.getpalette()
             
             slot_palette = []
             for j in range(16):
@@ -133,20 +195,9 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
 
     # === Save tilemap.bin ===
     map_path = os.path.join(output_dir, "map.bin")
+    reorganized = reorganized = reorganize_tilemap_for_gba_bg(tile_map, img_w, img_h)
     with open(map_path, "wb") as f:
-        for idx, hflip, vflip, real_pal_idx in tile_map:
-            entry = idx & 0x3FF
-            if hflip: entry |= (1 << 10)
-            if vflip: entry |= (1 << 11)
-            entry |= (int(real_pal_idx) << 12)
-            f.write(entry.to_bytes(2, 'little'))
-    
-    print(translator.tr("tilemap_saved"))
-
-    # === Save tilemap.bin ===
-    map_path = os.path.join(output_dir, "map.bin")
-    with open(map_path, "wb") as f:
-        for idx, hflip, vflip, real_pal_idx in tile_map:
+        for idx, hflip, vflip, real_pal_idx in reorganized:
             entry = idx & 0x3FF
             if hflip: entry |= (1 << 10)
             if vflip: entry |= (1 << 11)
@@ -207,8 +258,8 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         group_path = os.path.join(indexed_dir, f"group_0_indexed.png")
         
         if os.path.exists(group_path):
-            img_with_palette = Image.open(group_path)
-            actual_palette = img_with_palette.getpalette()
+            with Image.open(group_path) as img_with_palette:
+                actual_palette = img_with_palette.getpalette()
             
             flat_palette = []
             for j in range(16):
@@ -267,7 +318,7 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     print(translator.tr("local_palette_usage", counts=sorted_counts))
 
 def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent_tiles=0, tile_width=None):
-    w, h = img.size
+    img_w, img_h = img.size
     tiles = extract_tiles_rgba(img)
     n_tiles = len(tiles)
 
@@ -344,14 +395,14 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
 
     total_tiles = len(unique_tiles)
     if total_tiles > 1024:
-        print(translator.tr("error_tileset_too_big", n=total_tiles))
-        sys.exit(1)
+        raise ValueError(translator.tr("error_tileset_too_big", n=total_tiles))
 
     # === 3. Save tilemap.bin ===
     map_path = os.path.join(output_dir, "map.bin")
+    tile_map_list = [tile_map[i] if i in tile_map else (0, 0, 0, 0) for i in range(n_tiles)]
+    reorganized = reorganize_tilemap_for_gba_bg(tile_map_list, img_w, img_h)
     with open(map_path, "wb") as f:
-        for i in range(n_tiles):
-            tile_id, hflip, vflip, pal_idx = tile_map[i]
+        for tile_id, hflip, vflip, pal_idx in reorganized:
             entry = tile_id & 0x3FF
             if hflip: entry |= (1 << 10)
             if vflip: entry |= (1 << 11)

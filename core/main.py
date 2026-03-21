@@ -14,9 +14,11 @@ from core.config import PRESET_SIZES, MARKER_COLOR
 from utils.translator import Translator
 from core.final_assets import generate_final_assets_4bpp, generate_final_assets_8bpp
 from core.tile_utils import split_into_groups, rebuild_final_image
-from core.image_utils import create_gbagfx_preview_4bpp, create_gbagfx_preview_8bpp
+from core.image_utils import create_gbagfx_preview
 from core.quantization import quantize_to_n_colors_4bpp, quantize_to_n_colors_8bpp
-from core.palette_utils import apply_gba_palette_format, extract_palettes_from_indexed
+from core.palette_utils import extract_palettes_from_indexed
+from core.config_manager import ConfigManager
+
 translator = Translator()
 
 def parse_coord(value, size=None):
@@ -71,7 +73,6 @@ def parse_size(value):
         return None
 
 def parse_selected_palettes(value):
-    """Parse selected palettes: '0,1,3,6,7,8' → [0,1,3,6,7,8]"""
     if not value:
         return [0]
     try:
@@ -83,14 +84,12 @@ def parse_selected_palettes(value):
         return None
 
 def clean_output(output_dir="output"):
-    """Cleans the output directory, removing all files."""
     if os.path.exists(output_dir):
         try:
             shutil.rmtree(output_dir)
             print(translator.tr("output_cleaned"))
         except Exception as e:
-            print(translator.tr("error_cleaning_output", e=e))
-            sys.exit(1)
+            raise RuntimeError(translator.tr("error_cleaning_output", e=e))
     os.makedirs(output_dir, exist_ok=True)
 
 def apply_crop_and_resize(img, origin, end, output_size, img_w, img_h):
@@ -135,38 +134,40 @@ def apply_crop_and_resize(img, origin, end, output_size, img_w, img_h):
         cropped_img = cropped_img.convert("RGBA")
     return cropped_img
 
+def save_tilemap_dimensions_to_config(tilemap_width, tilemap_height):
+    try:
+        config = ConfigManager()
+        config.set('CONVERSION', 'tilemap_width', str(tilemap_width))
+        config.set('CONVERSION', 'tilemap_height', str(tilemap_height))
+    except Exception as e:
+        print(f"Warning: Could not save tilemap dimensions to config: {e}")
+
 def main(input_path, tilemap_path=None, selected_palettes=None, transparent_color=(0,0,0), extra_transparent_tiles=0, tile_width=None, origin=None, end=None, output_size=None, save_preview=False, keep_temp=False, keep_transparent=False, bpp=4, start_index=0, palette_size=256):
     use_tilemap = tilemap_path is not None
     temp_dir = "temp"
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Validate bpp
     if bpp not in (4, 8):
-        print(translator.tr("error_bpp_invalid"))
-        sys.exit(1)
+        raise ValueError(translator.tr("error_bpp_invalid"))
 
-    # Common variables
     reconstructed_path = None
     preview_source_dir = temp_dir
+    final_img = None
+    quantized_img = None
 
-    # === PROCESS ACCORDING TO BPP ===
     if bpp == 4:
-        # --- 4bpp Flow ---
         if selected_palettes is None:
             selected_palettes = [0]
         if not all(0 <= p <= 15 for p in selected_palettes):
-            print(translator.tr("error_selected_palettes_invalid"))
-            sys.exit(1)
+            raise ValueError(translator.tr("error_selected_palettes_invalid"))
         if len(selected_palettes) == 0:
-            print(translator.tr("error_selected_palettes_empty"))
-            sys.exit(1)
+            raise ValueError(translator.tr("error_selected_palettes_empty"))
 
         try:
             img = Image.open(input_path)
             w, h = img.size
         except Exception as e:
-            print(translator.tr("error_loading_image", e=e))
-            sys.exit(1)
+            raise RuntimeError(translator.tr("error_loading_image", e=e))
 
         origin_parsed = parse_pair(origin, w, h) if origin else (0, 0)
         end_parsed = parse_pair(end, w, h) if end else None
@@ -174,7 +175,7 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
 
         cropped_img = apply_crop_and_resize(img, origin_parsed, end_parsed, output_size_parsed, w, h)
         if cropped_img is None:
-            return
+            raise RuntimeError("Failed to crop/resize image. Check origin and output size.")
 
         if cropped_img.mode != 'RGBA':
             cropped_img = cropped_img.convert("RGBA")
@@ -246,25 +247,20 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
         )
 
     else:  # bpp == 8
-        # --- 8bpp Flow ---
         print(translator.tr("status_processing_8bpp"), flush=True)
 
         if start_index < 0 or start_index > 255:
-            print(translator.tr("error_start_index_8bpp"), flush=True)
-            sys.exit(1)
+            raise ValueError(translator.tr("error_start_index_8bpp"))
         if palette_size < 1 or palette_size > 256:
-            print(translator.tr("error_palette_size"), flush=True)
-            sys.exit(1)
+            raise ValueError(translator.tr("error_palette_size"))
         if start_index + palette_size > 256:
-            print(translator.tr("error_palette_overflow"), flush=True)
-            sys.exit(1)
+            raise ValueError(translator.tr("error_palette_overflow"))
 
         try:
             img = Image.open(input_path)
             w, h = img.size
         except Exception as e:
-            print(translator.tr("error_loading_image", e=e), flush=True)
-            sys.exit(1)
+            raise RuntimeError(translator.tr("error_loading_image", e=e))
 
         origin_parsed = parse_pair(origin, w, h) if origin else (0, 0)
         end_parsed = parse_pair(end, w, h) if end else None
@@ -272,7 +268,7 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
 
         cropped_img = apply_crop_and_resize(img, origin_parsed, end_parsed, output_size_parsed, w, h)
         if cropped_img is None:
-            sys.exit(1)
+            raise RuntimeError("Failed to crop/resize image. Check origin and output size.")
 
         temp_input = os.path.join(temp_dir, "input_cropped.png")
         cropped_img.save(temp_input)
@@ -306,8 +302,7 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
                 keep_transparent=keep_transparent
             )
         except Exception as e:
-            print(translator.tr("error_quantizing", e=e), flush=True)
-            sys.exit(1)
+            raise RuntimeError(translator.tr("error_quantizing", e=e))
 
         quantized_path = os.path.join(temp_dir, "02_quantized.png")
         quantized_img.save(quantized_path)
@@ -324,18 +319,19 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
             tile_width=tile_width,
         )
 
-    os.makedirs("temp/preview", exist_ok=True)
-    tw = cropped_img.width // 8
-    th = cropped_img.height // 8
-    if bpp == 4:
-        create_gbagfx_preview_4bpp(save_preview=save_preview, transparent_color=transparent_color, keep_transparent=keep_transparent, tilemap_width=tw, tilemap_height=th)
-    else:
-        create_gbagfx_preview_8bpp(save_preview=save_preview, transparent_color=transparent_color, keep_transparent=keep_transparent, quantized_img=quantized_img, tilemap_width=tw, tilemap_height=th)
+    tilemap_width = cropped_img.width // 8
+    tilemap_height = cropped_img.height // 8
+    save_tilemap_dimensions_to_config(tilemap_width, tilemap_height)
 
+    os.makedirs("temp/preview", exist_ok=True)
+    
+    create_gbagfx_preview(
+        save_preview=save_preview,
+        keep_transparent=keep_transparent
+    )
 
     print(translator.tr("preview_generated", path="temp/preview/preview.png"), flush=True)
 
-    # === 2. Clean temp/ (common) ===
     if not keep_temp:
         try:
             for item in os.listdir(temp_dir):
@@ -376,13 +372,11 @@ def cli_main():
 
     args = parser.parse_args()
 
-    # Parse selected_palettes
     selected_palettes = parse_selected_palettes(args.selected_palettes)
     if selected_palettes is None:
         print(translator.tr("error_selected_palettes_invalid"))
         sys.exit(1)
 
-    # Validate transparent-color
     try:
         trans_rgb = tuple(map(int, args.transparent_color.split(',')))
         if len(trans_rgb) != 3 or not all(0 <= c <= 255 for c in trans_rgb):
@@ -391,7 +385,6 @@ def cli_main():
         print(translator.tr("error_transparent_color"))
         sys.exit(1)
 
-    # === Handling start_index and palette_size (only for bpp=8) ===
     start_index = args.start_index
     palette_size = args.palette_size
 
@@ -412,7 +405,6 @@ def cli_main():
         start_index = 0
         palette_size = 256
 
-    # === Call main ===
     main(
         input_path=args.input,
         tilemap_path=args.tilemap,

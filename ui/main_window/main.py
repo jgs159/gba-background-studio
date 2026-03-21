@@ -211,6 +211,36 @@ class GBABackgroundStudio(QMainWindow):
         except Exception as e:
             print(f"Error setting window icon: {e}")
 
+    def refresh_preview_display(self):
+        preview_path = "temp/preview/preview.png"
+        if not os.path.exists(preview_path):
+            print("Preview not found, skipping refresh")
+            return
+        
+        try:
+            from PIL import Image
+            from core.image_utils import pil_to_qimage
+            from PySide6.QtGui import QPixmap
+            
+            with Image.open(preview_path) as f:
+                preview_img = f.copy()
+            preview_qimg = pil_to_qimage(preview_img)
+            preview_pixmap = QPixmap.fromImage(preview_qimg)
+            
+            self.preview_tab.preview_image_scene.clear()
+            self.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
+            self.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
+            
+            self.edit_palettes_tab.display_tilemap_replica(self.preview_tab.preview_image_scene)
+            
+            if hasattr(self, 'apply_zoom_to_all'):
+                self.apply_zoom_to_all()
+                
+        except Exception as e:
+            print(f"Error refreshing preview display: {e}")
+            import traceback
+            traceback.print_exc()
+
     def undo(self):
         if hasattr(self, 'history_manager'):
             state = self.history_manager.undo()
@@ -287,24 +317,28 @@ class GBABackgroundStudio(QMainWindow):
         self.edit_tiles_tab.tilemap_width_spin.setValue(new_w)
         self.edit_tiles_tab.tilemap_height_spin.setValue(new_h)
 
-        if hasattr(self.edit_tiles_tab, 'render_tilemap_visual'):
-            self.edit_tiles_tab.render_tilemap_visual()
-        
         if hasattr(self, 'edit_palettes_tab'):
             self.edit_palettes_tab.tilemap_data = new_data
             self.edit_palettes_tab.tilemap_width = new_w
             self.edit_palettes_tab.tilemap_height = new_h
-            
             self.edit_palettes_tab.tilemap_width_spin.setValue(new_w)
             self.edit_palettes_tab.tilemap_height_spin.setValue(new_h)
-            
-            if hasattr(self.edit_tiles_tab, 'edit_tilemap_scene') and self.edit_tiles_tab.edit_tilemap_scene.sceneRect().isValid():
-                self.edit_palettes_tab.update_palette_overlay(
-                    self.edit_tiles_tab.edit_tilemap_scene,
-                    new_data,
-                    new_w,
-                    new_h
-                )
+
+        if hasattr(self, 'config_manager'):
+            self.config_manager.set('CONVERSION', 'tilemap_width',  str(new_w))
+            self.config_manager.set('CONVERSION', 'tilemap_height', str(new_h))
+
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open(os.path.join('output', 'map.bin'), 'wb') as f:
+            f.write(new_data)
+
+        from core.image_utils import create_gbagfx_preview
+        save_preview = self.config_manager.getboolean('SETTINGS', 'save_preview_files', False) if hasattr(self, 'config_manager') else False
+        keep_transparent = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False) if hasattr(self, 'config_manager') else False
+        result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+        if result:
+            self.refresh_preview_display()
     
     def apply_tile_change(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tilemap_data:
@@ -351,7 +385,7 @@ class GBABackgroundStudio(QMainWindow):
 
             if hasattr(self, 'edit_palettes_tab'):
                 self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
-                self.edit_palettes_tab.update_palette_overlay_for_tile(tile_x, tile_y, palette_id)
+                self.edit_palettes_tab.update_single_tile_replica(tile_x, tile_y)
 
         finally:
             if hasattr(self, 'history_manager'):

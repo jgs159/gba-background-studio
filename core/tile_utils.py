@@ -10,14 +10,6 @@ from utils.translator import Translator
 translator = Translator()
 
 def split_into_groups(input_path, num_palettes=1, pal_indices=None):
-    """
-    Split image into groups based on palette indices.
-    
-    Args:
-        input_path: Path to input image
-        num_palettes: Number of palette groups to create
-        pal_indices: List of palette indices for each tile (optional)
-    """
     img = Image.open(input_path)
     if img.mode != 'RGBA':
         img = img.convert("RGBA")
@@ -28,12 +20,10 @@ def split_into_groups(input_path, num_palettes=1, pal_indices=None):
     tiles = extract_tiles_rgba(img)
     n_tiles = len(tiles)
     
-    # If pal_indices is provided, use them directly
     if pal_indices is not None:
         if len(pal_indices) != n_tiles:
             raise ValueError(f"Number of palette indices ({len(pal_indices)}) doesn't match number of tiles ({n_tiles})")
     else:
-        # Auto-detect palette groups using KMeans
         features = []
         for tile in tiles:
             arr = np.array(tile)
@@ -67,7 +57,6 @@ def split_into_groups(input_path, num_palettes=1, pal_indices=None):
                     pal_indices[i] = labels[j] % num_palettes
                     j += 1
     
-    # Get unique palette indices from the tilemap
     unique_pal_indices = sorted(set(pal_indices))
     output_dir="temp"
     os.makedirs(output_dir, exist_ok=True)
@@ -75,7 +64,6 @@ def split_into_groups(input_path, num_palettes=1, pal_indices=None):
     
     tile_assigned = [False] * n_tiles
     
-    # Create groups for each unique palette index found
     for group_idx, pal_idx in enumerate(unique_pal_indices):
         group_img = Image.new("RGBA", (w, h), (*MARKER_COLOR, 255))
         modified = False
@@ -112,7 +100,6 @@ def rebuild_final_image(input_path, pal_indices, indexed_dir, palettes, output_p
     tiles = extract_tiles_rgba(img)
     n_tiles = len(tiles)
     
-    # Get unique palette indices to map group numbers
     unique_pal_indices = sorted(set(pal_indices))
     pal_idx_to_group_idx = {pal_idx: group_idx for group_idx, pal_idx in enumerate(unique_pal_indices)}
     indexed_tiles = {}

@@ -10,6 +10,7 @@ from core.image_utils import pil_to_qimage
 from core.main import main as converter_main
 from .conversion_params import get_conversion_parameters
 from .show_success_dialog import show_success_dialog
+from .gba_compatibility_dialog import GBACompatibilityDialog
 from PIL import Image as PilImage
 
 class ConversionDialogLogic:
@@ -145,6 +146,21 @@ class ConversionDialogLogic:
             else:
                 palettes_to_use = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
 
+        if self.output_combo.currentText() == "Custom":
+            w = self.custom_width.value()
+            h = self.custom_height.value()
+            if w > 32:
+                adjusted_w = ((w + 31) // 32) * 32
+                adjusted_h = ((h + 31) // 32) * 32
+                if adjusted_w != w or adjusted_h != h:
+                    dlg = GBACompatibilityDialog(w, h, adjusted_w, adjusted_h, self)
+                    if dlg.exec():
+                        self.custom_width.setValue(adjusted_w)
+                        self.custom_height.setValue(adjusted_h)
+                        self.update_output_info()
+                    else:
+                        return
+
         self.convert_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setFormat("Starting...")
@@ -237,12 +253,13 @@ class ConversionDialogLogic:
                 show_success_dialog(self)
             time.sleep(0.3)
             self.accept()
-        except Exception as e:
+        except (Exception, SystemExit) as e:
             if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
                 self.grid_was_visible):
                 self.parent().grid_manager.set_grid_visible(True)
                 
             self.progress_bar.setFormat("Error")
             QApplication.processEvents()
-            QMessageBox.critical(self, "Error", f"Conversion failed: {str(e)}")
+            msg = str(e) if str(e) else "Process exited unexpectedly."
+            QMessageBox.critical(self, "Error", f"Conversion failed: {msg}")
             self.convert_btn.setEnabled(True)
