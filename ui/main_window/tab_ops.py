@@ -85,31 +85,27 @@ def load_conversion_results(main_window):
     main_window.current_bpp = 8 if bpp_index == 1 else 4
     main_window.start_index = int(main_window.config_manager.get('CONVERSION', 'start_index', '0'))
 
-    if os.path.exists(tiles_path):
-        tiles_img = PilImage.open(tiles_path)
-        display_tileset(main_window, tiles_img)
+    tilemap_width  = int(main_window.config_manager.get('CONVERSION', 'tilemap_width',  '32'))
+    tilemap_height = int(main_window.config_manager.get('CONVERSION', 'tilemap_height', '32'))
 
-    if os.path.exists(tilemap_path) and os.path.exists(preview_path):
+    if os.path.exists(tiles_path):
+        display_tileset(main_window, PilImage.open(tiles_path))
+
+    if os.path.exists(tilemap_path):
         with open(tilemap_path, 'rb') as f:
             tilemap_data = f.read()
 
-        preview_img = PilImage.open(preview_path)
-        tilemap_width = preview_img.width // 8
-        tilemap_height = preview_img.height // 8
+        for tab in [main_window.edit_tiles_tab, main_window.edit_palettes_tab]:
+            tab.tilemap_data   = tilemap_data
+            tab.tilemap_width  = tilemap_width
+            tab.tilemap_height = tilemap_height
 
-        main_window.edit_tiles_tab.tilemap_data = tilemap_data
-        main_window.edit_tiles_tab.tilemap_width = tilemap_width
-        main_window.edit_tiles_tab.tilemap_height = tilemap_height
         main_window.edit_tiles_tab.tilemap_width_spin.blockSignals(True)
         main_window.edit_tiles_tab.tilemap_height_spin.blockSignals(True)
         main_window.edit_tiles_tab.tilemap_width_spin.setValue(tilemap_width)
         main_window.edit_tiles_tab.tilemap_height_spin.setValue(tilemap_height)
         main_window.edit_tiles_tab.tilemap_width_spin.blockSignals(False)
         main_window.edit_tiles_tab.tilemap_height_spin.blockSignals(False)
-
-        main_window.edit_palettes_tab.tilemap_data = tilemap_data
-        main_window.edit_palettes_tab.tilemap_width = tilemap_width
-        main_window.edit_palettes_tab.tilemap_height = tilemap_height
 
         for ctrl in [main_window.edit_tiles_tab.tilemap_width_spin,
                      main_window.edit_tiles_tab.tilemap_height_spin,
@@ -118,6 +114,10 @@ def load_conversion_results(main_window):
                      main_window.edit_tiles_tab.btn_left, main_window.edit_tiles_tab.btn_right,
                      main_window.edit_tiles_tab.cyclic_checkbox]:
             ctrl.setEnabled(True)
+
+        main_window.edit_palettes_tab.toggle_tilemap_controls_enabled(True)
+        main_window.edit_palettes_tab.tilemap_width_spin.setValue(tilemap_width)
+        main_window.edit_palettes_tab.tilemap_height_spin.setValue(tilemap_height)
 
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
@@ -135,9 +135,15 @@ def load_conversion_results(main_window):
         main_window.edit_tiles_tab.edit_tilemap_scene.addPixmap(preview_pixmap)
         main_window.edit_tiles_tab.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
 
+        main_window.edit_palettes_tab.display_tilemap_replica(
+            main_window.edit_tiles_tab.edit_tilemap_scene
+        )
+
         from .view_ops import apply_zoom_to_view
         apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
-        main_window.preview_tab.preview_image_view.centerOn(main_window.preview_tab.preview_image_scene.items()[0])
+        main_window.preview_tab.preview_image_view.centerOn(
+            main_window.preview_tab.preview_image_scene.items()[0]
+        )
 
     if os.path.exists(palette_path):
         palette_colors = [(0, 0, 0)] * 256
@@ -170,4 +176,10 @@ def load_conversion_results(main_window):
         main_window.output_loaded_for_zoom = True
 
     main_window.main_tabs.setCurrentIndex(1)
-    sync_palettes_tab(main_window)
+
+    from core.image_utils import create_gbagfx_preview
+    create_gbagfx_preview(
+        save_preview=main_window.save_preview_files,
+        keep_transparent=main_window.keep_transparent_color
+    )
+    main_window.refresh_preview_display()

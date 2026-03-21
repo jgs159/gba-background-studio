@@ -1,4 +1,5 @@
 # ui/edit_tiles_tab.py
+import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QSplitter, QGraphicsPixmapItem,
     QGraphicsView, QGraphicsScene, QGraphicsRectItem, QHBoxLayout,
@@ -8,13 +9,15 @@ from PySide6.QtGui import QFont, QPainter, QPixmap, QPen, QColor
 from PySide6.QtCore import Qt
 
 from PIL import Image as PilImage
-from core.image_utils import pil_to_qimage
+from core.final_assets import revert_gba_tilemap_reorganization
+from core.image_utils import pil_to_qimage, create_gbagfx_preview
 from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
+from ui.tilemap_utils import TilemapUtils
 
 
 EMPTY_TILE_ENTRY = b'\x00\x00'
 
-class EditTilesTab(QWidget):
+class EditTilesTab(TilemapUtils, QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent
@@ -59,6 +62,8 @@ class EditTilesTab(QWidget):
         self.edit_tilemap_view.setScene(self.edit_tilemap_scene)
         self.setup_view(self.edit_tilemap_view)
         tilemap_container.layout().addWidget(self.edit_tilemap_view)
+        self.tilemap_view  = self.edit_tilemap_view
+        self.tilemap_scene = self.edit_tilemap_scene
         splitter.addWidget(tilemap_container)
 
         splitter.setSizes([500, 500])
@@ -177,7 +182,6 @@ class EditTilesTab(QWidget):
 
         self._tileset_width_before_edit = new_width
 
-
     def render_tileset_with_padding(self, width_tiles, height_tiles, total_tiles_original):
         if not self.tileset_img_original:
             return
@@ -231,83 +235,7 @@ class EditTilesTab(QWidget):
             self.main_window.grid_manager.update_grid_for_view("tileset")
 
     def setup_tilemap_controls(self, container):
-        controls_frame = QFrame()
-        controls_frame.setFrameStyle(QFrame.StyledPanel)
-        controls_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border: 1px solid #ccc; }")
-        controls_frame.setFixedHeight(28)
-        controls_layout = QVBoxLayout(controls_frame)
-        controls_layout.setSpacing(1)
-        controls_layout.setContentsMargins(3, 3, 3, 3)
-        controls_main_layout = QHBoxLayout()
-        controls_main_layout.setSpacing(3)
-        controls_main_layout.setContentsMargins(0, 0, 0, 0)
-        controls_main_layout.setAlignment(Qt.AlignLeft)
-        width_label = QLabel("Width:")
-        width_label.setStyleSheet("QLabel { border: none; }")
-        controls_main_layout.addWidget(width_label)
-        self.tilemap_width_spin = QSpinBox()
-        self.tilemap_width_spin.setRange(1, 999)
-        self.tilemap_width_spin.setValue(32)
-        self.tilemap_width_spin.setFixedWidth(45)
-        self.tilemap_width_spin.setFixedHeight(18)
-        self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
-        controls_main_layout.addWidget(self.tilemap_width_spin)
-        height_label = QLabel("Height:")
-        height_label.setStyleSheet("QLabel { border: none; }")
-        controls_main_layout.addWidget(height_label)
-        self.tilemap_height_spin = QSpinBox()
-        self.tilemap_height_spin.setRange(1, 999)
-        self.tilemap_height_spin.setValue(32)
-        self.tilemap_height_spin.setFixedWidth(45)
-        self.tilemap_height_spin.setFixedHeight(18)
-        self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
-        controls_main_layout.addWidget(self.tilemap_height_spin)
-        self.resize_button = QPushButton("Resize")
-        self.resize_button.setFixedWidth(50)
-        self.resize_button.setFixedHeight(20)
-        self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
-        self.resize_button.clicked.connect(self.on_tilemap_resize)
-        controls_main_layout.addWidget(self.resize_button)
-        self.btn_up = QPushButton("↑")
-        self.btn_left = QPushButton("←")
-        self.btn_right = QPushButton("→")
-        self.btn_down = QPushButton("↓")
-        self.move_label = QLabel("Move")
-        self.move_label.setStyleSheet("QLabel { border: none; }")
-        for btn in [self.btn_up, self.btn_left, self.btn_right, self.btn_down]:
-            btn.setFixedSize(20, 20)
-            btn.setStyleSheet("""
-                QPushButton {
-                    font-weight: bold;
-                    padding: 0px;
-                    font-size: 7pt;
-                }
-            """)
-
-        self.btn_up.clicked.connect(lambda: self.on_tilemap_shift("up"))
-        self.btn_down.clicked.connect(lambda: self.on_tilemap_shift("down"))
-        self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
-        self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
-        controls_main_layout.addWidget(self.btn_left)
-        controls_main_layout.addWidget(self.btn_up)
-        controls_main_layout.addWidget(self.move_label)
-        controls_main_layout.addWidget(self.btn_down)
-        controls_main_layout.addWidget(self.btn_right)
-        self.cyclic_checkbox = QCheckBox("Cyclic Shift")
-        self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
-        self.cyclic_checkbox.setFixedHeight(18)
-        controls_main_layout.addWidget(self.cyclic_checkbox)
-        controls_layout.addLayout(controls_main_layout)
-        container.layout().addWidget(controls_frame)
-        
-        self.tilemap_width_spin.setEnabled(False)
-        self.tilemap_height_spin.setEnabled(False)
-        self.resize_button.setEnabled(False)
-        self.btn_up.setEnabled(False)
-        self.btn_down.setEnabled(False)
-        self.btn_left.setEnabled(False)
-        self.btn_right.setEnabled(False)
-        self.cyclic_checkbox.setEnabled(False)
+        container.layout().addWidget(self.build_tilemap_toolbar())
 
     def create_tileset_reserved_container(self):
         container = QWidget()
@@ -423,31 +351,6 @@ class EditTilesTab(QWidget):
             pen
         )
         rect_item.setZValue(100)
-
-    def setup_tilemap_interaction(self):
-        self.edit_tilemap_view.on_tile_drawing = self.on_tilemap_drawing
-        self.edit_tilemap_view.on_tile_selected = self.on_tilemap_right_click
-        self.edit_tilemap_view.on_tile_hover = self.on_tilemap_hover
-        self.edit_tilemap_view.on_tile_leave = self.on_tilemap_leave
-
-    def on_tilemap_leave(self):
-        self.main_window.hover_manager.hide_hover(self.edit_tilemap_view)
-        self.last_hover_pos = (-1, -1)
-        self.update_status_bar(-1, -1)
-
-    def on_tilemap_hover(self, tile_x, tile_y):
-        scene_rect = self.edit_tilemap_scene.sceneRect()
-        max_tile_x = int(scene_rect.width()) // 8 - 1
-        max_tile_y = int(scene_rect.height()) // 8 - 1
-        
-        if (0 <= tile_x <= max_tile_x and 0 <= tile_y <= max_tile_y):
-            self.last_hover_pos = (tile_x, tile_y)
-            self.main_window.hover_manager.update_hover(tile_x, tile_y, self.edit_tilemap_view)
-            self.update_status_bar(tile_x, tile_y)
-        else:
-            self.last_hover_pos = (-1, -1)
-            self.main_window.hover_manager.hide_hover(self.edit_tilemap_view)
-            self.update_status_bar(-1, -1)
 
     def on_tilemap_drawing(self, tile_x, tile_y):
         if self.selected_tile_id is None or not self.tilemap_data:
@@ -592,58 +495,6 @@ class EditTilesTab(QWidget):
 
         self.on_tilemap_hover(tile_x, tile_y)
 
-    def render_tilemap_visual(self):
-        if not self.tilemap_data or not self.tileset_img:
-            self.edit_tilemap_scene.clear()
-            self.edit_tilemap_scene.setSceneRect(0, 0, 0, 0)
-            return
-
-        w = self.tilemap_width * 8
-        h = self.tilemap_height * 8
-        
-        img = PilImage.new('RGBA', (w, h), (0, 0, 0, 0))
-        
-        total_map_size = self.tilemap_width * self.tilemap_height
-        max_read_tiles = len(self.tilemap_data) // 2
-        
-        for i in range(min(total_map_size, max_read_tiles)):
-            entry = self.tilemap_data[i * 2] | (self.tilemap_data[i * 2 + 1] << 8)
-            tile_id = entry & 0x3FF
-            h_flip = bool(entry & (1 << 10))
-            v_flip = bool(entry & (1 << 11))
-            
-            if self.tiles_per_row > 0:
-                tx = (tile_id % self.tiles_per_row) * 8
-                ty = (tile_id // self.tiles_per_row) * 8
-                
-                if tx + 8 <= self.tileset_img.width and ty + 8 <= self.tileset_img.height:
-                    tile = self.tileset_img.crop((tx, ty, tx + 8, ty + 8))
-                    if h_flip:
-                        tile = tile.transpose(PilImage.FLIP_LEFT_RIGHT)
-                    if v_flip:
-                        tile = tile.transpose(PilImage.FLIP_TOP_BOTTOM)
-                    
-                    x = (i % self.tilemap_width) * 8
-                    y = (i // self.tilemap_width) * 8
-                    img.paste(tile, (x, y))
-
-        qimg = pil_to_qimage(img)
-        pixmap = QPixmap.fromImage(qimg)
-        self.edit_tilemap_scene.clear()
-        self.edit_tilemap_scene.addPixmap(pixmap)
-        self.edit_tilemap_scene.setSceneRect(0, 0, w, h)
-        
-        if self.main_window and hasattr(self.main_window, 'grid_manager'):
-            if self.main_window.grid_manager.is_grid_visible():
-                self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
-
-        if self.last_hover_pos != (-1, -1):
-            x, y = self.last_hover_pos
-            if 0 <= x < self.tilemap_width and 0 <= y < self.tilemap_height:
-                self.on_tilemap_hover(x, y)
-            else:
-                self.on_tilemap_leave()
-
     def display_tileset(self, pil_img):
         self.edit_tileset_scene.clear()
         self.tileset_img_original = pil_img
@@ -666,12 +517,14 @@ class EditTilesTab(QWidget):
 
     def load_tilemap(self, tilemap_data, tileset_path, preview_path=None):
         self.tilemap_data = tilemap_data
-        self.tileset_img = PilImage.open(tileset_path)
+        with PilImage.open(tileset_path) as f:
+            self.tileset_img = f.copy()
         self.tiles_per_row = self.tileset_img.width // 8
 
         if preview_path:
             try:
-                preview_img = PilImage.open(preview_path)
+                with PilImage.open(preview_path) as f:
+                    preview_img = f.copy()
                 self.tilemap_width = preview_img.width // 8
                 self.tilemap_height = preview_img.height // 8
             except:
@@ -691,15 +544,7 @@ class EditTilesTab(QWidget):
 
         self.tilemap_width_spin.setValue(self.tilemap_width)
         self.tilemap_height_spin.setValue(self.tilemap_height)
-        self.render_tilemap_visual()
-        self.tilemap_width_spin.setEnabled(True)
-        self.tilemap_height_spin.setEnabled(True)
-        self.resize_button.setEnabled(True)
-        self.btn_up.setEnabled(True)
-        self.btn_down.setEnabled(True)
-        self.btn_left.setEnabled(True)
-        self.btn_right.setEnabled(True)
-        self.cyclic_checkbox.setEnabled(True)
+        self.enable_tilemap_controls()
         
         if hasattr(self.main_window, 'sync_palettes_tab'):
             self.main_window.sync_palettes_tab()
@@ -728,76 +573,52 @@ class EditTilesTab(QWidget):
             palette_id=palette_id,
             flip_state=flip_state
         )
-  
-    def on_tile_size_changed(self, width, height):
-        """Manejar cambio de tamaño de tiles"""
-        # Aquí va la lógica para actualizar el tamaño de tiles
-        pass
-        
-    def on_tilemap_size_changed(self, width, height):
-        """Manejar cambio de tamaño de tilemap"""
-        # Aquí va la lógica para actualizar el tamaño de tilemap
-        pass
-        
-    def on_tilemap_shift(self, direction):
-        """Manejar desplazamiento del tilemap"""
-        is_cyclic = self.cyclic_checkbox.isChecked()
-        # Aquí va la lógica para desplazar el tilemap
-        # direction será: 'up', 'down', 'left', 'right'
-        pass
-        
-    def on_tilemap_resize(self):
-        new_w = self.tilemap_width_spin.value()
-        new_h = self.tilemap_height_spin.value()
 
-        if not self.tilemap_data or (new_w == self.tilemap_width and new_h == self.tilemap_height):
-            return
-
-        old_w = self.tilemap_width
-        old_h = self.tilemap_height
-        old_data = self.tilemap_data
-        
-        min_w = min(new_w, old_w)
-        min_h = min(new_h, old_h)
-        
-        new_data = bytearray()
-        
-        for y in range(min_h):
-            start_index = y * old_w * 2
-            new_data.extend(old_data[start_index : start_index + min_w * 2])
+    def _update_all_displays(self):
+        try:
+            save_preview = False
+            keep_transparent = False
             
-            if new_w > old_w:
-                padding_needed = new_w - old_w
-                new_data.extend(EMPTY_TILE_ENTRY * padding_needed)
-
-        if new_h > old_h:
-            empty_data = EMPTY_TILE_ENTRY * new_w
-            padding_needed_rows = new_h - old_h
-            new_data.extend(empty_data * padding_needed_rows)
-
-        self.tilemap_data = bytes(new_data)
-        self.tilemap_width = new_w
-        self.tilemap_height = new_h
-        
-        if hasattr(self.main_window, 'config_manager'):
-            self.main_window.config_manager.set('CONVERSION', 'tilemap_width', str(new_w))
-            self.main_window.config_manager.set('CONVERSION', 'tilemap_height', str(new_h))
-        
-        if hasattr(self.main_window, 'history_manager'):
-            self.main_window.history_manager.record_state(
-                state_type='tilemap_resize',
-                editor_type='tiles',
-                data={
-                    'old_w': old_w, 
-                    'old_h': old_h, 
-                    'new_w': new_w, 
-                    'new_h': new_h, 
-                    'old_data': old_data, 
-                    'new_data': self.tilemap_data
-                },
-                description=f"Tilemap resized from {old_w}x{old_h} to {new_w}x{new_h}"
+            if hasattr(self.main_window, 'config_manager'):
+                save_preview = self.main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
+                keep_transparent = self.main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
+            
+            from core.image_utils import create_gbagfx_preview
+            result = create_gbagfx_preview(
+                save_preview=save_preview,
+                keep_transparent=keep_transparent
             )
+            
+            if result and hasattr(self.main_window, 'refresh_preview_display'):
+                self.main_window.refresh_preview_display()
+            elif result:
+                self._manual_refresh_display()
+                
+        except Exception as e:
+            print(f"Error updating displays: {e}")
+            import traceback
+            traceback.print_exc()
 
-        self.render_tilemap_visual()
-        if hasattr(self.main_window, 'sync_palettes_tab'):
-            self.main_window.sync_palettes_tab()
+    def _manual_refresh_display(self):
+        preview_path = "temp/preview/preview.png"
+        if not os.path.exists(preview_path):
+            return
+        
+        try:
+            from PIL import Image
+            from core.image_utils import pil_to_qimage
+            from PySide6.QtGui import QPixmap
+            
+            with Image.open(preview_path) as f:
+                preview_img = f.copy()
+            preview_qimg = pil_to_qimage(preview_img)
+            preview_pixmap = QPixmap.fromImage(preview_qimg)
+            
+            self.main_window.preview_tab.preview_image_scene.clear()
+            self.main_window.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
+            self.main_window.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
+            
+            self.display_tilemap_replica(self.main_window.preview_tab.preview_image_scene)
+            
+        except Exception as e:
+            print(f"Error in manual refresh: {e}")

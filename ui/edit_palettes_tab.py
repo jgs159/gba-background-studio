@@ -14,12 +14,13 @@ from core.image_utils import pil_to_qimage
 from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 from ui.palette_grid_view import PaletteGridView
 from ui.color_editor import ColorEditor
+from ui.tilemap_utils import TilemapUtils
 from utils.translator import Translator
 translator = Translator()
 
 EMPTY_TILE_ENTRY = b'\x00\x00'
 
-class EditPalettesTab(QWidget):
+class EditPalettesTab(TilemapUtils, QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent
@@ -139,6 +140,19 @@ class EditPalettesTab(QWidget):
         
         return container
 
+    def on_palette_grid_click(self, event):
+        if event.button() != Qt.LeftButton:
+            return
+        super(QGraphicsView, self.grid_view).mousePressEvent(event)
+        pos = self.grid_view.mapToScene(event.pos())
+        if not (0 <= pos.x() < 32 and 0 <= pos.y() < 32):
+            return
+        palette_x = max(0, min(int(pos.x()) // 8, 3))
+        palette_y = max(0, min(int(pos.y()) // 8, 3))
+        self.selected_palette_id = palette_y * 4 + palette_x
+        self.highlight_selected_palette(palette_x, palette_y)
+        self.update_status_bar(self.last_hover_pos[0], self.last_hover_pos[1], palette_id=self.selected_palette_id)
+
     def create_right_palette_container(self):
         container = QWidget()
         layout = QVBoxLayout(container)
@@ -193,89 +207,13 @@ class EditPalettesTab(QWidget):
         self.edit_tilemap2_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.edit_tilemap2_view.setMouseTracking(True)
         layout.addWidget(self.edit_tilemap2_view)
+        self.tilemap_view  = self.edit_tilemap2_view
+        self.tilemap_scene = self.edit_tilemap2_scene
 
         return container
 
     def create_tilemap_toolbar(self):
-        controls_frame = QFrame()
-        self.palette_tilemap_controls_frame = controls_frame
-        controls_frame.setFrameStyle(QFrame.StyledPanel)
-        controls_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border: 1px solid #ccc; }")
-        controls_frame.setFixedHeight(28)
-        controls_layout = QVBoxLayout(controls_frame)
-        controls_layout.setSpacing(1)
-        controls_layout.setContentsMargins(3, 3, 3, 3)
-        controls_main_layout = QHBoxLayout()
-        controls_main_layout.setSpacing(3)
-        controls_main_layout.setContentsMargins(0, 0, 0, 0)
-        controls_main_layout.setAlignment(Qt.AlignLeft)
-        width_label = QLabel("Width:")
-        width_label.setStyleSheet("QLabel { border: none; }")
-        controls_main_layout.addWidget(width_label)
-        self.tilemap_width_spin = QSpinBox()
-        self.tilemap_width_spin.setRange(1, 999)
-        self.tilemap_width_spin.setValue(32)
-        self.tilemap_width_spin.setFixedWidth(45)
-        self.tilemap_width_spin.setFixedHeight(18)
-        self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
-        controls_main_layout.addWidget(self.tilemap_width_spin)
-        height_label = QLabel("Height:")
-        height_label.setStyleSheet("QLabel { border: none; }")
-        controls_main_layout.addWidget(height_label)
-        self.tilemap_height_spin = QSpinBox()
-        self.tilemap_height_spin.setRange(1, 999)
-        self.tilemap_height_spin.setValue(32)
-        self.tilemap_height_spin.setFixedWidth(45)
-        self.tilemap_height_spin.setFixedHeight(18)
-        self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
-        controls_main_layout.addWidget(self.tilemap_height_spin)
-        self.resize_button = QPushButton("Resize")
-        self.resize_button.setFixedWidth(50)
-        self.resize_button.setFixedHeight(20)
-        self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
-        self.resize_button.clicked.connect(self.on_tilemap_resize)
-        controls_main_layout.addWidget(self.resize_button)
-        self.btn_up = QPushButton("↑")
-        self.btn_left = QPushButton("←")
-        self.btn_right = QPushButton("→")
-        self.btn_down = QPushButton("↓")
-        self.move_label = QLabel("Move")
-        self.move_label.setStyleSheet("QLabel { border: none; }")
-        for btn in [self.btn_up, self.btn_left, self.btn_right, self.btn_down]:
-            btn.setFixedSize(20, 20)
-            btn.setStyleSheet("""
-                QPushButton {
-                    font-weight: bold;
-                    padding: 0px;
-                    font-size: 7pt;
-                }
-            """)
-
-        self.btn_up.clicked.connect(lambda: self.on_tilemap_shift("up"))
-        self.btn_down.clicked.connect(lambda: self.on_tilemap_shift("down"))
-        self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
-        self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
-        controls_main_layout.addWidget(self.btn_left)
-        controls_main_layout.addWidget(self.btn_up)
-        controls_main_layout.addWidget(self.move_label)
-        controls_main_layout.addWidget(self.btn_down)
-        controls_main_layout.addWidget(self.btn_right)
-        self.cyclic_checkbox = QCheckBox("Cyclic Shift")
-        self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
-        self.cyclic_checkbox.setFixedHeight(18)
-        controls_main_layout.addWidget(self.cyclic_checkbox)
-        controls_layout.addLayout(controls_main_layout)
-
-        self.tilemap_width_spin.setEnabled(False)
-        self.tilemap_height_spin.setEnabled(False)
-        self.resize_button.setEnabled(False)
-        self.btn_up.setEnabled(False)
-        self.btn_down.setEnabled(False)
-        self.btn_left.setEnabled(False)
-        self.btn_right.setEnabled(False)
-        self.cyclic_checkbox.setEnabled(False)
-
-        return controls_frame
+        return self.build_tilemap_toolbar()
 
     def initialize_color_editor(self):
         if (hasattr(self, 'palette_colors') and 
@@ -291,12 +229,15 @@ class EditPalettesTab(QWidget):
             self.last_edited_color = (r, g, b)
 
     def setup_tilemap_interaction(self):
-        self.edit_tilemap2_view.on_tile_drawing = self.on_tilemap_drawing
-        self.edit_tilemap2_view.on_tile_selected = self.on_tilemap_right_click
-        self.edit_tilemap2_view.on_tile_hover = self.on_tilemap_hover
-        self.edit_tilemap2_view.on_tile_leave = self.on_tilemap_leave
+        super().setup_tilemap_interaction()
 
-    def on_palette_grid_click(self, event):
+    def on_tilemap_leave(self):
+        super().on_tilemap_leave()
+
+    def on_tilemap_hover(self, tile_x, tile_y):
+        super().on_tilemap_hover(tile_x, tile_y)
+
+    def on_tilemap_drawing(self, tile_x, tile_y):
         self.finalize_color_editing()
         if event.button() == Qt.LeftButton:
             pos = self.grid_view.mapToScene(event.pos())
@@ -510,15 +451,7 @@ class EditPalettesTab(QWidget):
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
 
     def toggle_tilemap_controls_enabled(self, enabled):
-        if hasattr(self, 'tilemap_width_spin'):
-            self.tilemap_width_spin.setEnabled(enabled)
-            self.tilemap_height_spin.setEnabled(enabled)
-            self.resize_button.setEnabled(enabled)
-            self.btn_up.setEnabled(enabled)
-            self.btn_down.setEnabled(enabled)
-            self.btn_left.setEnabled(enabled)
-            self.btn_right.setEnabled(enabled)
-            self.cyclic_checkbox.setEnabled(enabled)
+        self._set_tilemap_controls_enabled(enabled)
 
     def update_palette_overlay(self, source_scene, tilemap_data, tile_width, tile_height):
         if not source_scene.items() or not tilemap_data:
@@ -557,7 +490,7 @@ class EditPalettesTab(QWidget):
                 palette_id = (entry >> 12) & 0xF
                 self.update_palette_overlay_for_tile(j, i, palette_id)
 
-        self.toggle_tilemap_controls_enabled(True) 
+        self.enable_tilemap_controls()
 
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
@@ -671,7 +604,7 @@ class EditPalettesTab(QWidget):
 
     def _regenerate_preview(self):
         try:
-            from core.image_utils import create_gbagfx_preview_4bpp
+            from core.image_utils import create_gbagfx_preview
             from PySide6.QtGui import QPixmap
             from PIL import Image as PilImage
             from core.image_utils import pil_to_qimage
@@ -682,7 +615,7 @@ class EditPalettesTab(QWidget):
             save_preview_files = self.main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
 
             if self.main_window.current_bpp == 4:
-                create_gbagfx_preview_4bpp(
+                create_gbagfx_preview(
                     save_preview=save_preview_files,
                     transparent_color=transparent_rgb,
                     keep_transparent=True,
@@ -754,12 +687,10 @@ class EditPalettesTab(QWidget):
             if os.path.exists(tiles_path):
                 try:
                     from PIL import Image as PilImage
-                    new_tileset_img = PilImage.open(tiles_path)
+                    with PilImage.open(tiles_path) as f:
+                        new_tileset_img = f.copy()
                     tiles_tab.display_tileset(new_tileset_img)
                     
-                    if hasattr(tiles_tab, 'tilemap_data') and tiles_tab.tilemap_data:
-                        tiles_tab.render_tilemap_visual()
-                        
                 except Exception as e:
                      print(translator.tr("error_reloading_tileset").format(e=e))
 
@@ -844,7 +775,8 @@ class EditPalettesTab(QWidget):
             return
         
         try:
-            tiles_img = Image.open(tiles_path)
+            with Image.open(tiles_path) as f:
+                tiles_img = f.copy()
             if tiles_img.mode != 'P':
                 return
             
@@ -937,87 +869,6 @@ class EditPalettesTab(QWidget):
             self.color_editor.set_color(index, r, g, b)
         
         self._save_and_update_all()
-
-    def on_tilemap_shift(self, direction):
-        """Manejar desplazamiento del tilemap"""
-        is_cyclic = self.cyclic_checkbox.isChecked()
-        # Aquí va la lógica para desplazar el tilemap
-        # direction será: 'up', 'down', 'left', 'right'
-        pass
-
-    def on_tilemap_resize(self):
-        new_w = self.tilemap_width_spin.value()
-        new_h = self.tilemap_height_spin.value()
-
-        if not self.tilemap_data or (new_w == self.tilemap_width and new_h == self.tilemap_height):
-            return
-
-        old_w = self.tilemap_width
-        old_h = self.tilemap_height
-        old_data = self.tilemap_data
-        
-        min_w = min(new_w, old_w)
-        min_h = min(new_h, old_h)
-        
-        new_data = bytearray()
-        
-        for y in range(min_h):
-            start_index = y * old_w * 2
-            new_data.extend(old_data[start_index : start_index + min_w * 2])
-            
-            if new_w > old_w:
-                padding_needed = new_w - old_w
-                new_data.extend(EMPTY_TILE_ENTRY * padding_needed)
-
-        if new_h > old_h:
-            empty_data = EMPTY_TILE_ENTRY * new_w
-            padding_needed_rows = new_h - old_h
-            new_data.extend(empty_data * padding_needed_rows)
-
-        self.tilemap_data = bytes(new_data)
-        self.tilemap_width = new_w
-        self.tilemap_height = new_h
-        
-        self.tilemap_width_spin.setValue(new_w)
-        self.tilemap_height_spin.setValue(new_h)
-        
-        if hasattr(self.main_window, 'config_manager'):
-            self.main_window.config_manager.set('CONVERSION', 'tilemap_width', str(new_w))
-            self.main_window.config_manager.set('CONVERSION', 'tilemap_height', str(new_h))
-        
-        if hasattr(self.main_window, 'edit_tiles_tab'):
-            tiles_tab = self.main_window.edit_tiles_tab
-            tiles_tab.tilemap_data = self.tilemap_data
-            tiles_tab.tilemap_width = new_w
-            tiles_tab.tilemap_height = new_h
-            tiles_tab.tilemap_width_spin.setValue(new_w)
-            tiles_tab.tilemap_height_spin.setValue(new_h)
-            
-            if hasattr(tiles_tab, 'render_tilemap_visual'):
-                tiles_tab.render_tilemap_visual()
-            
-            if hasattr(self.main_window, 'history_manager'):
-                self.main_window.history_manager.record_state(
-                    state_type='tilemap_resize',
-                    editor_type='palettes',
-                    data={
-                        'old_w': old_w, 
-                        'old_h': old_h, 
-                        'new_w': new_w, 
-                        'new_h': new_h, 
-                        'old_data': old_data, 
-                        'new_data': self.tilemap_data
-                    },
-                    description=f"Tilemap resized from {old_w}x{old_h} to {new_w}x{new_h}"
-                )
-
-            if hasattr(tiles_tab, 'edit_tilemap_scene'):
-                 self.update_palette_overlay(
-                     tiles_tab.edit_tilemap_scene,
-                     self.tilemap_data,
-                     self.tilemap_width,
-                     self.tilemap_height
-                 )
 
     def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
         update_status_bar_shared(

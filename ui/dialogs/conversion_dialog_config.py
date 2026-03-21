@@ -32,11 +32,6 @@ class ConversionDialogConfig:
             self.origin.setText(config.get('CONVERSION', 'origin', '0,0'))
 
             output_size = config.get('CONVERSION', 'output_size', 'Original')
-            index = self.output_combo.findText(output_size)
-            if index >= 0:
-                self.output_combo.setCurrentIndex(index)
-                self.on_output_size_changed()
-            
             custom_width_loaded = int(config.get('CONVERSION', 'custom_width', '32'))
             custom_height_loaded = int(config.get('CONVERSION', 'custom_height', '20'))
 
@@ -50,6 +45,11 @@ class ConversionDialogConfig:
                 self.custom_height.setValue(custom_height_loaded)
             self.custom_width.blockSignals(False)
             self.custom_height.blockSignals(False)
+            
+            index = self.output_combo.findText(output_size)
+            if index >= 0:
+                self.output_combo.setCurrentIndex(index)
+                self.on_output_size_changed()
             
             self.start_index.setValue(int(config.get('CONVERSION', 'start_index', '0')))
             self.palette_size.setValue(int(config.get('CONVERSION', 'palette_size', '1')))
