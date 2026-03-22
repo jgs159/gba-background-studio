@@ -497,6 +497,113 @@ def save_tileset(main_window):
         )
 
 def open_tilemap(main_window):
+    from ui.dialogs.open_tilemap_dialog import OpenTilemapDialog
+
+    file_path, _ = QFileDialog.getOpenFileName(
+        main_window,
+        "Open Tilemap",
+        "",
+        "Binary Files (*.bin);;All Files (*)"
+    )
+    if not file_path:
+        return
+
+    try:
+        with open(file_path, 'rb') as f:
+            tilemap_data = f.read()
+    except Exception as e:
+        QMessageBox.warning(main_window, "Error", f"Could not read file:\n{e}")
+        return
+
+    if len(tilemap_data) < 2 or len(tilemap_data) % 2 != 0:
+        QMessageBox.warning(main_window, "Invalid Tilemap",
+                            "File size is not valid (must be a multiple of 2 bytes).")
+        return
+
+    total_tiles = len(tilemap_data) // 2
+
+    dlg = OpenTilemapDialog(total_tiles, main_window)
+    if dlg.exec() != QDialog.Accepted:
+        return
+
+    w, h, bpp = dlg.get_values()
+
+    # Validate max tile index against loaded tileset
+    tiles_path = "output/tiles.png"
+    if os.path.exists(tiles_path):
+        try:
+            with PilImage.open(tiles_path) as img:
+                tileset_tile_count = (img.width // 8) * (img.height // 8)
+        except Exception:
+            tileset_tile_count = None
+
+        if tileset_tile_count is not None:
+            max_tile_idx = 0
+            for i in range(total_tiles):
+                entry = tilemap_data[i * 2] | (tilemap_data[i * 2 + 1] << 8)
+                tile_id = entry & 0x3FF
+                if tile_id > max_tile_idx:
+                    max_tile_idx = tile_id
+
+            if max_tile_idx >= tileset_tile_count:
+                QMessageBox.warning(
+                    main_window, "Tilemap Incompatible",
+                    f"The tilemap references tile index {max_tile_idx}, but the current "
+                    f"tileset only has {tileset_tile_count} tiles (0–{tileset_tile_count - 1})."
+                )
+                return
+
+    os.makedirs('output', exist_ok=True)
+    shutil.copy2(file_path, 'output/map.bin')
+
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'tilemap_width',  str(w))
+        main_window.config_manager.set('CONVERSION', 'tilemap_height', str(h))
+        main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
+
+    main_window.current_bpp = bpp
+
+    et = main_window.edit_tiles_tab
+    et.tilemap_data   = tilemap_data
+    et.tilemap_width  = w
+    et.tilemap_height = h
+    et.tilemap_width_spin.setValue(w)
+    et.tilemap_height_spin.setValue(h)
+    et.enable_tilemap_controls()
+
+    from core.image_utils import create_gbagfx_preview
+    from core.image_utils import pil_to_qimage as _pil_to_qimage
+    from PySide6.QtGui import QPixmap as _QPixmap
+
+    save_preview     = main_window.config_manager.getboolean('SETTINGS', 'save_preview_files',     False) if hasattr(main_window, 'config_manager') else False
+    keep_transparent = main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False) if hasattr(main_window, 'config_manager') else False
+    create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+
+    preview_path = 'temp/preview/preview.png'
+    if os.path.exists(preview_path):
+        with PilImage.open(preview_path) as _f:
+            preview_img = _f.copy()
+        preview_pixmap = _QPixmap.fromImage(_pil_to_qimage(preview_img))
+
+        main_window.preview_tab.preview_image_scene.clear()
+        main_window.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
+        main_window.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
+
+        et.edit_tilemap_scene.clear()
+        et.edit_tilemap_scene.addPixmap(preview_pixmap)
+        et.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
+
+        main_window.edit_palettes_tab.display_tilemap_replica(et.edit_tilemap_scene)
+        main_window.edit_palettes_tab.update_palette_overlay(
+            et.edit_tilemap_scene, tilemap_data, w, h
+        )
+
+        from .view_ops import apply_zoom_to_view
+        apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
+
+    main_window.menu_bar.action_save_tilemap.setEnabled(True)
+    main_window.sync_palettes_tab()
+
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
 
