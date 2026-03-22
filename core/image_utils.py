@@ -127,7 +127,7 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
         num_entries = len(map_bytes) // 2
         total_tiles_needed = tilemap_width * tilemap_height
 
-        if tilemap_width > 32:
+        if tilemap_width > 32 and tilemap_height >= 32:
             blocks_x = tilemap_width // 32
             blocks_y = tilemap_height // 32
             positions = [None] * total_tiles_needed
