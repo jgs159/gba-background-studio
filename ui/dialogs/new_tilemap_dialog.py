@@ -22,10 +22,17 @@ class NewTilemapDialog(QDialog):
         mode_row.addWidget(self.mode_combo)
         layout.addLayout(mode_row)
 
+        current_bpp = getattr(parent, 'current_bpp', 4) if parent else 4
+
         bpp_row = QHBoxLayout()
         bpp_row.addWidget(QLabel("Bit Depth:"))
         self.bpp_combo = QComboBox()
         self.bpp_combo.addItems(["4bpp", "8bpp"])
+        if current_bpp == 8:
+            self.bpp_combo.setCurrentIndex(1)
+            self.bpp_combo.setEnabled(False)
+        else:
+            self.bpp_combo.setCurrentIndex(0)
         bpp_row.addWidget(self.bpp_combo)
         layout.addLayout(bpp_row)
 
