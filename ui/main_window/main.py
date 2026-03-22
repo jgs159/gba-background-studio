@@ -23,7 +23,6 @@ class GBABackgroundStudio(QMainWindow):
 
         self.current_bpp = 4
         self.tileset_from_conversion = False
-        self.can_update_tileset_palette = False
         self.set_window_icon()
 
         from .config import load_configuration

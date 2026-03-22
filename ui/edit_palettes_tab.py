@@ -717,30 +717,30 @@ class EditPalettesTab(TilemapUtils, QWidget):
                         os.remove(filepath)
     
     def _save_output_palette_8bpp(self, output_dir):
-        first_idx = None
-        last_idx = None
-        
-        for i, color in enumerate(self.palette_colors):
-            if color != (0, 0, 0):
-                if first_idx is None:
-                    first_idx = i
+        start_idx = 0
+        for i in range(1, len(self.palette_colors)):
+            if self.palette_colors[i] != (0, 0, 0):
+                start_idx = i
+                break
+
+        last_idx = start_idx
+        for i in range(start_idx, len(self.palette_colors)):
+            if self.palette_colors[i] != (0, 0, 0):
                 last_idx = i
-        
-        if first_idx is None:
-            return
-        
-        continuous_colors = []
-        for i in range(first_idx, last_idx + 1):
-            if i < len(self.palette_colors):
-                continuous_colors.append(self.palette_colors[i])
-        
-        filename = f"palette_{first_idx:03d}.pal"
+
+        colors_to_save = self.palette_colors[start_idx:last_idx + 1]
+
+        for f in os.listdir(output_dir):
+            if f.startswith("palette_") and f.endswith(".pal"):
+                os.remove(os.path.join(output_dir, f))
+
+        filename = f"palette_{start_idx:03d}.pal"
         filepath = os.path.join(output_dir, filename)
-        
+
         with open(filepath, "w", encoding='utf-8') as f:
             f.write("JASC-PAL\n0100\n")
-            f.write(f"{len(continuous_colors)}\n")
-            for r, g, b in continuous_colors:
+            f.write(f"{len(colors_to_save)}\n")
+            for r, g, b in colors_to_save:
                 f.write(f"{r} {g} {b}\n")
 
     def _save_and_update_all(self):       
@@ -756,7 +756,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                  print(translator.tr("error_saving_preview_palette").format(e=e))
             
             self._save_output_palette()
-            self._update_output_tiles()  # sync palette into tiles.png before preview
+            self._update_output_tiles()
             
             if (self.main_window and hasattr(self.main_window, 'preview_tab')):
                 self.main_window.preview_tab.palette_colors = self.palette_colors.copy()
@@ -768,9 +768,6 @@ class EditPalettesTab(TilemapUtils, QWidget):
         from PIL import Image
 
         mw = self.main_window
-        if not getattr(mw, 'can_update_tileset_palette', False):
-            return
-
         tiles_path = "output/tiles.png"
         if not os.path.exists(tiles_path):
             return
@@ -786,7 +783,10 @@ class EditPalettesTab(TilemapUtils, QWidget):
                 src_colors = self.palette_colors
             else:
                 selected_str = mw.config_manager.get('CONVERSION', 'selected_palettes', '0')
-                slot = int(selected_str.split(',')[0].strip())
+                selected_slots = [s.strip() for s in selected_str.split(',') if s.strip()]
+                if len(selected_slots) > 1:
+                    return
+                slot = int(selected_slots[0]) if selected_slots else 0
                 src_colors = self.palette_colors[slot * 16 : slot * 16 + 16]
                 src_colors = list(src_colors) + [(0, 0, 0)] * (256 - len(src_colors))
 

@@ -12,6 +12,24 @@ from core.palette_utils import rgb_to_gba_rounded
 from utils.translator import Translator
 translator = Translator()
 
+
+def analyze_tiles_bpp(image_path, tile_size=8):
+    import numpy as np
+    img = Image.open(image_path)
+    if img.mode != 'P':
+        return None
+    width, height = img.size
+    data = np.array(img)
+    for y in range(0, height, tile_size):
+        for x in range(0, width, tile_size):
+            tile = data[y:y + tile_size, x:x + tile_size]
+            unique_indices = np.unique(tile)
+            if len(unique_indices) > 16:
+                return 8
+            if len(np.unique(unique_indices // 16)) > 1:
+                return 8
+    return 4
+
 def extract_tiles_rgba(img):
     w, h = img.size
     tiles = []

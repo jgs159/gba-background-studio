@@ -10,6 +10,64 @@ from core.image_utils import pil_to_qimage
 from core.palette_utils import generate_grayscale_palette
 
 
+class PaletteApplyDialog(QDialog):
+    ADD     = "add"
+    SYNC    = "sync"
+    REPLACE = "replace"
+
+    def __init__(self, parent=None, need_bpp=False):
+        super().__init__(parent)
+        self.setWindowTitle("Apply Palette")
+        self.setModal(True)
+        self.setFixedSize(400, 200 if need_bpp else 160)
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "How do you want to apply the loaded palette?"
+        ))
+
+        from PySide6.QtWidgets import QRadioButton, QButtonGroup, QComboBox
+        self._add_radio     = QRadioButton("Add — write colors at the specified index (keep the rest)")
+        self._sync_radio    = QRadioButton("Sync — remap tileset pixels to match new palette")
+        self._replace_radio = QRadioButton("Replace — reset to black, then apply at specified index")
+        self._add_radio.setChecked(True)
+        grp = QButtonGroup(self)
+        grp.addButton(self._add_radio)
+        grp.addButton(self._sync_radio)
+        grp.addButton(self._replace_radio)
+        layout.addWidget(self._add_radio)
+        layout.addWidget(self._sync_radio)
+        layout.addWidget(self._replace_radio)
+
+        self._bpp_combo = None
+        if need_bpp:
+            current_bpp = getattr(parent, 'current_bpp', 4) if parent else 4
+            bpp_row = QHBoxLayout()
+            bpp_row.addWidget(QLabel("Color depth:"))
+            self._bpp_combo = QComboBox()
+            self._bpp_combo.addItems(["4bpp", "8bpp"])
+            if current_bpp == 8:
+                self._bpp_combo.setCurrentIndex(1)
+                self._bpp_combo.setEnabled(False)
+            bpp_row.addWidget(self._bpp_combo)
+            layout.addLayout(bpp_row)
+
+        btn_row = QHBoxLayout()
+        ok_btn     = QPushButton("OK")
+        cancel_btn = QPushButton("Cancel")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+
+    def get_values(self):
+        mode = self.ADD if self._add_radio.isChecked() else (self.SYNC if self._sync_radio.isChecked() else self.REPLACE)
+        bpp  = 8 if (self._bpp_combo and self._bpp_combo.currentIndex() == 1) else 4
+        return mode, bpp
+
+
 class PaletteLoadDialog(QDialog):
     def __init__(self, parent=None, palette_length=256):
         super().__init__(parent)
@@ -77,7 +135,6 @@ def load_last_output_files(main_window):
         main_window.conversion_palette_count = len([p for p in selected.split(',') if p.strip()]) if main_window.current_bpp == 4 else 16
         is_8bpp = main_window.current_bpp == 8
         palette_count = len([p for p in selected.split(',') if p.strip()])
-        main_window.can_update_tileset_palette = is_8bpp or (palette_count == 1)
         
         with open(tilemap_path, 'rb') as f:
             tilemap_data = f.read()
@@ -146,11 +203,21 @@ def _apply_palette_colors(main_window, colors):
         QMessageBox.warning(main_window, "Error", "Palette editor not available.")
         return
 
-    dialog = PaletteLoadDialog(main_window, len(colors))
-    if dialog.exec() != QDialog.Accepted:
-        return
+    palette_tab = main_window.edit_palettes_tab
+    has_tilemap = bool(getattr(palette_tab, 'tilemap_data', None))
+    need_bpp    = not has_tilemap
 
-    index, length = dialog.get_values()
+    apply_dlg = PaletteApplyDialog(main_window, need_bpp=need_bpp)
+    if apply_dlg.exec() != QDialog.Accepted:
+        return
+    mode, dlg_bpp = apply_dlg.get_values()
+
+    bpp = getattr(main_window, 'current_bpp', 4) if has_tilemap else dlg_bpp
+
+    load_dlg = PaletteLoadDialog(main_window, len(colors))
+    if load_dlg.exec() != QDialog.Accepted:
+        return
+    index, length = load_dlg.get_values()
 
     if length > len(colors):
         QMessageBox.warning(
@@ -159,20 +226,38 @@ def _apply_palette_colors(main_window, colors):
         )
         return
 
-    palette_tab = main_window.edit_palettes_tab
+    if mode == PaletteApplyDialog.ADD:
+        new_palette = list(palette_tab.palette_colors)
+        for i in range(length):
+            if index + i < 256:
+                new_palette[index + i] = colors[i]
+    else:
+        new_palette = [(0, 0, 0)] * 256
+        for i in range(length):
+            if index + i < 256:
+                new_palette[index + i] = colors[i]
 
-    # Reset all colors to black first
+    tiles_path = "output/tiles.png"
+    if os.path.exists(tiles_path):
+        try:
+            with PilImage.open(tiles_path) as _t:
+                can_update = _t.mode == 'P'
+        except Exception:
+            can_update = False
+    else:
+        can_update = False
+
+    if can_update:
+        if mode == PaletteApplyDialog.SYNC:
+            _sync_tileset_to_palette(tiles_path, palette_tab.palette_colors, new_palette, bpp)
+        elif mode in (PaletteApplyDialog.REPLACE, PaletteApplyDialog.ADD):
+            _replace_tileset_palette(tiles_path, new_palette)
+
     for i in range(256):
-        palette_tab.palette_colors[i] = (0, 0, 0)
+        palette_tab.palette_colors[i] = new_palette[i]
         if i < len(palette_tab.palette_rects):
-            palette_tab.palette_rects[i].setBrush(QBrush(QColor(0, 0, 0)))
-
-    for i in range(length):
-        if index + i < 256:
-            palette_tab.palette_colors[index + i] = colors[i]
-            if index + i < len(palette_tab.palette_rects):
-                r, g, b = colors[i]
-                palette_tab.palette_rects[index + i].setBrush(QBrush(QColor(r, g, b)))
+            r, g, b = new_palette[i]
+            palette_tab.palette_rects[i].setBrush(QBrush(QColor(r, g, b)))
 
     palette_tab._save_and_update_all()
     palette_tab.color_editor.toggle_controls_enabled(True)
@@ -187,6 +272,60 @@ def _apply_palette_colors(main_window, colors):
         f"Successfully loaded {length} colors starting at index {index}."
     )
 
+def _sync_tileset_to_palette(tiles_path, old_palette, new_palette, bpp):
+    import numpy as np
+    try:
+        with PilImage.open(tiles_path) as f:
+            arr = np.array(f).copy()
+
+        old_rgb = np.array(
+            [old_palette[i] if i < len(old_palette) else (0, 0, 0) for i in range(256)],
+            dtype=np.int32
+        )
+        new_rgb = np.array(
+            [new_palette[i] if i < len(new_palette) else (0, 0, 0) for i in range(256)],
+            dtype=np.int32
+        )
+
+        slot_size = 16 if bpp == 4 else 256
+        remap = np.arange(256, dtype=np.uint8)
+
+        for old_idx in range(256):
+            oc = old_rgb[old_idx]
+            slot_start = (old_idx // slot_size) * slot_size
+            slot_end   = slot_start + slot_size
+            candidates = np.arange(slot_start, slot_end)
+            dists = np.sum((new_rgb[candidates] - oc) ** 2, axis=1)
+            min_dist = dists.min()
+            ties = candidates[dists == min_dist]
+            remap[old_idx] = old_idx if old_idx in ties else ties[0]
+
+        lut = remap
+        remapped = lut[arr]
+
+        out_img = PilImage.fromarray(remapped, mode='P')
+        flat = [c for rgb in new_palette for c in (int(rgb[0]), int(rgb[1]), int(rgb[2]))]
+        while len(flat) < 768:
+            flat.append(0)
+        out_img.putpalette(flat)
+        out_img.save(tiles_path)
+    except Exception as e:
+        print(f"Error syncing tileset: {e}")
+
+def _replace_tileset_palette(tiles_path, new_palette):
+    try:
+        with PilImage.open(tiles_path) as f:
+            import numpy as np
+            arr = np.array(f).copy()
+            size = f.size
+        out_img = PilImage.fromarray(arr, mode='P')
+        flat = [c for rgb in new_palette for c in (int(rgb[0]), int(rgb[1]), int(rgb[2]))]
+        while len(flat) < 768:
+            flat.append(0)
+        out_img.putpalette(flat)
+        out_img.save(tiles_path)
+    except Exception as e:
+        print(f"Error replacing tileset palette: {e}")
 
 def open_image_for_conversion(main_window):
     from ui.dialogs.conversion_dialog import ConversionDialog
@@ -224,20 +363,18 @@ def _reset_tilemap(main_window):
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
 
-
 def _reset_palette(main_window):
     from core.palette_utils import generate_grayscale_palette
     grayscale = generate_grayscale_palette()
 
     ep = main_window.edit_palettes_tab
-    ep.palette_colors = [(0, 0, 0)] * 256
+    ep.palette_colors = list(grayscale)
     ep.display_palette_colors(grayscale, enable_editor=False)
 
     if hasattr(main_window, 'preview_tab'):
         main_window.preview_tab.display_palette_colors(grayscale)
 
     main_window.menu_bar.action_save_palette.setEnabled(False)
-
 
 def open_tileset(main_window):
     file_path, _ = QFileDialog.getOpenFileName(
@@ -251,45 +388,71 @@ def open_tileset(main_window):
 
     try:
         with PilImage.open(file_path) as f:
+            if f.mode != 'P':
+                QMessageBox.warning(
+                    main_window,
+                    main_window.translator.tr("error"),
+                    "The image must be indexed (palette-based). Please convert it to indexed mode first."
+                )
+                return
             pil_img = f.copy()
-            is_indexed = (f.mode == 'P')
-            raw_palette = f.getpalette() if is_indexed else None
+            raw_palette = f.getpalette()
     except Exception as e:
         QMessageBox.warning(main_window, main_window.translator.tr("error"),
                             main_window.translator.tr("could_not_load_tileset").format(error=str(e)))
         return
 
-    import os
     os.makedirs('output', exist_ok=True)
+
+    for fname in os.listdir('output'):
+        if fname != 'tiles.png':
+            fpath = os.path.join('output', fname)
+            try:
+                os.remove(fpath)
+            except Exception:
+                pass
+
+    for fpath in ('temp/preview/preview.png', 'temp/preview/palette.pal'):
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except Exception:
+                pass
+
     pil_img.save('output/tiles.png')
 
+    from core.image_utils import analyze_tiles_bpp
+    detected_bpp = analyze_tiles_bpp('output/tiles.png')
+    if detected_bpp is None:
+        QMessageBox.warning(
+            main_window, main_window.translator.tr("error"),
+            "The image must be indexed (4bpp or 8bpp). Please convert it to indexed mode first."
+        )
+        return
+    main_window.current_bpp = detected_bpp
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'bpp', '1' if detected_bpp == 8 else '0')
+
     _reset_tilemap(main_window)
-    _reset_palette(main_window)
+
+    palette_colors = [(0, 0, 0)] * 256
+    for i in range(min(256, len(raw_palette) // 3)):
+        palette_colors[i] = (raw_palette[i * 3], raw_palette[i * 3 + 1], raw_palette[i * 3 + 2])
+
+    ep = main_window.edit_palettes_tab
+    ep.palette_colors = list(palette_colors)
+    ep.display_palette_colors(palette_colors, enable_editor=True)
+    if hasattr(main_window, 'preview_tab'):
+        main_window.preview_tab.display_palette_colors(palette_colors)
+    main_window.menu_bar.action_save_palette.setEnabled(True)
 
     main_window.display_tileset(pil_img)
     main_window.menu_bar.action_save_tileset.setEnabled(True)
     main_window.tileset_from_conversion = False
     main_window.conversion_palette_count = 0
-    main_window.can_update_tileset_palette = False
 
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
-
-    if is_indexed and raw_palette:
-        reply = QMessageBox.question(
-            main_window,
-            "Load Palette from Image",
-            "The image has an embedded palette. Do you want to load it?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
-        )
-        if reply == QMessageBox.Yes:
-            colors = []
-            for i in range(0, min(len(raw_palette), 768), 3):
-                colors.append((raw_palette[i], raw_palette[i+1], raw_palette[i+2]))
-            while len(colors) < 256:
-                colors.append((0, 0, 0))
-            _apply_palette_colors(main_window, colors)
 
     main_window.main_tabs.setCurrentIndex(1)
 
@@ -474,19 +637,20 @@ def open_palette(main_window):
 
 def save_palette(main_window):
     output_dir = "output"
-    
-    palette_files = []
-    if main_window.current_bpp == 4:
-        for i in range(16):
-            palette_path = os.path.join(output_dir, f"palette_{i:02d}.pal")
-            if os.path.exists(palette_path):
-                palette_files.append(palette_path)
-    else:
-        for file in os.listdir(output_dir):
-            if file.startswith("palette_") and file.endswith(".pal"):
-                palette_path = os.path.join(output_dir, file)
-                if len(file) == 13:
-                    palette_files.append(palette_path)
+
+    if not os.path.exists(output_dir):
+        QMessageBox.information(
+            main_window,
+            main_window.translator.tr("save_palette"),
+            main_window.translator.tr("no_palette_files_to_save")
+        )
+        return
+
+    palette_files = sorted(
+        os.path.join(output_dir, f)
+        for f in os.listdir(output_dir)
+        if f.startswith("palette_") and f.endswith(".pal")
+    )
     
     if not palette_files:
         QMessageBox.information(

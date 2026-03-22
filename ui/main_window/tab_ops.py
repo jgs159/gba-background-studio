@@ -173,15 +173,9 @@ def load_conversion_results(main_window):
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
+    main_window.menu_bar.action_save_palette.setEnabled(True)
 
     main_window.tileset_from_conversion = True
-    is_8bpp = main_window.current_bpp == 8
-    if is_8bpp:
-        main_window.conversion_palette_count = 16
-    else:
-        selected = main_window.config_manager.get('CONVERSION', 'selected_palettes', '0')
-        main_window.conversion_palette_count = len([p for p in selected.split(',') if p.strip()])
-    main_window.can_update_tileset_palette = is_8bpp or (main_window.conversion_palette_count == 1)
 
     if hasattr(main_window, 'output_loaded_for_zoom'):
         main_window.output_loaded_for_zoom = True
