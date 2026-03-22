@@ -55,6 +55,40 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
         tc_str = config.get('CONVERSION', 'transparent_color', '0,0,0')
         transparent_color = tuple(map(int, tc_str.split(',')))
 
+        palette_rgb = [(0, 0, 0)] * 256
+        pal_files = sorted(f for f in os.listdir(output_dir)
+                           if f.startswith('palette_') and f.endswith('.pal'))
+        for pal_file in pal_files:
+            stem = pal_file[len('palette_'):-len('.pal')]
+            try:
+                slot_or_index = int(stem)
+                is_8bpp_pal = len(stem) == 3
+                with open(os.path.join(output_dir, pal_file), 'r', encoding='utf-8') as pf:
+                    plines = [l.strip() for l in pf
+                              if l.strip() and not l.startswith(('JASC-PAL', '0100'))]
+                count = int(plines[0])
+                if is_8bpp_pal:
+                    start = slot_or_index
+                    for i in range(1, min(1 + count, len(plines))):
+                        idx = start + (i - 1)
+                        if idx < 256:
+                            palette_rgb[idx] = tuple(map(int, plines[i].split()))
+                    if keep_transparent:
+                        tc = (
+                            min(transparent_color[0] // 8 * 8, 248),
+                            min(transparent_color[1] // 8 * 8, 248),
+                            min(transparent_color[2] // 8 * 8, 248)
+                        )
+                        palette_rgb[0] = tc
+                else:
+                    slot = slot_or_index
+                    for i in range(1, min(1 + count, len(plines))):
+                        idx = slot * 16 + (i - 1)
+                        if idx < 256:
+                            palette_rgb[idx] = tuple(map(int, plines[i].split()))
+            except Exception:
+                pass
+
         with Image.open(tiles_path) as tiles_img:
             if tiles_img.mode != 'P':
                 print(translator.tr("error_tiles_not_indexed"))
@@ -63,19 +97,11 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
             ts_width_px, ts_height_px = tiles_img.size
             ts_width_tiles = ts_width_px // 8
             ts_height_tiles = ts_height_px // 8
-            full_palette = tiles_img.getpalette()
-
-        if full_palette is None:
-            print(translator.tr("error_no_palette"))
-            return None
-        
-        palette_rgb = []
-        for i in range(0, min(768, len(full_palette)), 3):
-            r, g, b = full_palette[i], full_palette[i+1], full_palette[i+2]
-            palette_rgb.append((r, g, b))
-        
-        while len(palette_rgb) < 256:
-            palette_rgb.append((0, 0, 0))
+            if not palette_rgb or all(c == (0,0,0) for c in palette_rgb):
+                full_palette = tiles_img.getpalette()
+                if full_palette:
+                    for i in range(min(256, len(full_palette) // 3)):
+                        palette_rgb[i] = (full_palette[i*3], full_palette[i*3+1], full_palette[i*3+2])
 
         with open(map_path, "rb") as f:
             map_bytes = f.read()
@@ -126,15 +152,6 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
             preview_array[py:py+8, px:px+8] = tile_data + (pal_slot * 16)
 
         final_preview = Image.fromarray(preview_array, mode="P")
-
-        if not keep_transparent:
-            palette_rgb[0] = (0, 0, 0)
-        else:
-            palette_rgb[0] = (
-                min(transparent_color[0] // 8 * 8, 248),
-                min(transparent_color[1] // 8 * 8, 248),
-                min(transparent_color[2] // 8 * 8, 248)
-            )
 
         flat_palette = []
         for r, g, b in palette_rgb:

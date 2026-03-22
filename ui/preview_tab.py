@@ -101,7 +101,6 @@ class PreviewTab(QWidget):
         return header
 
     def open_output_folder(self):
-        """Open output directory in file explorer"""
         output_dir = "output"
         try:
             if not os.path.exists(output_dir):
@@ -120,21 +119,10 @@ class PreviewTab(QWidget):
                 self.parent.current_status_message = f"Error opening output directory: {str(e)}"
 
     def init_palette_150(self):
-        """Initialize palette with 150% sized color squares (12x12 pixels)"""
         self.preview_palette_scene.clear()
         tile_size = 12
-        palette_path = "assets/default_rainbow.pal"
         
         colors = generate_grayscale_palette()
-        
-        try:
-            if os.path.exists(palette_path):
-                colors = self.load_gba_palette(palette_path)
-            else:
-                print("ℹ️ Palette file not found, using grayscale")
-                
-        except Exception as e:
-            print(f"❌ Error loading palette: {e}, using grayscale")
         
         for i, (r, g, b) in enumerate(colors):
             if i >= 256:

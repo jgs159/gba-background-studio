@@ -50,9 +50,12 @@ def sync_palettes_tab(main_window):
         main_window.grid_manager.set_grid_visible(False)
     
     try:
+        ep = main_window.edit_palettes_tab
+        editor_enabled = ep.color_editor.red_slider.isEnabled()
+
         if hasattr(main_window, 'preview_tab') and hasattr(main_window.preview_tab, 'palette_colors'):
             colors_copy = [(r, g, b) for r, g, b in main_window.preview_tab.palette_colors]
-            main_window.edit_palettes_tab.display_palette_colors(colors_copy)
+            ep.display_palette_colors(colors_copy, enable_editor=editor_enabled)
 
         if hasattr(main_window, 'edit_tiles_tab') and hasattr(main_window.edit_tiles_tab, 'edit_tilemap_scene'):
             main_window.edit_palettes_tab.display_tilemap_replica(main_window.edit_tiles_tab.edit_tilemap_scene)
@@ -170,7 +173,15 @@ def load_conversion_results(main_window):
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
-    main_window.menu_bar.action_save_selection.setEnabled(True)
+
+    main_window.tileset_from_conversion = True
+    is_8bpp = main_window.current_bpp == 8
+    if is_8bpp:
+        main_window.conversion_palette_count = 16
+    else:
+        selected = main_window.config_manager.get('CONVERSION', 'selected_palettes', '0')
+        main_window.conversion_palette_count = len([p for p in selected.split(',') if p.strip()])
+    main_window.can_update_tileset_palette = is_8bpp or (main_window.conversion_palette_count == 1)
 
     if hasattr(main_window, 'output_loaded_for_zoom'):
         main_window.output_loaded_for_zoom = True
