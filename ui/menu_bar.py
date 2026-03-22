@@ -77,7 +77,7 @@ class MenuBar:
         self.action_save_palette = palette_menu.addAction(self.main_window.translator.tr("save_palette"))
         self.action_save_palette.setShortcut("Ctrl+Shift+P")
         self.action_save_palette.triggered.connect(self.main_window.save_palette)
-        self.action_save_palette.setEnabled(True)
+        self.action_save_palette.setEnabled(False)
 
         # Edit menu
         edit_menu = self.menu_bar.addMenu(self.main_window.translator.tr("edit_menu"))
@@ -216,7 +216,6 @@ class MenuBar:
         action_contribute.triggered.connect(self.main_window.show_contribute)
 
     def export_files(self):
-        """Export output files to selected directory"""
         output_dir = "output"
         if not os.path.exists(output_dir) or not os.listdir(output_dir):
             QMessageBox.information(self.main_window, self.main_window.translator.tr("export_files"), 
@@ -234,7 +233,6 @@ class MenuBar:
             return
         
         try:
-            # Copy all files from output directory
             for file_name in os.listdir(output_dir):
                 source_path = os.path.join(output_dir, file_name)
                 target_path = os.path.join(target_dir, file_name)

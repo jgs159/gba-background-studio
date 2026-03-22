@@ -46,6 +46,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         QTimer.singleShot(100, lambda: self.draw_selection_rectangle(0))
         QTimer.singleShot(100, self.connect_tab_signals)
         QTimer.singleShot(100, self.initialize_color_editor)
+        QTimer.singleShot(0, self._init_grayscale_palette)
 
         self.update_status_bar(-1, -1)
 
@@ -227,6 +228,10 @@ class EditPalettesTab(TilemapUtils, QWidget):
             self.current_editing_index = 0
             self.last_edited_index = -1
             self.last_edited_color = (r, g, b)
+
+    def _init_grayscale_palette(self):
+        from core.palette_utils import generate_grayscale_palette
+        self.display_palette_colors(generate_grayscale_palette(), enable_editor=False)
 
     def setup_tilemap_interaction(self):
         super().setup_tilemap_interaction()
@@ -454,7 +459,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self._set_tilemap_controls_enabled(enabled)
 
     def update_palette_overlay(self, source_scene, tilemap_data, tile_width, tile_height):
-        if not source_scene.items() or not tilemap_data:
+        if not tilemap_data:
             return
 
         self.tilemap_data = tilemap_data
@@ -463,6 +468,11 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.overlay_items.clear()
         self.tilemap_width_spin.setValue(tile_width)
         self.tilemap_height_spin.setValue(tile_height)
+
+        self.enable_tilemap_controls()
+
+        if not source_scene.items():
+            return
 
         self.overlay_items.clear()
         self.edit_tilemap2_scene.clear()
@@ -538,7 +548,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.edit_tilemap2_view.resetTransform()
         self.edit_tilemap2_view.scale(factor, factor)
 
-    def display_palette_colors(self, colors):
+    def display_palette_colors(self, colors, enable_editor=True):
         self.palette_colors = [(r, g, b) for r, g, b in colors]
         self.draw_full_palette(self.palette_colors)
         
@@ -548,7 +558,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
             self.color_editor.set_color(0, r, g, b)
             self.draw_selection_rectangle(0)
             
-            self.color_editor.toggle_controls_enabled(True)
+            self.color_editor.toggle_controls_enabled(enable_editor)
             
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
@@ -603,52 +613,41 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.draw_selection_rectangle(index)
 
     def _regenerate_preview(self):
+        if not hasattr(self.main_window, 'edit_tiles_tab'):
+            return
+        tiles_tab = self.main_window.edit_tiles_tab
+        if not getattr(tiles_tab, 'tileset_img', None) or not getattr(tiles_tab, 'tilemap_data', None):
+            return
         try:
-            from core.image_utils import create_gbagfx_preview
-            from PySide6.QtGui import QPixmap
-            from PIL import Image as PilImage
-            from core.image_utils import pil_to_qimage
-            import os
-
-            transparent_rgb = self.palette_colors[0]
-            self._save_output_palette()
-            save_preview_files = self.main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
-
-            if self.main_window.current_bpp == 4:
-                create_gbagfx_preview(
-                    save_preview=save_preview_files,
-                    transparent_color=transparent_rgb,
-                    keep_transparent=True,
-                    tilemap_width=self.tilemap_width,
-                    tilemap_height=self.tilemap_height
-                )
-            else:
-                preview_path = "temp/preview/preview.png"
-                if os.path.exists(preview_path):
-                    with PilImage.open(preview_path) as existing:
-                        preview_img = existing.copy()
-                    flat_palette = []
-                    for r, g, b in self.palette_colors:
-                        flat_palette.extend([int(r), int(g), int(b)])
-                    while len(flat_palette) < 768:
-                        flat_palette.append(0)
-                    preview_img.putpalette(flat_palette)
-                    preview_img.save(preview_path)
+            if hasattr(self.main_window, 'config_manager') and tiles_tab.tilemap_width > 0:
+                self.main_window.config_manager.set('CONVERSION', 'tilemap_width',  str(tiles_tab.tilemap_width))
+                self.main_window.config_manager.set('CONVERSION', 'tilemap_height', str(tiles_tab.tilemap_height))
 
             preview_path = "temp/preview/preview.png"
             if os.path.exists(preview_path):
-                with PilImage.open(preview_path) as preview_img:
-                    preview_qimg = pil_to_qimage(preview_img)
-                    preview_pixmap = QPixmap.fromImage(preview_qimg)
+                from PIL import Image as PilImage
+                with PilImage.open(preview_path) as f:
+                    preview_img = f.copy()
+                if preview_img.mode == 'P':
+                    flat = []
+                    for r, g, b in self.palette_colors:
+                        flat.extend([int(r), int(g), int(b)])
+                    while len(flat) < 768:
+                        flat.append(0)
+                    preview_img.putpalette(flat)
+                    preview_img.save(preview_path)
+                    if hasattr(self.main_window, 'refresh_preview_display'):
+                        self.main_window.refresh_preview_display()
+                    return
 
-                self.main_window.preview_tab.preview_image_scene.clear()
-                self.main_window.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
-                self.main_window.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
-                self.display_tilemap_replica(self.main_window.preview_tab.preview_image_scene)
-
+            from core.image_utils import create_gbagfx_preview
+            save_preview     = self.main_window.config_manager.getboolean('SETTINGS', 'save_preview_files',      False)
+            keep_transparent = self.main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
+            result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+            if result and hasattr(self.main_window, 'refresh_preview_display'):
+                self.main_window.refresh_preview_display()
         except Exception as e:
             print(translator.tr("error_regenerating_preview").format(e=e))
-
     
     def _update_all_tiles(self):
         if not self.tilemap_data or not hasattr(self.main_window, 'edit_tiles_tab'):
@@ -757,9 +756,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                  print(translator.tr("error_saving_preview_palette").format(e=e))
             
             self._save_output_palette()
-            if self.main_window.current_bpp == 8:
-                self._update_output_tiles()
-            self._reload_tileset()
+            self._update_output_tiles()  # sync palette into tiles.png before preview
             
             if (self.main_window and hasattr(self.main_window, 'preview_tab')):
                 self.main_window.preview_tab.palette_colors = self.palette_colors.copy()
@@ -769,30 +766,52 @@ class EditPalettesTab(TilemapUtils, QWidget):
     
     def _update_output_tiles(self):
         from PIL import Image
-        
+
+        mw = self.main_window
+        if not getattr(mw, 'can_update_tileset_palette', False):
+            return
+
         tiles_path = "output/tiles.png"
         if not os.path.exists(tiles_path):
             return
-        
+
         try:
             with Image.open(tiles_path) as f:
                 tiles_img = f.copy()
             if tiles_img.mode != 'P':
                 return
-            
+
+            is_8bpp = getattr(mw, 'current_bpp', 4) == 8
+            if is_8bpp:
+                src_colors = self.palette_colors
+            else:
+                selected_str = mw.config_manager.get('CONVERSION', 'selected_palettes', '0')
+                slot = int(selected_str.split(',')[0].strip())
+                src_colors = self.palette_colors[slot * 16 : slot * 16 + 16]
+                src_colors = list(src_colors) + [(0, 0, 0)] * (256 - len(src_colors))
+
             flat_palette = []
-            for r, g, b in self.palette_colors:
-                flat_palette.extend([r, g, b])
-            
+            for r, g, b in src_colors:
+                flat_palette.extend([int(r), int(g), int(b)])
             while len(flat_palette) < 768:
                 flat_palette.extend([0, 0, 0])
-            
+
             tiles_img.putpalette(flat_palette[:768])
-            
             tiles_img.save(tiles_path)
-            
+
+            if hasattr(mw, 'edit_tiles_tab'):
+                with Image.open(tiles_path) as f:
+                    updated = f.copy()
+                et = mw.edit_tiles_tab
+                et.tileset_img = updated
+                et.tileset_img_original = updated
+                total_tiles = (updated.width // 8) * (updated.height // 8)
+                w = et.tiles_per_row if et.tiles_per_row > 0 else updated.width // 8
+                h = (total_tiles + w - 1) // w
+                et.render_tileset_with_padding(w, h, total_tiles)
+
         except Exception as e:
-             print(translator.tr("error_updating_output_tiles").format(e=e))
+            print(translator.tr("error_updating_output_tiles").format(e=e))
         
     def finalize_color_editing(self):
         if (self.color_editor.has_changes() and 

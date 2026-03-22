@@ -517,9 +517,10 @@ class EditTilesTab(TilemapUtils, QWidget):
 
     def load_tilemap(self, tilemap_data, tileset_path, preview_path=None):
         self.tilemap_data = tilemap_data
-        with PilImage.open(tileset_path) as f:
-            self.tileset_img = f.copy()
-        self.tiles_per_row = self.tileset_img.width // 8
+        if tileset_path and os.path.exists(tileset_path):
+            with PilImage.open(tileset_path) as f:
+                self.tileset_img = f.copy()
+        self.tiles_per_row = self.tileset_img.width // 8 if self.tileset_img else 16
 
         if preview_path:
             try:
