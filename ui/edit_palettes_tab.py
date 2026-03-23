@@ -324,7 +324,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.finalize_color_editing()
         if not self.tilemap_data:
             return
-        tile_index = tile_y * self.tilemap_width + tile_x
+        tile_index = self._tilemap_index(tile_x, tile_y)
         if 0 <= tile_index < len(self.tilemap_data) // 2:
             entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
             palette_id = (entry >> 12) & 0xF
@@ -347,11 +347,23 @@ class EditPalettesTab(TilemapUtils, QWidget):
         if current_tab != self:
             self.finalize_color_editing()
 
+    def _tilemap_index(self, tile_x, tile_y):
+        w = self.tilemap_width
+        if w <= 32:
+            return tile_y * w + tile_x
+        block_x = tile_x // 32
+        block_y = tile_y // 32
+        blocks_x = w // 32
+        local_x = tile_x % 32
+        local_y = tile_y % 32
+        block_index = block_y * blocks_x + block_x
+        return block_index * 1024 + local_y * 32 + local_x
+
     def edit_palette_at(self, tile_x, tile_y):
         if not self.tilemap_data:
             return
 
-        tile_index = tile_y * self.tilemap_width + tile_x
+        tile_index = self._tilemap_index(tile_x, tile_y)
         if tile_index >= len(self.tilemap_data) // 2:
             return
 
@@ -407,7 +419,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         if not et or not et.tileset_img or not et.tilemap_data:
             return
 
-        tile_index = tile_y * self.tilemap_width + tile_x
+        tile_index = self._tilemap_index(tile_x, tile_y)
         if tile_index >= len(et.tilemap_data) // 2:
             return
 
@@ -505,7 +517,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
             
             for y in range(self.tilemap_height):
                 for x in range(self.tilemap_width):
-                    idx = y * self.tilemap_width + x
+                    idx = self._tilemap_index(x, y)
                     if idx >= len(self.tilemap_data) // 2:
                         continue
                     
@@ -555,7 +567,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
         for i in range(tile_height):
             for j in range(tile_width):
-                idx = i * tile_width + j
+                idx = self._tilemap_index(j, i)
                 if idx >= len(tilemap_data) // 2:
                     continue
 
@@ -600,7 +612,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         pixmap_item.setZValue(0)
 
         if hasattr(self, 'tilemap_data') and self.tilemap_data:
-            tile_index = tile_y * self.tilemap_width + tile_x
+            tile_index = self._tilemap_index(tile_x, tile_y)
             if tile_index < len(self.tilemap_data) // 2:
                 entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
                 palette_id = (entry >> 12) & 0xF

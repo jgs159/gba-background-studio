@@ -367,11 +367,22 @@ class EditTilesTab(TilemapUtils, QWidget):
             f.write(self.tilemap_data)
         self._update_all_displays()
 
+    def _tilemap_index(self, tile_x, tile_y):
+        w = self.tilemap_width
+        if w <= 32:
+            return tile_y * w + tile_x
+        block_x = tile_x // 32
+        block_y = tile_y // 32
+        blocks_x = w // 32
+        local_x = tile_x % 32
+        local_y = tile_y % 32
+        return (block_y * blocks_x + block_x) * 1024 + local_y * 32 + local_x
+
     def on_tilemap_right_click(self, tile_x, tile_y):
         if not self.tilemap_data:
             return
 
-        tile_index = tile_y * self.tilemap_width + tile_x
+        tile_index = self._tilemap_index(tile_x, tile_y)
 
         if 0 <= tile_index < len(self.tilemap_data) // 2:
             entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
@@ -395,7 +406,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         if not self.tilemap_data:
             return
 
-        tile_index = tile_y * self.tilemap_width + tile_x
+        tile_index = self._tilemap_index(tile_x, tile_y)
 
         if tile_index >= len(self.tilemap_data) // 2:
             return
@@ -462,7 +473,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         if not self.tileset_img or not self.tilemap_data:
             return
 
-        tile_index = tile_y * self.tilemap_width + tile_x
+        tile_index = self._tilemap_index(tile_x, tile_y)
         if tile_index >= len(self.tilemap_data) // 2:
             return
 
