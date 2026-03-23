@@ -268,8 +268,10 @@ class GBABackgroundStudio(QMainWindow):
                     r, g, b = data['old_color']
                 else:
                     r, g, b = data['new_color']
-                
                 self.edit_palettes_tab.apply_color_change(data['index'], r, g, b)
+
+            elif state['type'] == 'move_color':
+                self.apply_move_color(state, is_undo)
                 
             elif state['type'] == 'tilemap_resize':
                 self.apply_tilemap_resize(state, is_undo)
@@ -279,6 +281,59 @@ class GBABackgroundStudio(QMainWindow):
                 self.apply_tileset_reshape(state, is_undo)
         except Exception as e:
             print(f"Error applying history state: {e}")
+
+    def apply_move_color(self, state, is_undo):
+        import numpy as np
+        from PIL import Image as _Img
+        data = state['data']
+        colors        = data['old_colors']       if is_undo else data['new_colors']
+        tiles_data    = data['old_tiles_data']   if is_undo else data['new_tiles_data']
+        tiles_shape   = data['tiles_shape']
+        preview_data  = data.get('old_preview_data' if is_undo else 'new_preview_data')
+        preview_shape = data.get('preview_shape')
+
+        ep = self.edit_palettes_tab
+        ep.palette_colors = list(colors)
+        from PySide6.QtGui import QBrush, QColor
+        for i, (r, g, b) in enumerate(colors):
+            if i < len(ep.palette_rects):
+                ep.palette_rects[i].setBrush(QBrush(QColor(r, g, b)))
+
+        flat = [c for rgb in colors for c in rgb]
+        while len(flat) < 768:
+            flat.append(0)
+
+        def _restore_image(path, raw_data, shape):
+            if not raw_data or not shape:
+                return
+            arr = np.frombuffer(raw_data, dtype=np.uint8).reshape(shape)
+            out = _Img.fromarray(arr, mode='P')
+            out.putpalette(flat)
+            out.save(path)
+
+        _restore_image('output/tiles.png', tiles_data, tiles_shape)
+        _restore_image('temp/preview/preview.png', preview_data, preview_shape)
+
+        if tiles_data and tiles_shape:
+            try:
+                et = self.edit_tiles_tab
+                with _Img.open('output/tiles.png') as f:
+                    et.tileset_img = f.copy()
+                    et.tileset_img_original = et.tileset_img
+                total = (et.tileset_img.width // 8) * (et.tileset_img.height // 8)
+                w = et.tiles_per_row if et.tiles_per_row > 0 else et.tileset_img.width // 8
+                et.render_tileset_with_padding(w, (total + w - 1) // w, total)
+            except Exception as e:
+                print(f"apply_move_color tiles error: {e}")
+
+        ep._save_and_update_all(skip_tiles=True)
+
+        if ep.palette_colors:
+            idx = ep.current_editing_index
+            idx = max(0, min(idx, len(ep.palette_colors) - 1))
+            r, g, b = ep.palette_colors[idx]
+            ep.color_editor.set_color(idx, r, g, b)
+            ep.draw_selection_rectangle(idx)
 
     def apply_tileset_reshape(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tileset_img_original:

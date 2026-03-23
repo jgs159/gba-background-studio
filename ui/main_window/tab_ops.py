@@ -118,6 +118,14 @@ def load_conversion_results(main_window):
                      main_window.edit_tiles_tab.cyclic_checkbox]:
             ctrl.setEnabled(True)
 
+        et = main_window.edit_tiles_tab
+        for cb in [et.flip_h_checkbox, et.flip_v_checkbox, et.cyclic_checkbox]:
+            cb.setChecked(False)
+        ep = main_window.edit_palettes_tab
+        for cb in ep._palette_op_btns:
+            cb.setChecked(False)
+        ep._on_palette_op_mode_changed()
+
         main_window.edit_palettes_tab.toggle_tilemap_controls_enabled(True)
         main_window.edit_palettes_tab.tilemap_width_spin.setValue(tilemap_width)
         main_window.edit_palettes_tab.tilemap_height_spin.setValue(tilemap_height)
