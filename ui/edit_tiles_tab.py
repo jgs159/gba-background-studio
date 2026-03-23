@@ -458,7 +458,7 @@ class EditTilesTab(TilemapUtils, QWidget):
             self.main_window.edit_palettes_tab.tilemap_data = self.tilemap_data
             self.main_window.edit_palettes_tab.update_single_tile_replica(tile_x, tile_y)
 
-    def update_single_tile_visual(self, tile_x, tile_y):
+    def update_single_tile_visual(self, tile_x, tile_y, sync_palettes=True):
         if not self.tileset_img or not self.tilemap_data:
             return
 
@@ -489,16 +489,19 @@ class EditTilesTab(TilemapUtils, QWidget):
         x = tile_x * 8
         y = tile_y * 8
 
-        for item in self.edit_tilemap_scene.items():
-            if isinstance(item, QGraphicsPixmapItem) and int(item.x()) == x and int(item.y()) == y:
-                self.edit_tilemap_scene.removeItem(item)
-                break
+        if not hasattr(self, '_tilemap_items'):
+            self._tilemap_items = {}
+
+        old = self._tilemap_items.get((tile_x, tile_y))
+        if old and old in self.edit_tilemap_scene.items():
+            self.edit_tilemap_scene.removeItem(old)
 
         tile_item = self.edit_tilemap_scene.addPixmap(pixmap)
         tile_item.setPos(x, y)
         tile_item.setZValue(0)
+        self._tilemap_items[(tile_x, tile_y)] = tile_item
 
-        if hasattr(self.main_window, 'edit_palettes_tab'):
+        if sync_palettes and hasattr(self.main_window, 'edit_palettes_tab'):
             self.main_window.edit_palettes_tab.tilemap_data = self.tilemap_data
             self.main_window.edit_palettes_tab.update_single_tile_replica(tile_x, tile_y)
 
@@ -526,6 +529,7 @@ class EditTilesTab(TilemapUtils, QWidget):
 
     def load_tilemap(self, tilemap_data, tileset_path, preview_path=None):
         self.tilemap_data = tilemap_data
+        self._tilemap_items = {}
         if tileset_path and os.path.exists(tileset_path):
             with PilImage.open(tileset_path) as f:
                 self.tileset_img = f.copy()
