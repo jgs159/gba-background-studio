@@ -307,6 +307,19 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.on_tilemap_hover(tile_x, tile_y)
         self.edit_palette_at(tile_x, tile_y)
 
+    def on_tilemap_release(self):
+        if not self.tilemap_data:
+            return
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(self.tilemap_data)
+        if self.main_window:
+            if hasattr(self.main_window, 'edit_tiles_tab'):
+                self.main_window.edit_tiles_tab.tilemap_data = self.tilemap_data
+            if hasattr(self.main_window, '_save_map_and_refresh'):
+                self.main_window._save_map_and_refresh()
+
     def on_tilemap_right_click(self, tile_x, tile_y):
         self.finalize_color_editing()
         if not self.tilemap_data:
@@ -382,10 +395,58 @@ class EditPalettesTab(TilemapUtils, QWidget):
             )
 
         self.update_palette_overlay_for_tile(tile_x, tile_y, self.selected_palette_id)
-        
+        self._repaint_tile_in_scene(tile_x, tile_y, self.selected_palette_id)
+
         if self.main_window and hasattr(self.main_window, 'edit_tiles_tab'):
             self.main_window.edit_tiles_tab.tilemap_data = self.tilemap_data
-            self.main_window.edit_tiles_tab.update_single_tile_visual(tile_x, tile_y)
+
+    def _repaint_tile_in_scene(self, tile_x, tile_y, palette_id):
+        if not self._pixmap_item:
+            return
+        et = getattr(self.main_window, 'edit_tiles_tab', None)
+        if not et or not et.tileset_img or not et.tilemap_data:
+            return
+
+        tile_index = tile_y * self.tilemap_width + tile_x
+        if tile_index >= len(et.tilemap_data) // 2:
+            return
+
+        entry = et.tilemap_data[tile_index * 2] | (et.tilemap_data[tile_index * 2 + 1] << 8)
+        tile_id  = entry & 0x3FF
+        h_flip   = bool(entry & (1 << 10))
+        v_flip   = bool(entry & (1 << 11))
+
+        import numpy as np
+        ts = et.tileset_img
+        tx = (tile_id % et.tiles_per_row) * 8
+        ty = (tile_id // et.tiles_per_row) * 8
+        if tx + 8 > ts.width or ty + 8 > ts.height:
+            return
+
+        tile_arr = np.array(ts)[ty:ty+8, tx:tx+8].copy()
+        if h_flip:
+            tile_arr = np.fliplr(tile_arr)
+        if v_flip:
+            tile_arr = np.flipud(tile_arr)
+
+        slot_start = palette_id * 16
+        slot_colors = self.palette_colors[slot_start:slot_start + 16]
+
+        from PySide6.QtGui import QImage, QPainter as _QPainter, QColor as _QColor
+        tile_img = QImage(8, 8, QImage.Format_RGB32)
+        for py in range(8):
+            for px in range(8):
+                idx = int(tile_arr[py, px]) % 16
+                r, g, b = slot_colors[idx]
+                tile_img.setPixel(px, py, _QColor(r, g, b).rgb())
+
+        tile_pixmap = QPixmap.fromImage(tile_img)
+
+        scene_pixmap = self._pixmap_item.pixmap()
+        painter = _QPainter(scene_pixmap)
+        painter.drawPixmap(tile_x * 8, tile_y * 8, tile_pixmap)
+        painter.end()
+        self._pixmap_item.setPixmap(scene_pixmap)
 
     def update_palette_overlay_for_tile(self, tile_x, tile_y, palette_id):
         x = tile_x * 8
@@ -419,6 +480,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
     def display_tilemap_replica(self, source_scene):
         self.edit_tilemap2_scene.clear()
         self.overlay_items.clear()
+        self._tilemap_items = {}
         
         if source_scene.items():
             item = source_scene.items()[0]
@@ -476,6 +538,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
         self.overlay_items.clear()
         self.edit_tilemap2_scene.clear()
+        self._tilemap_items = {}
 
         pixmap_item = None
         if source_scene.items():
