@@ -341,6 +341,21 @@ class GBABackgroundStudio(QMainWindow):
         if result:
             self.refresh_preview_display()
     
+    def _save_map_and_refresh(self):
+        import os
+        tilemap_data = getattr(self.edit_tiles_tab, 'tilemap_data', None)
+        if not tilemap_data:
+            return
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(tilemap_data)
+        from core.image_utils import create_gbagfx_preview
+        save_preview     = self.config_manager.getboolean('SETTINGS', 'save_preview_files',     False) if hasattr(self, 'config_manager') else False
+        keep_transparent = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False) if hasattr(self, 'config_manager') else False
+        result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+        if result:
+            self.refresh_preview_display()
+
     def apply_tile_change(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab') or not self.edit_tiles_tab.tilemap_data:
             return
@@ -388,6 +403,8 @@ class GBABackgroundStudio(QMainWindow):
                 self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
                 self.edit_palettes_tab.update_single_tile_replica(tile_x, tile_y)
 
+            self._save_map_and_refresh()
+
         finally:
             if hasattr(self, 'history_manager'):
                 self.history_manager.is_undoing = False
@@ -428,6 +445,8 @@ class GBABackgroundStudio(QMainWindow):
         if hasattr(self, 'edit_tiles_tab'):
             self.edit_tiles_tab.tilemap_data = self.edit_palettes_tab.tilemap_data
             self.edit_tiles_tab.update_single_tile_visual(tile_x, tile_y)
+
+        self._save_map_and_refresh()
 
     def sync_between_editors(self):
         if hasattr(self, 'edit_tiles_tab') and hasattr(self, 'edit_palettes_tab'):

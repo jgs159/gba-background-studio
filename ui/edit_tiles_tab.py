@@ -358,6 +358,15 @@ class EditTilesTab(TilemapUtils, QWidget):
         self.on_tilemap_hover(tile_x, tile_y)
         self.edit_tile_at(tile_x, tile_y)
 
+    def on_tilemap_release(self):
+        if not self.tilemap_data:
+            return
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(self.tilemap_data)
+        self._update_all_displays()
+
     def on_tilemap_right_click(self, tile_x, tile_y):
         if not self.tilemap_data:
             return

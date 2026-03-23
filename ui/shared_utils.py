@@ -7,10 +7,12 @@ class CustomGraphicsView(QGraphicsView):
         super().__init__(parent)
         self.setMouseTracking(True)
         self._is_drawing = False
+        self._had_drawing = False
         self.on_tile_drawing = None
         self.on_tile_selected = None
         self.on_tile_hover = None
         self.on_tile_leave = None
+        self.on_tile_release = None
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -23,6 +25,7 @@ class CustomGraphicsView(QGraphicsView):
                     tile_y = max(0, min(int(pos.y()) // 8, int(scene_rect.height()) // 8 - 1))
                     if self.on_tile_drawing:
                         self.on_tile_drawing(tile_x, tile_y)
+                        self._had_drawing = True
             event.accept()
         elif event.button() == Qt.RightButton:
             pos = self.mapToScene(event.pos())
@@ -60,6 +63,7 @@ class CustomGraphicsView(QGraphicsView):
 
         if self._is_drawing and (event.buttons() & Qt.LeftButton) and self.on_tile_drawing:
             self.on_tile_drawing(tile_x, tile_y)
+            self._had_drawing = True
             event.accept()
         else:
             event.accept()
@@ -73,6 +77,9 @@ class CustomGraphicsView(QGraphicsView):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._is_drawing = False
+            if self._had_drawing and self.on_tile_release:
+                self.on_tile_release()
+            self._had_drawing = False
         super().mouseReleaseEvent(event)
 
 
