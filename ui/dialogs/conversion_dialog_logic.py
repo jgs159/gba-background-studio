@@ -66,6 +66,34 @@ class ConversionDialogLogic:
             sender = self.sender()
             sender.setChecked(True)
 
+    def on_eyedropper_toggled(self, active):
+        from PySide6.QtCore import Qt
+        if active:
+            self.input_view.setCursor(Qt.CrossCursor)
+            self.input_view.mousePressEvent = self._eyedropper_pick
+        else:
+            self.input_view.setCursor(Qt.ArrowCursor)
+            self.input_view.mousePressEvent = self._default_input_press
+
+    def _eyedropper_pick(self, event):
+        from PySide6.QtCore import Qt
+        pos = self.input_view.mapToScene(event.pos())
+        items = self.input_scene.items(pos)
+        for item in items:
+            from PySide6.QtWidgets import QGraphicsPixmapItem
+            if isinstance(item, QGraphicsPixmapItem):
+                px = item.pixmap()
+                ix, iy = int(pos.x() - item.x()), int(pos.y() - item.y())
+                if 0 <= ix < px.width() and 0 <= iy < px.height():
+                    color = px.toImage().pixelColor(ix, iy)
+                    self.transparent_color.setText(f"{color.red()},{color.green()},{color.blue()}")
+                break
+        self.eyedropper_btn.setChecked(False)
+
+    def _default_input_press(self, event):
+        from PySide6.QtWidgets import QGraphicsView
+        QGraphicsView.mousePressEvent(self.input_view, event)
+
     def load_input_image(self):
         try:
             pil_img = PilImage.open(self.image_path).convert("RGBA")
@@ -77,6 +105,7 @@ class ConversionDialogLogic:
             self.input_view.resetTransform()
             self.input_view.scale(1.0, 1.0)
             self.input_view.centerOn(item)
+            self._default_input_press = self.input_view.mousePressEvent
         except Exception as e:
             print(f"Error loading input image: {e}")
 
