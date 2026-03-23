@@ -36,9 +36,100 @@ class TilemapUtils:
         self.update_status_bar(-1, -1)
 
     def on_tilemap_shift(self, direction):
+        if not self.tilemap_data:
+            return
+
+        w = self.tilemap_width
+        h = self.tilemap_height
         is_cyclic = self.cyclic_checkbox.isChecked()
-        # direction: 'up' | 'down' | 'left' | 'right'
-        pass
+        EMPTY = b'\x00\x00'
+        old_data = self.tilemap_data
+
+        if w > 32:
+            from core.final_assets import revert_gba_tilemap_reorganization
+            linear = bytearray(revert_gba_tilemap_reorganization(self.tilemap_data, w, h, w, h))
+        else:
+            linear = bytearray(self.tilemap_data)
+
+        def get(x, y):  return linear[(y * w + x) * 2 : (y * w + x) * 2 + 2]
+        def set_(x, y, v): linear[(y * w + x) * 2 : (y * w + x) * 2 + 2] = v
+
+        if direction == 'up':
+            first_row = [bytes(get(x, 0)) for x in range(w)]
+            for y in range(h - 1):
+                for x in range(w):
+                    set_(x, y, get(x, y + 1))
+            for x in range(w):
+                set_(x, h - 1, first_row[x] if is_cyclic else EMPTY)
+
+        elif direction == 'down':
+            last_row = [bytes(get(x, h - 1)) for x in range(w)]
+            for y in range(h - 1, 0, -1):
+                for x in range(w):
+                    set_(x, y, get(x, y - 1))
+            for x in range(w):
+                set_(x, 0, last_row[x] if is_cyclic else EMPTY)
+
+        elif direction == 'left':
+            first_col = [bytes(get(0, y)) for y in range(h)]
+            for x in range(w - 1):
+                for y in range(h):
+                    set_(x, y, get(x + 1, y))
+            for y in range(h):
+                set_(w - 1, y, first_col[y] if is_cyclic else EMPTY)
+
+        elif direction == 'right':
+            last_col = [bytes(get(w - 1, y)) for y in range(h)]
+            for x in range(w - 1, 0, -1):
+                for y in range(h):
+                    set_(x, y, get(x - 1, y))
+            for y in range(h):
+                set_(0, y, last_col[y] if is_cyclic else EMPTY)
+
+        if w > 32:
+            from core.final_assets import reorganize_tilemap_for_gba_bg
+            tile_list = []
+            for i in range(w * h):
+                entry = int.from_bytes(linear[i*2:i*2+2], 'little')
+                tile_list.append((entry & 0x3FF, (entry >> 10) & 1, (entry >> 11) & 1, (entry >> 12) & 0xF))
+            reorganized = reorganize_tilemap_for_gba_bg(tile_list, w * 8, h * 8)
+            final = bytearray()
+            for tile_id, hf, vf, pal in reorganized:
+                e = (tile_id & 0x3FF) | (hf << 10) | (vf << 11) | (pal << 12)
+                final.extend(e.to_bytes(2, 'little'))
+            new_data = bytes(final)
+        else:
+            new_data = bytes(linear)
+
+        self.tilemap_data = new_data
+
+        if hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='tilemap_shift',
+                editor_type='tiles',
+                data={'old_data': old_data, 'new_data': new_data, 'w': w, 'h': h},
+                description=f"Tilemap shifted {direction}"
+            )
+
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(new_data)
+
+        for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+            other = getattr(self.main_window, attr, None)
+            if other and other is not self:
+                other.tilemap_data = new_data
+
+        save_preview = keep_transparent = False
+        if hasattr(self.main_window, 'config_manager'):
+            save_preview     = self.main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
+            keep_transparent = self.main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
+
+        from core.image_utils import create_gbagfx_preview
+        result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+        if result and hasattr(self.main_window, 'refresh_preview_display'):
+            self.main_window.refresh_preview_display()
 
     def on_tilemap_resize(self):
         new_w = self.tilemap_width_spin.value()

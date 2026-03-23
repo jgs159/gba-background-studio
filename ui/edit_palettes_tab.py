@@ -444,18 +444,16 @@ class EditPalettesTab(TilemapUtils, QWidget):
         slot_start = palette_id * 16
         slot_colors = self.palette_colors[slot_start:slot_start + 16]
 
-        from PySide6.QtGui import QImage, QPainter as _QPainter, QColor as _QColor
-        tile_img = QImage(8, 8, QImage.Format_RGB32)
-        for py in range(8):
-            for px in range(8):
-                idx = int(tile_arr[py, px]) % 16
-                r, g, b = slot_colors[idx]
-                tile_img.setPixel(px, py, _QColor(r, g, b).rgb())
+        lut = np.array(slot_colors, dtype=np.uint8)
+        indices = (tile_arr % 16).astype(np.uint8)
+        rgb = lut[indices]
 
+        from PySide6.QtGui import QImage
+        tile_img = QImage(rgb.tobytes(), 8, 8, 8 * 3, QImage.Format_RGB888)
         tile_pixmap = QPixmap.fromImage(tile_img)
 
         scene_pixmap = self._pixmap_item.pixmap()
-        painter = _QPainter(scene_pixmap)
+        painter = QPainter(scene_pixmap)
         painter.drawPixmap(tile_x * 8, tile_y * 8, tile_pixmap)
         painter.end()
         self._pixmap_item.setPixmap(scene_pixmap)
@@ -463,15 +461,17 @@ class EditPalettesTab(TilemapUtils, QWidget):
     def update_palette_overlay_for_tile(self, tile_x, tile_y, palette_id):
         x = tile_x * 8
         y = tile_y * 8
-        
-        tile_key = (tile_x, tile_y)
-        if tile_key in self.overlay_items:
-            for item in self.overlay_items[tile_key]:
-                if item in self.edit_tilemap2_scene.items():
-                    self.edit_tilemap2_scene.removeItem(item)
-            del self.overlay_items[tile_key]
-        
         color = self.colors[palette_id]
+        tile_key = (tile_x, tile_y)
+
+        if tile_key in self.overlay_items:
+            rect_item, text_item = self.overlay_items[tile_key]
+            rect_item.setBrush(QBrush(color))
+            text_item.setPlainText(f"{palette_id:X}")
+            rect = text_item.boundingRect()
+            text_item.setPos(x + (8 - rect.width()) / 2, y + (8 - rect.height()) * 0.5)
+            return
+
         rect_item = self.edit_tilemap2_scene.addRect(x, y, 8, 8, QPen(Qt.NoPen), QBrush(color))
         rect_item.setZValue(1)
         rect_item.setOpacity(0.3)
@@ -480,11 +480,8 @@ class EditPalettesTab(TilemapUtils, QWidget):
         text_item = self.edit_tilemap2_scene.addText(f"{palette_id:X}")
         text_item.setFont(font)
         text_item.setDefaultTextColor(QColor(0, 0, 0))
-        
         rect = text_item.boundingRect()
-        cx = x + (8 - rect.width()) / 2
-        cy = y + (8 - rect.height()) * 0.5
-        text_item.setPos(cx, cy)
+        text_item.setPos(x + (8 - rect.width()) / 2, y + (8 - rect.height()) * 0.5)
         text_item.setZValue(2)
 
         self.overlay_items[tile_key] = [rect_item, text_item]
@@ -582,41 +579,21 @@ class EditPalettesTab(TilemapUtils, QWidget):
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
 
     def update_single_tile_replica(self, tile_x, tile_y):
-        if not hasattr(self, 'main_window') or not hasattr(self.main_window, 'edit_tiles_tab'):
+        if not self._pixmap_item:
             return
-            
-        source_scene = self.main_window.edit_tiles_tab.edit_tilemap_scene
-        x_pos = tile_x * 8
-        y_pos = tile_y * 8
-        
-        new_pixmap = None
-        for item in source_scene.items():
-            if isinstance(item, QGraphicsPixmapItem):
-                if int(item.x()) == x_pos and int(item.y()) == y_pos:
-                    new_pixmap = item.pixmap()
-                    break
-        
-        if not new_pixmap:
+        et = getattr(self.main_window, 'edit_tiles_tab', None)
+        if not et or not et.tileset_img or not et.tilemap_data:
             return
-        
-        for item in self.edit_tilemap2_scene.items():
-            if (isinstance(item, QGraphicsPixmapItem) and 
-                int(item.x()) == x_pos and 
-                int(item.y()) == y_pos and
-                item.zValue() == 0):
-                self.edit_tilemap2_scene.removeItem(item)
-                break
-        
-        pixmap_item = self.edit_tilemap2_scene.addPixmap(new_pixmap)
-        pixmap_item.setPos(x_pos, y_pos)
-        pixmap_item.setZValue(0)
 
-        if hasattr(self, 'tilemap_data') and self.tilemap_data:
-            tile_index = self._tilemap_index(tile_x, tile_y)
-            if tile_index < len(self.tilemap_data) // 2:
-                entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-                palette_id = (entry >> 12) & 0xF
-                self.update_palette_overlay_for_tile(tile_x, tile_y, palette_id)
+        tile_index = self._tilemap_index(tile_x, tile_y)
+        if tile_index >= len(et.tilemap_data) // 2:
+            return
+
+        entry = et.tilemap_data[tile_index * 2] | (et.tilemap_data[tile_index * 2 + 1] << 8)
+        palette_id = (entry >> 12) & 0xF
+
+        self._repaint_tile_in_scene(tile_x, tile_y, palette_id)
+        self.update_palette_overlay_for_tile(tile_x, tile_y, palette_id)
 
     def apply_zoom(self, factor):
         self.grid_view.set_zoom_factor(factor)

@@ -63,7 +63,9 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
         map_path = os.path.join(output_dir, "map.bin")
 
         if not os.path.exists(tiles_path) or not os.path.exists(map_path):
-            print(translator.tr("error_preview_missing_files"))
+            from core.app_mode import is_gui_mode
+            if not is_gui_mode():
+                print(translator.tr("error_preview_missing_files"))
             return None
 
         config = ConfigManager()
@@ -109,7 +111,9 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
 
         with Image.open(tiles_path) as tiles_img:
             if tiles_img.mode != 'P':
-                print(translator.tr("error_tiles_not_indexed"))
+                from core.app_mode import is_gui_mode
+                if not is_gui_mode():
+                    print(translator.tr("error_tiles_not_indexed"))
                 return None
             tileset_data = np.array(tiles_img)
             ts_width_px, ts_height_px = tiles_img.size
@@ -194,7 +198,9 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
             copy2(preview_path, os.path.join(output_dir, "preview_image.png"))
             copy2(pal_output, os.path.join(output_dir, "preview_palette.pal"))
 
-        print(translator.tr("preview_generated"))
+        from core.app_mode import is_gui_mode
+        if not is_gui_mode():
+            print(translator.tr("preview_generated"))
         return preview_path
 
     except Exception as e:
