@@ -11,6 +11,10 @@ class TilemapUtils:
         self.tilemap_view.on_tile_selected = self.on_tilemap_right_click
         self.tilemap_view.on_tile_hover    = self.on_tilemap_hover
         self.tilemap_view.on_tile_leave    = self.on_tilemap_leave
+        self.tilemap_view.on_tile_release  = self.on_tilemap_release
+
+    def on_tilemap_release(self):
+        pass
 
     def on_tilemap_hover(self, tile_x, tile_y):
         scene_rect  = self.tilemap_scene.sceneRect()
