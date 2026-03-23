@@ -1,6 +1,6 @@
 # ui/shared_utils.py
-from PySide6.QtWidgets import QGraphicsView
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QGraphicsView, QRubberBand
+from PySide6.QtCore import Qt, QRect, QPoint, QSize
 
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, parent=None):
@@ -13,8 +13,40 @@ class CustomGraphicsView(QGraphicsView):
         self.on_tile_hover = None
         self.on_tile_leave = None
         self.on_tile_release = None
+        self.selection_mode = False
+        self.on_selection_complete = None
+        self.on_selection_hover = None
+        self._sel_origin = None
+        self._rubber_band = None
+
+    def _scene_tile(self, pos):
+        scene_rect = self.scene().sceneRect()
+        tx = max(0, min(int(pos.x()) // 8, int(scene_rect.width())  // 8 - 1))
+        ty = max(0, min(int(pos.y()) // 8, int(scene_rect.height()) // 8 - 1))
+        return tx, ty
+
+    def _tile_to_viewport(self, tx, ty):
+        scene_p1 = self.mapFromScene(tx * 8, ty * 8)
+        scene_p2 = self.mapFromScene((tx + 1) * 8, (ty + 1) * 8)
+        return scene_p1, scene_p2
 
     def mousePressEvent(self, event):
+        if self.selection_mode and event.button() == Qt.LeftButton:
+            scene_pos = self.mapToScene(event.pos())
+            if self.scene() and self.scene().sceneRect().isValid():
+                tx, ty = self._scene_tile(scene_pos)
+                self._sel_tile_origin = (tx, ty)
+                snapped = self.mapFromScene(tx * 8, ty * 8)
+                self._sel_origin = snapped
+            else:
+                self._sel_origin = event.pos()
+                self._sel_tile_origin = None
+            if not self._rubber_band:
+                self._rubber_band = QRubberBand(QRubberBand.Rectangle, self)
+            self._rubber_band.setGeometry(QRect(self._sel_origin, QSize()))
+            self._rubber_band.show()
+            event.accept()
+            return
         if event.button() == Qt.LeftButton:
             self._is_drawing = True
             pos = self.mapToScene(event.pos())
@@ -41,6 +73,21 @@ class CustomGraphicsView(QGraphicsView):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self.selection_mode and self._sel_origin is not None and self._rubber_band:
+            scene_pos = self.mapToScene(event.pos())
+            if self.scene() and self.scene().sceneRect().isValid():
+                tx2, ty2 = self._scene_tile(scene_pos)
+                snapped_end = self.mapFromScene((tx2 + 1) * 8, (ty2 + 1) * 8)
+                self._rubber_band.setGeometry(QRect(self._sel_origin, snapped_end).normalized())
+                if self.on_selection_hover and hasattr(self, '_sel_tile_origin') and self._sel_tile_origin:
+                    ox, oy = self._sel_tile_origin
+                    x1, x2 = min(ox, tx2), max(ox, tx2)
+                    y1, y2 = min(oy, ty2), max(oy, ty2)
+                    self.on_selection_hover(x1, y1, x2, y2)
+            else:
+                self._rubber_band.setGeometry(QRect(self._sel_origin, event.pos()).normalized())
+            event.accept()
+            return
         pos = self.mapToScene(event.pos())
         if not self.scene() or not pos or not self.scene().sceneRect().isValid():
             if self.on_tile_leave:
@@ -69,18 +116,33 @@ class CustomGraphicsView(QGraphicsView):
             event.accept()
             super().mouseMoveEvent(event)
 
-    def leaveEvent(self, event):
-        if self.on_tile_leave:
-            self.on_tile_leave()
-        super().leaveEvent(event)
-
     def mouseReleaseEvent(self, event):
+        if self.selection_mode and event.button() == Qt.LeftButton and self._sel_origin is not None:
+            if self._rubber_band:
+                self._rubber_band.hide()
+            scene_p2 = self.mapToScene(event.pos())
+            if self.scene() and self.scene().sceneRect().isValid() and hasattr(self, '_sel_tile_origin') and self._sel_tile_origin:
+                ox, oy = self._sel_tile_origin
+                tx2, ty2 = self._scene_tile(scene_p2)
+                x1, x2 = min(ox, tx2), max(ox, tx2)
+                y1, y2 = min(oy, ty2), max(oy, ty2)
+                if self.on_selection_complete:
+                    self.on_selection_complete(x1, y1, x2, y2)
+            self._sel_origin = None
+            self._sel_tile_origin = None
+            event.accept()
+            return
         if event.button() == Qt.LeftButton:
             self._is_drawing = False
             if self._had_drawing and self.on_tile_release:
                 self.on_tile_release()
             self._had_drawing = False
         super().mouseReleaseEvent(event)
+
+    def leaveEvent(self, event):
+        if self.on_tile_leave:
+            self.on_tile_leave()
+        super().leaveEvent(event)
 
 
 def update_status_bar_shared(main_window, selection_type, selection_id, tile_x, tile_y, 

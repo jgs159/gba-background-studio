@@ -173,6 +173,7 @@ def load_conversion_results(main_window):
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
+    main_window.menu_bar.action_save_selection.setEnabled(True)
     main_window.menu_bar.action_save_palette.setEnabled(True)
 
     main_window.tileset_from_conversion = True
