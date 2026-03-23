@@ -72,8 +72,8 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
         tilemap_width = int(config.get('CONVERSION', 'tilemap_width', '32'))
         tilemap_height = int(config.get('CONVERSION', 'tilemap_height', '32'))
 
-        tc_str = config.get('CONVERSION', 'transparent_color', '0,0,0')
-        transparent_color = tuple(map(int, tc_str.split(',')))
+        tc_str = config.get('CONVERSION', 'transparent_color', '0,0,0').strip()
+        transparent_color = tuple(map(int, tc_str.split(','))) if tc_str else (0, 0, 0)
 
         palette_rgb = [(0, 0, 0)] * 256
         pal_files = sorted(f for f in os.listdir(output_dir)

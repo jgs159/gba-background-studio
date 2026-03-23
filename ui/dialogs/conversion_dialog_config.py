@@ -76,10 +76,10 @@ class ConversionDialogConfig:
                 selected_palettes = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
                 config.set('CONVERSION', 'selected_palettes', ','.join(map(str, selected_palettes)))
             
-            config.set('CONVERSION', 'transparent_color', self.transparent_color.text())
+            config.set('CONVERSION', 'transparent_color', self.transparent_color.text().strip() or '0,0,0')
             config.set('CONVERSION', 'extra_transparent', str(self.extra_transparent.value()))
             config.set('CONVERSION', 'tileset_width', str(self.tileset_width.value()))
-            config.set('CONVERSION', 'origin', self.origin.text())
+            config.set('CONVERSION', 'origin', self.origin.text().strip() or '0,0')
             
             config.set('CONVERSION', 'output_size', self.output_combo.currentText())
             config.set('CONVERSION', 'custom_width', str(self.custom_width.value()))
