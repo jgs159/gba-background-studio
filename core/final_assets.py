@@ -191,7 +191,9 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
                 for r, g, b in slot_palette:
                     f.write(f"{r} {g} {b}\n")
 
-    print(translator.tr("palette_saved"))
+    from core.app_mode import is_gui_mode
+    if not is_gui_mode():
+        print(translator.tr("palette_saved"))
 
     # === Save tilemap.bin ===
     map_path = os.path.join(output_dir, "map.bin")
@@ -204,7 +206,8 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
             entry |= (int(real_pal_idx) << 12)
             f.write(entry.to_bytes(2, 'little'))
     
-    print(translator.tr("tilemap_saved"))
+    if not is_gui_mode():
+        print(translator.tr("tilemap_saved"))
 
     # === Generate tiles.png ===
     n = total_tiles
@@ -301,11 +304,12 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
 
     # === Final message ===
     real_unique = total_tiles - extra_transparent_tiles
-    if extra_transparent_tiles > 0:
-        print(translator.tr("process_completed_extra", real=real_unique, extra=extra_transparent_tiles, total=total_tiles))
-        print(translator.tr("note_transparency"))
-    else:
-        print(translator.tr("process_completed", n=total_tiles))
+    if not is_gui_mode():
+        if extra_transparent_tiles > 0:
+            print(translator.tr("process_completed_extra", real=real_unique, extra=extra_transparent_tiles, total=total_tiles))
+            print(translator.tr("note_transparency"))
+        else:
+            print(translator.tr("process_completed", n=total_tiles))
 
     counts = {}
     for _x, _y, _z, real_pal_idx in tile_map:
@@ -315,7 +319,8 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     filtered_counts = {k: v for k, v in counts.items() if k in selected_palettes}
     sorted_counts = dict(sorted(filtered_counts.items()))
     
-    print(translator.tr("local_palette_usage", counts=sorted_counts))
+    if not is_gui_mode():
+        print(translator.tr("local_palette_usage", counts=sorted_counts))
 
 def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent_tiles=0, tile_width=None):
     img_w, img_h = img.size
@@ -323,7 +328,9 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
     n_tiles = len(tiles)
 
     # === 1. Save final palette ===
-    print(translator.tr("extracting_palettes"), flush=True)
+    from core.app_mode import is_gui_mode
+    if not is_gui_mode():
+        print(translator.tr("extracting_palettes"), flush=True)
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
     pal_filename = f"palette_{start_index:03d}.pal"
@@ -348,10 +355,12 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
         for r, g, b in saved_palette:
             f.write(f"{int(r)} {int(g)} {int(b)}\n")
 
-    print(translator.tr("palette_saved"))
+    if not is_gui_mode():
+        print(translator.tr("palette_saved"))
 
     # === 2. Detection of unique tiles with H/V flip ===
-    print(translator.tr("generating_assets"), flush=True)
+    if not is_gui_mode():
+        print(translator.tr("generating_assets"), flush=True)
     unique_tiles = []
     tile_map = {}
     seen = {}
@@ -408,7 +417,8 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
             if vflip: entry |= (1 << 11)
             entry |= (pal_idx << 12)
             f.write(entry.to_bytes(2, 'little'))
-    print(translator.tr("tilemap_saved"))
+    if not is_gui_mode():
+        print(translator.tr("tilemap_saved"))
 
     # === 4. Generate tiles.png ===
     n = total_tiles
@@ -467,7 +477,8 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
 
     # === Final message ===
     real_unique = total_tiles - extra_transparent_tiles
-    if extra_transparent_tiles > 0:
-        print(translator.tr("process_completed_extra", real=real_unique, extra=extra_transparent_tiles, total=total_tiles))
-    else:
-        print(translator.tr("process_completed", n=total_tiles))
+    if not is_gui_mode():
+        if extra_transparent_tiles > 0:
+            print(translator.tr("process_completed_extra", real=real_unique, extra=extra_transparent_tiles, total=total_tiles))
+        else:
+            print(translator.tr("process_completed", n=total_tiles))

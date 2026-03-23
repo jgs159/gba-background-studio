@@ -463,7 +463,7 @@ class EditTilesTab(TilemapUtils, QWidget):
                 description=f"Tile changed at ({tile_x}, {tile_y}) with flips"
             )
 
-        self.update_single_tile_visual(tile_x, tile_y)
+        self.update_single_tile_visual(tile_x, tile_y, sync_palettes=False)
 
         if self.main_window and hasattr(self.main_window, 'edit_palettes_tab'):
             self.main_window.edit_palettes_tab.tilemap_data = self.tilemap_data

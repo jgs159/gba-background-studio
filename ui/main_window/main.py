@@ -19,6 +19,8 @@ from ..history_manager import HistoryManager
 class GBABackgroundStudio(QMainWindow):
     def __init__(self):
         super().__init__()
+        from core.app_mode import set_gui_mode
+        set_gui_mode(True)
         self.config_manager = ConfigManager()
 
         self.current_bpp = 4
@@ -271,6 +273,8 @@ class GBABackgroundStudio(QMainWindow):
                 
             elif state['type'] == 'tilemap_resize':
                 self.apply_tilemap_resize(state, is_undo)
+            elif state['type'] == 'tilemap_shift':
+                self.apply_tilemap_shift(state, is_undo)
             elif state['type'] == 'tileset_reshape':
                 self.apply_tileset_reshape(state, is_undo)
         except Exception as e:
@@ -296,6 +300,25 @@ class GBABackgroundStudio(QMainWindow):
 
         if self.edit_tiles_tab.tileset_img:
             self.edit_tiles_tab.tileset_img.save("output/tiles.png")
+
+    def apply_tilemap_shift(self, state, is_undo):
+        data = state['data']
+        new_data = data['old_data'] if is_undo else data['new_data']
+
+        self.edit_tiles_tab.tilemap_data = new_data
+        self.edit_palettes_tab.tilemap_data = new_data
+
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(new_data)
+
+        from core.image_utils import create_gbagfx_preview
+        save_preview     = self.config_manager.getboolean('SETTINGS', 'save_preview_files',     False) if hasattr(self, 'config_manager') else False
+        keep_transparent = self.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False) if hasattr(self, 'config_manager') else False
+        result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+        if result:
+            self.refresh_preview_display()
 
     def apply_tilemap_resize(self, state, is_undo):
         if not hasattr(self, 'edit_tiles_tab'):
