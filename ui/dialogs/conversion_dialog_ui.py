@@ -203,9 +203,25 @@ class ConversionDialogUI:
         self.palette_size.valueChanged.connect(self.update_8bpp_size)
 
     def create_general_params(self, form_layout):
+        tc_layout = QHBoxLayout()
+        tc_layout.setContentsMargins(0, 0, 0, 0)
+        tc_layout.setSpacing(4)
         self.transparent_color = QLineEdit("0,0,0")
         self.transparent_color.setPlaceholderText("R,G,B (0-255)")
-        form_layout.addRow("Transparent Color:", self.transparent_color)
+        self.eyedropper_btn = QPushButton("🔍")
+        self.eyedropper_btn.setFixedSize(24, 24)
+        self.eyedropper_btn.setCheckable(True)
+        self.eyedropper_btn.setToolTip("Pick transparent color from image")
+        self.eyedropper_btn.setStyleSheet(
+            "QPushButton { font-size: 12px; padding: 0; }"
+            "QPushButton:checked { background: #aad4f5; border: 1px solid #3399cc; }"
+        )
+        self.eyedropper_btn.toggled.connect(self.on_eyedropper_toggled)
+        tc_layout.addWidget(self.transparent_color)
+        tc_layout.addWidget(self.eyedropper_btn)
+        tc_widget = QWidget()
+        tc_widget.setLayout(tc_layout)
+        form_layout.addRow("Transparent Color:", tc_widget)
 
         self.extra_transparent = QSpinBox()
         self.extra_transparent.setRange(0, 10)
