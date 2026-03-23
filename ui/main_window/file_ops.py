@@ -140,7 +140,7 @@ def load_last_output_files(main_window):
             tilemap_data = f.read()
         main_window.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path if os.path.exists(preview_path) else None)
         main_window.menu_bar.action_save_tilemap.setEnabled(True)
-        main_window.menu_bar.action_save_selection.setEnabled(False)
+        main_window.menu_bar.action_save_selection.setEnabled(True)
 
         if hasattr(main_window, 'history_manager'):
             main_window.history_manager.clear()
@@ -360,6 +360,7 @@ def _reset_tilemap(main_window):
         ep.overlay_items.clear()
 
     main_window.menu_bar.action_save_tilemap.setEnabled(False)
+    main_window.menu_bar.action_save_selection.setEnabled(False)
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
 
@@ -528,7 +529,6 @@ def open_tilemap(main_window):
 
     w, h, bpp = dlg.get_values()
 
-    # Validate max tile index against loaded tileset
     tiles_path = "output/tiles.png"
     if os.path.exists(tiles_path):
         try:
@@ -602,6 +602,7 @@ def open_tilemap(main_window):
         apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
 
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
+    main_window.menu_bar.action_save_selection.setEnabled(True)
     main_window.sync_palettes_tab()
 
     if hasattr(main_window, 'history_manager'):
@@ -669,6 +670,7 @@ def new_tilemap(main_window):
     main_window.edit_tiles_tab.tilemap_width_spin.setValue(w)
     main_window.edit_tiles_tab.tilemap_height_spin.setValue(h)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
+    main_window.menu_bar.action_save_selection.setEnabled(True)
 
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
@@ -681,10 +683,143 @@ def new_tilemap(main_window):
         main_window.refresh_preview_display()
 
 def save_tilemap(main_window):
-    pass
+    from ui.dialogs.save_tilemap_dialog import SaveTilemapDialog
+
+    source_path = os.path.join('output', 'map.bin')
+    if not os.path.exists(source_path):
+        QMessageBox.information(main_window, "Save Tilemap", "No tilemap to save.")
+        return
+
+    dlg = SaveTilemapDialog(main_window)
+    if dlg.exec() != QDialog.Accepted:
+        return
+
+    bpp = dlg.get_values()
+
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
+    main_window.current_bpp = bpp
+
+    target_path, _ = QFileDialog.getSaveFileName(
+        main_window, "Save Tilemap", "map", "Binary Files (*.bin);;All Files (*)"
+    )
+    if not target_path:
+        return
+
+    try:
+        shutil.copy2(source_path, target_path)
+        QMessageBox.information(main_window, "Save Tilemap",
+                                f"Tilemap saved to:\n{target_path}")
+    except Exception as e:
+        QMessageBox.warning(main_window, "Save Tilemap",
+                            f"Error saving tilemap:\n{e}")
 
 def save_selection(main_window):
-    pass
+    from ui.dialogs.save_tilemap_dialog import SaveTilemapDialog
+
+    et = main_window.edit_tiles_tab
+    ep = main_window.edit_palettes_tab
+
+    if not getattr(et, 'tilemap_data', None):
+        QMessageBox.information(main_window, "Save Selection", "No tilemap loaded.")
+        return
+
+    current_tab = main_window.main_tabs.currentIndex()
+    if current_tab == 2:
+        active_view = ep.edit_tilemap2_view
+    else:
+        active_view = et.edit_tilemap_view
+
+    QMessageBox.information(
+        main_window, "Save Selection",
+        "Drag to select an area on the tilemap, then release to confirm."
+    )
+
+    _pending = {'done': False}
+
+    def on_selection(x1, y1, x2, y2):
+        if _pending['done']:
+            return
+        _pending['done'] = True
+        _disable_selection_mode()
+
+        sel_w = x2 - x1 + 1
+        sel_h = y2 - y1 + 1
+
+        reply = QMessageBox.question(
+            main_window, "Save Selection",
+            f"Save selection of {sel_w}×{sel_h} tiles ({sel_w*8}×{sel_h*8} px)?\n"
+            f"Top-left: ({x1}, {y1})  Bottom-right: ({x2}, {y2})",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        dlg = SaveTilemapDialog(main_window)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        bpp = dlg.get_values()
+
+        tilemap_data = et.tilemap_data
+        tilemap_w    = et.tilemap_width
+
+        def tilemap_index(tx, ty):
+            if tilemap_w <= 32:
+                return ty * tilemap_w + tx
+            bx, by = tx // 32, ty // 32
+            bxs = tilemap_w // 32
+            return (by * bxs + bx) * 1024 + (ty % 32) * 32 + (tx % 32)
+
+        sel_data = bytearray()
+        for row in range(y1, y2 + 1):
+            for col in range(x1, x2 + 1):
+                idx = tilemap_index(col, row)
+                if idx * 2 + 1 < len(tilemap_data):
+                    sel_data.extend(tilemap_data[idx*2:idx*2+2])
+                else:
+                    sel_data.extend(b'\x00\x00')
+
+        target_path, _ = QFileDialog.getSaveFileName(
+            main_window, "Save Selection", "selection", "Binary Files (*.bin);;All Files (*)"
+        )
+        if not target_path:
+            return
+
+        try:
+            with open(target_path, 'wb') as f:
+                f.write(sel_data)
+            if hasattr(main_window, 'config_manager'):
+                main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
+            main_window.current_bpp = bpp
+            QMessageBox.information(main_window, "Save Selection",
+                                    f"Selection saved to:\n{target_path}")
+        except Exception as e:
+            QMessageBox.warning(main_window, "Save Selection", f"Error saving:\n{e}")
+
+    def _disable_selection_mode():
+        for view in (et.edit_tilemap_view, ep.edit_tilemap2_view):
+            view.selection_mode = False
+            view.on_selection_complete = None
+            view.on_selection_hover = None
+            view.setCursor(Qt.ArrowCursor)
+        if hasattr(main_window, 'custom_status_bar'):
+            zoom = int(main_window.zoom_level) if hasattr(main_window, 'zoom_level') else 100
+            main_window.custom_status_bar.restore_default_status(zoom_level=zoom)
+
+    from PySide6.QtCore import Qt
+
+    def _on_hover(x1, y1, x2, y2):
+        if hasattr(main_window, 'custom_status_bar'):
+            zoom = int(main_window.zoom_level) if hasattr(main_window, 'zoom_level') else 100
+            main_window.custom_status_bar.update_selection_status(x1, y1, x2, y2, zoom_level=zoom)
+
+    for view in (et.edit_tilemap_view, ep.edit_tilemap2_view):
+        view.selection_mode = True
+        view.on_selection_complete = on_selection
+        view.on_selection_hover = _on_hover
+        view.setCursor(Qt.CrossCursor)
+
+    main_window.main_tabs.setCurrentIndex(current_tab if current_tab in (1, 2) else 1)
 
 def open_palette(main_window):
     from PySide6.QtWidgets import QFileDialog, QMessageBox

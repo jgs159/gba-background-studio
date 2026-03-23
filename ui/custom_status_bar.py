@@ -44,3 +44,22 @@ class CustomStatusBar(QWidget):
         self.palette_label.setText(f"Palette: {palette_id}")
         self.flip_label.setText(f"Flip: {flip_state}")
         self.zoom_label.setText(f"Zoom: {zoom_level}%")
+
+    def update_selection_status(self, x1, y1, x2, y2, zoom_level=None):
+        w = x2 - x1 + 1
+        h = y2 - y1 + 1
+        self.selection_label.setText(f"Origin: ({x1}, {y1})")
+        self.tilemap_label.setText(f"End: ({x2}, {y2})")
+        self.tile_label.setText(f"Width: {w} tiles")
+        self.palette_label.setText(f"Height: {h} tiles")
+        self.flip_label.setText(f"Size: {w*8}×{h*8} px")
+        if zoom_level is not None:
+            self.zoom_label.setText(f"Zoom: {zoom_level}%")
+
+    def restore_default_status(self, zoom_level=100):
+        self.selection_label.setText("Tile Selected: -")
+        self.tilemap_label.setText("Tilemap: (-, -)")
+        self.tile_label.setText("Tile: -")
+        self.palette_label.setText("Palette: -")
+        self.flip_label.setText("Flip: None")
+        self.zoom_label.setText(f"Zoom: {zoom_level}%")
