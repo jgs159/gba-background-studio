@@ -16,7 +16,7 @@ def get_conversion_parameters(
     else:
         output_size_str = output_size.split()[0].lower()
 
-    trans_rgb = tuple(map(int, transparent_color.split(',')))
+    trans_rgb = tuple(map(int, transparent_color.split(','))) if transparent_color.strip() else (0, 0, 0)
 
     if is_8bpp:
         if start_index < 0 or start_index > 255:

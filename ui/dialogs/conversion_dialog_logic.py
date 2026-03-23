@@ -151,12 +151,28 @@ class ConversionDialogLogic:
 
         tc_text = self.transparent_color.text().strip()
         try:
-            tc = tuple(map(int, tc_text.split(',')))
+            tc = tuple(map(int, tc_text.split(','))) if tc_text else (0, 0, 0)
             if len(tc) != 3 or not all(0 <= c <= 255 for c in tc):
                 raise ValueError
         except:
             QMessageBox.critical(self, "Error", "Invalid transparent color. Use 'R,G,B' with values 0-255.")
             return
+
+        origin_text = self.origin.text().strip()
+        if origin_text and origin_text != "0,0":
+            try:
+                parts = origin_text.split(",")
+                if len(parts) != 2:
+                    raise ValueError
+                for p in parts:
+                    p = p.strip()
+                    if p.endswith('t'):
+                        int(p[:-1])
+                    else:
+                        int(p)
+            except:
+                QMessageBox.critical(self, "Error", "Invalid origin. Use 'x,y' or 'xt,yt' (e.g. '10,20' or '1t,2t').")
+                return
 
         tilemap_path = None
         palettes_to_use = []
