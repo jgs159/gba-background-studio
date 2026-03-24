@@ -4,8 +4,9 @@ from PySide6.QtCore import Qt
 
 
 class CustomStatusBar(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, translator=None, parent=None):
         super().__init__(parent)
+        self.tr = translator.tr if translator else lambda k, **kw: k
         self.setFixedHeight(24)
         self.setStyleSheet("""
             background: #f0f0f0; 
@@ -18,12 +19,12 @@ class CustomStatusBar(QWidget):
         layout.setContentsMargins(8, 2, 8, 2)
         layout.setSpacing(12)
         
-        self.selection_label = QLabel("Tile Selected: 0")
-        self.tilemap_label = QLabel("Tilemap: (0, 0)")
-        self.tile_label = QLabel("Tile: 0")
-        self.palette_label = QLabel("Palette: 0")
-        self.flip_label = QLabel("Flip: None")
-        self.zoom_label = QLabel("Zoom: 100%")
+        self.selection_label = QLabel(self.tr("status_selected", type="Tile", id="0"))
+        self.tilemap_label = QLabel(self.tr("status_tilemap", pos="(0, 0)"))
+        self.tile_label = QLabel(self.tr("status_tile", id="0"))
+        self.palette_label = QLabel(self.tr("status_palette", id="0"))
+        self.flip_label = QLabel(self.tr("status_flip", state="None"))
+        self.zoom_label = QLabel(self.tr("zoom_level", level=100))
         
         layout.addWidget(self.selection_label)
         layout.addWidget(self.tilemap_label)
@@ -33,17 +34,17 @@ class CustomStatusBar(QWidget):
         layout.addWidget(self.zoom_label)
         layout.addStretch()
         
-    def update_status(self, selection_type="Tile", selection_id="-", tilemap_pos=(-1, -1), 
+    def update_status(self, selection_type="Tile", selection_id="-", tilemap_pos=(-1, -1),
                      tile_id="-", palette_id="-", flip_state="None", zoom_level=100):
-        self.selection_label.setText(f"{selection_type} Selected: {selection_id}")
-        
+        self.selection_label.setText(self.tr("status_selected", type=selection_type, id=selection_id))
+
         tilemap_display = f"({tilemap_pos[0]}, {tilemap_pos[1]})" if tilemap_pos != (-1, -1) else "(-, -)"
-        self.tilemap_label.setText(f"Tilemap: {tilemap_display}")
-        
-        self.tile_label.setText(f"Tile: {tile_id}")
-        self.palette_label.setText(f"Palette: {palette_id}")
-        self.flip_label.setText(f"Flip: {flip_state}")
-        self.zoom_label.setText(f"Zoom: {zoom_level}%")
+        self.tilemap_label.setText(self.tr("status_tilemap", pos=tilemap_display))
+
+        self.tile_label.setText(self.tr("status_tile", id=tile_id))
+        self.palette_label.setText(self.tr("status_palette", id=palette_id))
+        self.flip_label.setText(self.tr("status_flip", state=flip_state))
+        self.zoom_label.setText(self.tr("zoom_level", level=zoom_level))
 
     def update_selection_status(self, x1, y1, x2, y2, zoom_level=None):
         w = x2 - x1 + 1
@@ -52,14 +53,14 @@ class CustomStatusBar(QWidget):
         self.tilemap_label.setText(f"End: ({x2}, {y2})")
         self.tile_label.setText(f"Width: {w} tiles")
         self.palette_label.setText(f"Height: {h} tiles")
-        self.flip_label.setText(f"Size: {w*8}×{h*8} px")
+        self.flip_label.setText(f"Size: {w*8}\u00d7{h*8} px")
         if zoom_level is not None:
-            self.zoom_label.setText(f"Zoom: {zoom_level}%")
+            self.zoom_label.setText(self.tr("zoom_level", level=zoom_level))
 
     def restore_default_status(self, zoom_level=100):
-        self.selection_label.setText("Tile Selected: -")
-        self.tilemap_label.setText("Tilemap: (-, -)")
-        self.tile_label.setText("Tile: -")
-        self.palette_label.setText("Palette: -")
-        self.flip_label.setText("Flip: None")
-        self.zoom_label.setText(f"Zoom: {zoom_level}%")
+        self.selection_label.setText(self.tr("status_selected", type="Tile", id="-"))
+        self.tilemap_label.setText(self.tr("status_tilemap", pos="(-, -)"))
+        self.tile_label.setText(self.tr("status_tile", id="-"))
+        self.palette_label.setText(self.tr("status_palette", id="-"))
+        self.flip_label.setText(self.tr("status_flip", state="None"))
+        self.zoom_label.setText(self.tr("zoom_level", level=zoom_level))

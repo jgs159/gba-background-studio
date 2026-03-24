@@ -58,17 +58,10 @@ def sync_palettes_tab(main_window):
             ep.display_palette_colors(colors_copy, enable_editor=editor_enabled)
 
         if hasattr(main_window, 'edit_tiles_tab') and hasattr(main_window.edit_tiles_tab, 'edit_tilemap_scene'):
-            main_window.edit_palettes_tab.display_tilemap_replica(main_window.edit_tiles_tab.edit_tilemap_scene)
-            main_window.edit_palettes_tab.update_palette_overlay(
-                main_window.edit_tiles_tab.edit_tilemap_scene,
-                main_window.edit_tiles_tab.tilemap_data,
-                main_window.edit_tiles_tab.tilemap_width,
-                main_window.edit_tiles_tab.tilemap_height
-            )
-            
             main_window.edit_palettes_tab.tilemap_data = main_window.edit_tiles_tab.tilemap_data
             main_window.edit_palettes_tab.tilemap_width = main_window.edit_tiles_tab.tilemap_width
             main_window.edit_palettes_tab.tilemap_height = main_window.edit_tiles_tab.tilemap_height
+            main_window.edit_palettes_tab.display_tilemap_replica(main_window.edit_tiles_tab.edit_tilemap_scene)
         
         if grid_was_visible:
             main_window.grid_manager.set_grid_visible(True)

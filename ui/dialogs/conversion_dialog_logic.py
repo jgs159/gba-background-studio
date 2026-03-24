@@ -286,6 +286,8 @@ class ConversionDialogLogic:
                     self.img_height_tiles,
                     self.custom_width.value(),
                     self.custom_height.value(),
+                    self.output_width_tiles,
+                    self.output_height_tiles,
                     self.start_index.value(),
                     self.palette_size.value(),
                     save_preview,

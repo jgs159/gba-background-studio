@@ -18,20 +18,19 @@ class PaletteApplyDialog(QDialog):
 
     def __init__(self, parent=None, need_bpp=False):
         super().__init__(parent)
-        self.setWindowTitle("Apply Palette")
+        tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else (lambda k, **kw: k)
+        self.setWindowTitle(tr("palette_apply_title"))
         self.setModal(True)
         self.setFixedSize(400, 200 if need_bpp else 160)
 
         layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel(
-            "How do you want to apply the loaded palette?"
-        ))
+        layout.addWidget(QLabel(tr("palette_apply_question")))
 
         from PySide6.QtWidgets import QRadioButton, QButtonGroup, QComboBox
-        self._add_radio     = QRadioButton("Add — write colors at the specified index (keep the rest)")
-        self._sync_radio    = QRadioButton("Sync — remap tileset pixels to match new palette")
-        self._replace_radio = QRadioButton("Replace — reset to black, then apply at specified index")
+        self._add_radio     = QRadioButton(tr("palette_apply_add"))
+        self._sync_radio    = QRadioButton(tr("palette_apply_sync"))
+        self._replace_radio = QRadioButton(tr("palette_apply_replace"))
         self._add_radio.setChecked(True)
         grp = QButtonGroup(self)
         grp.addButton(self._add_radio)
@@ -45,7 +44,7 @@ class PaletteApplyDialog(QDialog):
         if need_bpp:
             current_bpp = getattr(parent, 'current_bpp', 4) if parent else 4
             bpp_row = QHBoxLayout()
-            bpp_row.addWidget(QLabel("Color depth:"))
+            bpp_row.addWidget(QLabel(tr("palette_apply_color_depth")))
             self._bpp_combo = QComboBox()
             self._bpp_combo.addItems(["4bpp", "8bpp"])
             if current_bpp == 8:
@@ -55,8 +54,8 @@ class PaletteApplyDialog(QDialog):
             layout.addLayout(bpp_row)
 
         btn_row = QHBoxLayout()
-        ok_btn     = QPushButton("OK")
-        cancel_btn = QPushButton("Cancel")
+        ok_btn     = QPushButton(tr("ok"))
+        cancel_btn = QPushButton(tr("cancel"))
         ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
@@ -72,14 +71,15 @@ class PaletteApplyDialog(QDialog):
 class PaletteLoadDialog(QDialog):
     def __init__(self, parent=None, palette_length=256):
         super().__init__(parent)
-        self.setWindowTitle("Configure Palette Load")
+        tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else (lambda k, **kw: k)
+        self.setWindowTitle(tr("palette_load_title"))
         self.setModal(True)
         self.setFixedSize(300, 150)
         
         layout = QVBoxLayout(self)
         
         index_layout = QHBoxLayout()
-        index_layout.addWidget(QLabel("Start Index (0-255):"))
+        index_layout.addWidget(QLabel(tr("palette_load_start_index")))
         self.index_spin = QSpinBox()
         self.index_spin.setRange(0, 255)
         self.index_spin.setValue(0)
@@ -87,7 +87,7 @@ class PaletteLoadDialog(QDialog):
         layout.addLayout(index_layout)
         
         length_layout = QHBoxLayout()
-        length_layout.addWidget(QLabel(f"Length (1-{palette_length}):"))
+        length_layout.addWidget(QLabel(tr("palette_load_length", max=palette_length)))
         self.length_spin = QSpinBox()
         self.length_spin.setRange(1, palette_length)
         self.length_spin.setValue(palette_length)
@@ -95,8 +95,8 @@ class PaletteLoadDialog(QDialog):
         layout.addLayout(length_layout)
         
         button_layout = QHBoxLayout()
-        ok_btn = QPushButton("OK")
-        cancel_btn = QPushButton("Cancel")
+        ok_btn = QPushButton(tr("ok"))
+        cancel_btn = QPushButton(tr("cancel"))
         ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(ok_btn)
@@ -156,11 +156,10 @@ def load_last_output_files(main_window):
             main_window.preview_tab.preview_image_scene.clear()
             main_window.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
             main_window.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
-            
-            if hasattr(main_window, 'edit_palettes_tab'):
-                preview_scene = main_window.preview_tab.preview_image_scene
-                if preview_scene.items():
-                    main_window.edit_palettes_tab.display_tilemap_replica(preview_scene)
+
+            main_window.edit_tiles_tab.edit_tilemap_scene.clear()
+            main_window.edit_tiles_tab.edit_tilemap_scene.addPixmap(preview_pixmap)
+            main_window.edit_tiles_tab.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
             
             from .view_ops import apply_zoom_to_view
             apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
@@ -202,7 +201,8 @@ def load_last_output_files(main_window):
 
 def _apply_palette_colors(main_window, colors):
     if not hasattr(main_window, 'edit_palettes_tab'):
-        QMessageBox.warning(main_window, "Error", "Palette editor not available.")
+        QMessageBox.warning(main_window, main_window.translator.tr("error"),
+                            main_window.translator.tr("palette_load_editor_error"))
         return
 
     palette_tab = main_window.edit_palettes_tab
@@ -223,8 +223,9 @@ def _apply_palette_colors(main_window, colors):
 
     if length > len(colors):
         QMessageBox.warning(
-            main_window, "Invalid Length",
-            f"Source only contains {len(colors)} colors, but requested length is {length}."
+            main_window,
+            main_window.translator.tr("apply_palette_invalid_length_title"),
+            main_window.translator.tr("apply_palette_invalid_length", count=len(colors), length=length)
         )
         return
 
@@ -270,8 +271,9 @@ def _apply_palette_colors(main_window, colors):
     main_window.menu_bar.action_save_palette.setEnabled(True)
 
     QMessageBox.information(
-        main_window, "Palette Loaded",
-        f"Successfully loaded {length} colors starting at index {index}."
+        main_window,
+        main_window.translator.tr("apply_palette_loaded_title"),
+        main_window.translator.tr("apply_palette_loaded", length=length, index=index)
     )
 
 def _sync_tileset_to_palette(tiles_path, old_palette, new_palette, bpp):
@@ -336,7 +338,7 @@ def open_image_for_conversion(main_window):
         main_window,
         main_window.translator.tr("open_image"),
         "",
-        "Images (*.png *.jpg *.jpeg *.bmp *.gif);;All files (*)"
+        main_window.translator.tr("filter_images")
     )
     if not input_path:
         return
@@ -384,7 +386,7 @@ def open_tileset(main_window):
         main_window,
         main_window.translator.tr("open_tileset"),
         "",
-        "Images (*.png *.jpg *.jpeg *.bmp *.gif);;All files (*)"
+        main_window.translator.tr("filter_images")
     )
     if not file_path:
         return
@@ -395,7 +397,7 @@ def open_tileset(main_window):
                 QMessageBox.warning(
                     main_window,
                     main_window.translator.tr("error"),
-                    "The image must be indexed (palette-based). Please convert it to indexed mode first."
+                    main_window.translator.tr("tileset_not_indexed")
                 )
                 return
             pil_img = f.copy()
@@ -428,8 +430,9 @@ def open_tileset(main_window):
     detected_bpp = analyze_tiles_bpp('output/tiles.png')
     if detected_bpp is None:
         QMessageBox.warning(
-            main_window, main_window.translator.tr("error"),
-            "The image must be indexed (4bpp or 8bpp). Please convert it to indexed mode first."
+            main_window,
+            main_window.translator.tr("error"),
+            main_window.translator.tr("tileset_invalid_bpp")
         )
         return
     main_window.current_bpp = detected_bpp
@@ -474,7 +477,7 @@ def save_tileset(main_window):
         main_window,
         main_window.translator.tr("save_tileset"),
         "tiles",
-        "PNG Images (*.png);;BMP Images (*.bmp);;All Files (*)"
+        main_window.translator.tr("filter_png_bmp")
     )
 
     if not target_path:
@@ -504,9 +507,9 @@ def open_tilemap(main_window):
 
     file_path, _ = QFileDialog.getOpenFileName(
         main_window,
-        "Open Tilemap",
+        main_window.translator.tr("open_tilemap"),
         "",
-        "Binary Files (*.bin);;All Files (*)"
+        main_window.translator.tr("filter_bin")
     )
     if not file_path:
         return
@@ -515,11 +518,13 @@ def open_tilemap(main_window):
         with open(file_path, 'rb') as f:
             raw_data = f.read()
     except Exception as e:
-        QMessageBox.warning(main_window, "Error", f"Could not read file:\n{e}")
+        QMessageBox.warning(main_window, main_window.translator.tr("error"),
+                            main_window.translator.tr("open_tilemap_read_error", error=str(e)))
         return
 
     if len(raw_data) == 0:
-        QMessageBox.warning(main_window, "Invalid Tilemap", "File is empty.")
+        QMessageBox.warning(main_window, main_window.translator.tr("open_tilemap_invalid"),
+                            main_window.translator.tr("open_tilemap_empty"))
         return
 
     can_be_text = len(raw_data) % 2 == 0
@@ -536,14 +541,16 @@ def open_tilemap(main_window):
         expected = w * h
         if len(tilemap_data) != expected:
             QMessageBox.warning(
-                main_window, "Tilemap Incompatible",
-                f"Expected {expected} bytes for {w}×{h} rotation tilemap, got {len(tilemap_data)}."
+                main_window,
+                main_window.translator.tr("open_tilemap_incompatible"),
+                main_window.translator.tr("open_tilemap_incompatible_rot",
+                                          expected=expected, w=w, h=h, got=len(tilemap_data))
             )
             return
     else:
         if not can_be_text:
-            QMessageBox.warning(main_window, "Invalid Tilemap",
-                                "File size is not valid for Text Mode (must be a multiple of 2 bytes).")
+            QMessageBox.warning(main_window, main_window.translator.tr("open_tilemap_invalid"),
+                                main_window.translator.tr("open_tilemap_invalid_text_mode"))
             return
         tilemap_data = raw_data
         tiles_path = "output/tiles.png"
@@ -561,9 +568,11 @@ def open_tilemap(main_window):
                 )
                 if max_tile_idx >= tileset_tile_count:
                     QMessageBox.warning(
-                        main_window, "Tilemap Incompatible",
-                        f"The tilemap references tile index {max_tile_idx}, but the current "
-                        f"tileset only has {tileset_tile_count} tiles (0–{tileset_tile_count - 1})."
+                        main_window,
+                        main_window.translator.tr("open_tilemap_incompatible"),
+                        main_window.translator.tr("open_tilemap_incompatible_tiles",
+                                                  max_idx=max_tile_idx, count=tileset_tile_count,
+                                                  last=tileset_tile_count - 1)
                     )
                     return
 
@@ -698,7 +707,7 @@ def new_tilemap(main_window):
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
 
-    save_preview    = main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False) if hasattr(main_window, 'config_manager') else False
+    save_preview     = main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False) if hasattr(main_window, 'config_manager') else False
     keep_transparent = main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False) if hasattr(main_window, 'config_manager') else False
     result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
     if result:
@@ -709,7 +718,11 @@ def save_tilemap(main_window):
 
     source_path = os.path.join('output', 'map.bin')
     if not os.path.exists(source_path):
-        QMessageBox.information(main_window, "Save Tilemap", "No tilemap to save.")
+        QMessageBox.information(
+            main_window,
+            main_window.translator.tr("save_tilemap"),
+            main_window.translator.tr("no_tilemap_to_save")
+        )
         return
 
     dlg = SaveTilemapDialog(main_window)
@@ -719,7 +732,10 @@ def save_tilemap(main_window):
     bpp, is_rot, converted = dlg.get_values()
 
     target_path, _ = QFileDialog.getSaveFileName(
-        main_window, "Save Tilemap", "map", "Binary Files (*.bin);;All Files (*)"
+        main_window,
+        main_window.translator.tr("save_tilemap_dialog_title"),
+        "map",
+        main_window.translator.tr("filter_bin")
     )
     if not target_path:
         return
@@ -730,11 +746,11 @@ def save_tilemap(main_window):
                 f.write(converted)
         else:
             shutil.copy2(source_path, target_path)
-        QMessageBox.information(main_window, "Save Tilemap",
-                                f"Tilemap saved to:\n{target_path}")
+        QMessageBox.information(main_window, main_window.translator.tr("save_tilemap_dialog_title"),
+                                main_window.translator.tr("save_tilemap_saved", path=target_path))
     except Exception as e:
-        QMessageBox.warning(main_window, "Save Tilemap",
-                            f"Error saving tilemap:\n{e}")
+        QMessageBox.warning(main_window, main_window.translator.tr("save_tilemap_dialog_title"),
+                            main_window.translator.tr("save_tilemap_error", error=str(e)))
 
 def save_selection(main_window):
     from ui.dialogs.save_tilemap_dialog import SaveTilemapDialog
@@ -743,7 +759,11 @@ def save_selection(main_window):
     ep = main_window.edit_palettes_tab
 
     if not getattr(et, 'tilemap_data', None):
-        QMessageBox.information(main_window, "Save Selection", "No tilemap loaded.")
+        QMessageBox.information(
+            main_window,
+            main_window.translator.tr("save_selection"),
+            main_window.translator.tr("no_tileset_to_save")
+        )
         return
 
     current_tab = main_window.main_tabs.currentIndex()
@@ -753,8 +773,9 @@ def save_selection(main_window):
         active_view = et.edit_tilemap_view
 
     QMessageBox.information(
-        main_window, "Save Selection",
-        "Drag to select an area on the tilemap, then release to confirm."
+        main_window,
+        main_window.translator.tr("save_selection"),
+        main_window.translator.tr("save_selection_instruction")
     )
 
     _pending = {'done': False}
@@ -769,15 +790,17 @@ def save_selection(main_window):
         sel_h = y2 - y1 + 1
 
         reply = QMessageBox.question(
-            main_window, "Save Selection",
-            f"Save selection of {sel_w}×{sel_h} tiles ({sel_w*8}×{sel_h*8} px)?\n"
-            f"Top-left: ({x1}, {y1})  Bottom-right: ({x2}, {y2})",
+            main_window,
+            main_window.translator.tr("save_selection"),
+            main_window.translator.tr("save_selection_confirm",
+                                      w=sel_w, h=sel_h, wpx=sel_w*8, hpx=sel_h*8,
+                                      x1=x1, y1=y1, x2=x2, y2=y2),
             QMessageBox.Yes | QMessageBox.No
         )
         if reply != QMessageBox.Yes:
             return
 
-        dlg = SaveTilemapDialog(main_window)
+        dlg = SaveTilemapDialog(main_window, sel_w=sel_w, sel_h=sel_h)
         if dlg.exec() != QDialog.Accepted:
             return
         bpp, is_rot, _converted = dlg.get_values()
@@ -786,9 +809,10 @@ def save_selection(main_window):
             if (sel_w, sel_h) not in _ROT_SIZES:
                 valid = ', '.join(f'{w}×{h}' for w, h in sorted(_ROT_SIZES))
                 QMessageBox.warning(
-                    main_window, "Invalid Rotation Size",
-                    f"Selection {sel_w}×{sel_h} is not a valid Rotation/Scaling mode size.\n"
-                    f"Valid sizes: {valid}."
+                    main_window,
+                    main_window.translator.tr("invalid_rot_size_title"),
+                    main_window.translator.tr("save_selection_invalid_rot_size",
+                                              w=sel_w, h=sel_h, valid=valid)
                 )
                 return
 
@@ -824,7 +848,10 @@ def save_selection(main_window):
             sel_data = converted_sel
 
         target_path, _ = QFileDialog.getSaveFileName(
-            main_window, "Save Selection", "selection", "Binary Files (*.bin);;All Files (*)"
+            main_window,
+            main_window.translator.tr("save_selection"),
+            "selection",
+            main_window.translator.tr("filter_bin")
         )
         if not target_path:
             return
@@ -835,10 +862,15 @@ def save_selection(main_window):
             if hasattr(main_window, 'config_manager'):
                 main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
             main_window.current_bpp = bpp
-            QMessageBox.information(main_window, "Save Selection",
-                                    f"Selection saved to:\n{target_path}")
+            QMessageBox.information(
+                main_window,
+                main_window.translator.tr("save_selection"),
+                main_window.translator.tr("save_selection_saved", path=target_path))
         except Exception as e:
-            QMessageBox.warning(main_window, "Save Selection", f"Error saving:\n{e}")
+            QMessageBox.warning(
+                main_window,
+                main_window.translator.tr("save_selection"),
+                main_window.translator.tr("save_selection_error", error=str(e)))
 
     def _disable_selection_mode():
         for view in (et.edit_tilemap_view, ep.edit_tilemap2_view):
@@ -870,9 +902,9 @@ def open_palette(main_window):
 
     palette_path, _ = QFileDialog.getOpenFileName(
         main_window,
-        "Open Palette File",
+        main_window.translator.tr("open_palette_title"),
         "",
-        "Palette / Image Files (*.pal *.png *.bmp);;Palette Files (*.pal);;Indexed Images (*.png *.bmp);;All Files (*)"
+        main_window.translator.tr("filter_palette")
     )
 
     if not palette_path:
@@ -887,17 +919,17 @@ def open_palette(main_window):
                 if img.mode != 'P':
                     QMessageBox.warning(
                         main_window,
-                        "Not an Indexed Image",
-                        f"The selected image is not indexed (mode: {img.mode}).\n"
-                        "Only indexed (palette-based) PNG/BMP images are supported."
+                        main_window.translator.tr("open_palette_not_indexed_title"),
+                        main_window.translator.tr("open_palette_not_indexed", mode=img.mode)
                     )
                     return
                 raw = img.getpalette()
             for i in range(0, min(len(raw), 768), 3):
                 colors.append((raw[i], raw[i+1], raw[i+2]))
         except Exception as e:
-            QMessageBox.warning(main_window, "Error Loading Image",
-                                f"Failed to read image palette:\n{e}")
+            QMessageBox.warning(main_window,
+                                main_window.translator.tr("open_palette_image_error_title"),
+                                main_window.translator.tr("open_palette_image_error", error=str(e)))
             return
     else:
         try:
@@ -911,12 +943,15 @@ def open_palette(main_window):
                 r, g, b = map(int, lines[i].split())
                 colors.append((r, g, b))
         except Exception as e:
-            QMessageBox.warning(main_window, "Error Loading Palette",
-                                f"Failed to read palette file:\n{e}")
+            QMessageBox.warning(main_window,
+                                main_window.translator.tr("open_palette_file_error_title"),
+                                main_window.translator.tr("open_palette_file_error", error=str(e)))
             return
 
     if not colors:
-        QMessageBox.warning(main_window, "Empty Palette", "No colors found in the selected file.")
+        QMessageBox.warning(main_window,
+                            main_window.translator.tr("open_palette_empty_title"),
+                            main_window.translator.tr("open_palette_empty"))
         return
 
     _apply_palette_colors(main_window, colors)

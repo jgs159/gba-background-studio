@@ -33,7 +33,7 @@ class Translator:
             print(f"Warning: Language file '{file_path}' not found. Falling back to eng.ini.")
             code = "eng"
             file_path = os.path.join(self.lang_dir, "eng.ini")
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(interpolation=None)
         config.read(file_path, encoding='utf-8')
         if 'lang' not in config:
             raise ValueError(f"Invalid format: '{file_path}' must have [lang] section.")

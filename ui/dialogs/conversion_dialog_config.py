@@ -51,11 +51,15 @@ class ConversionDialogConfig:
                 self.custom_height.setValue(custom_height_loaded)
             self.custom_width.blockSignals(False)
             self.custom_height.blockSignals(False)
+            self.output_width_tiles = self.custom_width.value()
+            self.output_height_tiles = self.custom_height.value()
             
             index = self.output_combo.findText(output_size)
             if index >= 0:
                 self.output_combo.setCurrentIndex(index)
-                self.on_output_size_changed()
+            else:
+                self.output_combo.setCurrentIndex(0)
+            self.on_output_size_changed()
             
             self.start_index.setValue(int(config.get('CONVERSION', 'start_index', '0')))
             self.palette_size.setValue(int(config.get('CONVERSION', 'palette_size', '1')))
@@ -67,8 +71,7 @@ class ConversionDialogConfig:
             print(f"Error loading conversion settings: {e}")
 
     def save_conversion_settings(self, params):
-        if not (self.parent() and hasattr(self.parent(), 'config_manager') and 
-                self.parent().save_conversion_params):
+        if not (self.parent() and hasattr(self.parent(), 'config_manager')):
             return
         
         try:
@@ -88,11 +91,21 @@ class ConversionDialogConfig:
             config.set('CONVERSION', 'tileset_width', str(self.tileset_width.value()))
             config.set('CONVERSION', 'origin', self.origin.text().strip() or '0,0')
             
+            output_size_str = params.get('output_size', '')
+            import re
+            m = re.match(r'(\d+)t,(\d+)t', output_size_str)
+            if m:
+                tilemap_w = int(m.group(1))
+                tilemap_h = int(m.group(2))
+            else:
+                tilemap_w = self.output_width_tiles
+                tilemap_h = self.output_height_tiles
+
             config.set('CONVERSION', 'output_size', self.output_combo.currentText())
             config.set('CONVERSION', 'custom_width', str(self.custom_width.value()))
             config.set('CONVERSION', 'custom_height', str(self.custom_height.value()))
-            config.set('CONVERSION', 'tilemap_width', str(self.output_width_tiles))
-            config.set('CONVERSION', 'tilemap_height', str(self.output_height_tiles))
+            config.set('CONVERSION', 'tilemap_width', str(tilemap_w))
+            config.set('CONVERSION', 'tilemap_height', str(tilemap_h))
             
             config.set('CONVERSION', 'start_index', str(self.start_index.value()))
             config.set('CONVERSION', 'palette_size', str(self.palette_size.value()))

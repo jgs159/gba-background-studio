@@ -8,9 +8,32 @@ class GridManager:
     def __init__(self):
         self._grid_visible = False
         self._grid_items = {}
-        self._grid_pen = QPen(QColor(255, 255, 255, 180), 1.0, Qt.DashLine)
-        self._grid_pen.setCosmetic(True)
-        self._grid_pen.setDashPattern([2, 2])
+        self._grid_color = QColor(255, 255, 255)
+        self._grid_alpha = 180
+        self._grid_pen = self._make_pen()
+
+    def _make_pen(self):
+        color = QColor(self._grid_color)
+        color.setAlpha(self._grid_alpha)
+        pen = QPen(color, 1.0, Qt.DashLine)
+        pen.setCosmetic(True)
+        pen.setDashPattern([2, 2])
+        return pen
+
+    def set_grid_color(self, r, g, b):
+        self._grid_color = QColor(r, g, b)
+        self._grid_pen = self._make_pen()
+        self._refresh_all_pens()
+
+    def set_grid_alpha(self, alpha):
+        self._grid_alpha = alpha
+        self._grid_pen = self._make_pen()
+        self._refresh_all_pens()
+
+    def _refresh_all_pens(self):
+        for view_data in self._grid_items.values():
+            for item in view_data['items']:
+                item.setPen(self._grid_pen)
 
     def register_view(self, view, view_name):
         if view_name not in self._grid_items:

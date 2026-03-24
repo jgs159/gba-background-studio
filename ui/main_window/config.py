@@ -36,12 +36,34 @@ def setup_grids(main_window):
     main_window.grid_manager.register_view(main_window.edit_tiles_tab.edit_tilemap_view, "tilemap_edit")
     main_window.grid_manager.register_view(main_window.edit_palettes_tab.edit_palettes_view, "palettes")
     main_window.grid_manager.register_view(main_window.edit_palettes_tab.edit_tilemap2_view, "tilemap_palettes")
-    
+
+    _apply_display_settings(main_window)
+
     grid_visible = main_window.config_manager.getboolean('SETTINGS', 'show_grid', False)
     main_window.grid_manager.set_grid_visible(grid_visible)
-    
+
     if hasattr(main_window, 'menu_bar') and hasattr(main_window.menu_bar, 'action_grid'):
         main_window.menu_bar.action_grid.setChecked(grid_visible)
+
+
+def _apply_display_settings(main_window):
+    cfg = main_window.config_manager
+
+    def _parse(value, default):
+        try:
+            return [int(x) for x in value.split(',')]
+        except Exception:
+            return default
+
+    gc = _parse(cfg.get('DISPLAY', 'grid_color', '255,255,255'), [255, 255, 255])
+    ga = int(cfg.get('DISPLAY', 'grid_alpha', '180'))
+    main_window.grid_manager.set_grid_color(*gc)
+    main_window.grid_manager.set_grid_alpha(ga)
+
+    oc = _parse(cfg.get('DISPLAY', 'overlay_text_color', '0,0,0'), [0, 0, 0])
+    oa = int(cfg.get('DISPLAY', 'overlay_alpha', '76'))
+    main_window.edit_palettes_tab.set_overlay_text_color(*oc)
+    main_window.edit_palettes_tab.set_overlay_alpha(oa)
 
 def toggle_show_success_dialog(main_window, checked):
     main_window.show_success_dialog = checked
