@@ -24,6 +24,7 @@ class GBABackgroundStudio(QMainWindow):
         self.config_manager = ConfigManager()
 
         self.current_bpp = 4
+        self.current_rotation_mode = False
         self.tileset_from_conversion = False
         self.set_window_icon()
 
@@ -233,6 +234,10 @@ class GBABackgroundStudio(QMainWindow):
             self.preview_tab.preview_image_scene.clear()
             self.preview_tab.preview_image_scene.addPixmap(preview_pixmap)
             self.preview_tab.preview_image_scene.setSceneRect(preview_pixmap.rect())
+
+            self.edit_tiles_tab.edit_tilemap_scene.clear()
+            self.edit_tiles_tab.edit_tilemap_scene.addPixmap(preview_pixmap)
+            self.edit_tiles_tab.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
             
             self.edit_palettes_tab.display_tilemap_replica(self.preview_tab.preview_image_scene)
             

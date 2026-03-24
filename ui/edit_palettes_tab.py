@@ -546,7 +546,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
     def on_tilemap_drawing(self, tile_x, tile_y):
         self.finalize_color_editing()
-        if self.selected_palette_id is None or not self.tilemap_data:
+        if self.selected_palette_id is None or not self.tilemap_data or self._is_rotation():
             return
         self.on_tilemap_hover(tile_x, tile_y)
         self.edit_palette_at(tile_x, tile_y)
@@ -564,18 +564,19 @@ class EditPalettesTab(TilemapUtils, QWidget):
             if hasattr(self.main_window, '_save_map_and_refresh'):
                 self.main_window._save_map_and_refresh()
 
+    def _is_rotation(self):
+        return getattr(self.main_window, 'current_rotation_mode', False) if self.main_window else False
+
     def on_tilemap_right_click(self, tile_x, tile_y):
         self.finalize_color_editing()
-        if not self.tilemap_data:
+        if not self.tilemap_data or self._is_rotation():
             return
         tile_index = self._tilemap_index(tile_x, tile_y)
         if 0 <= tile_index < len(self.tilemap_data) // 2:
             entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
             palette_id = (entry >> 12) & 0xF
             self.selected_palette_id = palette_id
-            px = (palette_id % 4)
-            py = (palette_id // 4)
-            self.highlight_selected_palette(px, py)
+            self.highlight_selected_palette(palette_id % 4, palette_id // 4)
         self.on_tilemap_hover(tile_x, tile_y)
 
     def focusOutEvent(self, event):
@@ -752,16 +753,16 @@ class EditPalettesTab(TilemapUtils, QWidget):
                     if self.main_window.grid_manager.is_grid_visible():
                         self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
         
-        if (hasattr(self, 'tilemap_data') and self.tilemap_data and 
-            hasattr(self, 'tilemap_width') and self.tilemap_width > 0 and
-            hasattr(self, 'tilemap_height') and self.tilemap_height > 0):
+        if (not self._is_rotation() and
+                hasattr(self, 'tilemap_data') and self.tilemap_data and 
+                hasattr(self, 'tilemap_width') and self.tilemap_width > 0 and
+                hasattr(self, 'tilemap_height') and self.tilemap_height > 0):
             
             for y in range(self.tilemap_height):
                 for x in range(self.tilemap_width):
                     idx = self._tilemap_index(x, y)
                     if idx >= len(self.tilemap_data) // 2:
                         continue
-                    
                     entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
                     palette_id = (entry >> 12) & 0xF
                     self.update_palette_overlay_for_tile(x, y, palette_id)
@@ -783,7 +784,6 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.overlay_items.clear()
         self.tilemap_width_spin.setValue(tile_width)
         self.tilemap_height_spin.setValue(tile_height)
-
         self.enable_tilemap_controls()
 
         if not source_scene.items():
@@ -794,30 +794,33 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self._tilemap_items = {}
 
         pixmap_item = None
-        if source_scene.items():
-            for item in source_scene.items():
-                if isinstance(item, QGraphicsPixmapItem):
-                    pixmap_item = item
-                    break
-        
+        for item in source_scene.items():
+            if isinstance(item, QGraphicsPixmapItem):
+                pixmap_item = item
+                break
+
         if pixmap_item:
             pixmap = pixmap_item.pixmap()
             self._pixmap_item = self.edit_tilemap2_scene.addPixmap(pixmap)
             self.edit_tilemap2_scene.setSceneRect(pixmap.rect())
             self._pixmap_item.setZValue(0)
 
+        if self._is_rotation():
+            if self.main_window and hasattr(self.main_window, 'grid_manager'):
+                if self.main_window.grid_manager.is_grid_visible():
+                    self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
+            return
+
         for i in range(tile_height):
             for j in range(tile_width):
                 idx = self._tilemap_index(j, i)
                 if idx >= len(tilemap_data) // 2:
                     continue
-
                 entry = tilemap_data[idx * 2] | (tilemap_data[idx * 2 + 1] << 8)
                 palette_id = (entry >> 12) & 0xF
                 self.update_palette_overlay_for_tile(j, i, palette_id)
 
         self.enable_tilemap_controls()
-
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
@@ -845,6 +848,10 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.edit_tilemap2_view.scale(factor, factor)
 
     def display_palette_colors(self, colors, enable_editor=True):
+        is_rot = self._is_rotation()
+        if is_rot:
+            enable_editor = False
+
         self.palette_colors = [(r, g, b) for r, g, b in colors]
         self.draw_full_palette(self.palette_colors)
         

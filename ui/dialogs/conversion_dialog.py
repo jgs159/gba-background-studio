@@ -7,15 +7,22 @@ from .conversion_dialog_config import ConversionDialogConfig
 from .auto_spinbox import AutoSpinBox
 
 class ConversionDialog(QDialog, ConversionDialogUI, ConversionDialogLogic, ConversionDialogConfig):
-    PRESETS = {
+    PRESETS_TEXT = {
         "Original": None,
         "Screen Size (256x160)": (32, 20),
-        "BG0 (256x256)": (32, 32),
-        "BG1 (512x256)": (64, 32),
-        "BG2 (256x512)": (32, 64),
-        "BG3 (512x512)": (64, 64),
+        "Screen Size 0 (256x256)": (32, 32),
+        "Screen Size 1 (512x256)": (64, 32),
+        "Screen Size 2 (256x512)": (32, 64),
+        "Screen Size 3 (512x512)": (64, 64),
         "Custom": None
     }
+    PRESETS_ROT = {
+        "16×16 (128×128)": (16, 16),
+        "32×32 (256×256)": (32, 32),
+        "64×64 (512×512)": (64, 64),
+        "128×128 (1024×1024)": (128, 128),
+    }
+    PRESETS = PRESETS_TEXT  # default, overridden dynamically
 
     def __init__(self, image_path, parent=None):
         super().__init__(parent)

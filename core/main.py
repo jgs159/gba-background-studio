@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 from core.config import PRESET_SIZES, MARKER_COLOR
 from utils.translator import Translator
-from core.final_assets import generate_final_assets_4bpp, generate_final_assets_8bpp
+from core.final_assets import generate_final_assets_4bpp, generate_final_assets_8bpp, generate_final_assets_rotation
 from core.tile_utils import split_into_groups, rebuild_final_image
 from core.image_utils import create_gbagfx_preview
 from core.quantization import quantize_to_n_colors_4bpp, quantize_to_n_colors_8bpp
@@ -142,7 +142,7 @@ def save_tilemap_dimensions_to_config(tilemap_width, tilemap_height):
     except Exception as e:
         print(f"Warning: Could not save tilemap dimensions to config: {e}")
 
-def main(input_path, tilemap_path=None, selected_palettes=None, transparent_color=(0,0,0), extra_transparent_tiles=0, tile_width=None, origin=None, end=None, output_size=None, save_preview=False, keep_temp=False, keep_transparent=False, bpp=4, start_index=0, palette_size=256):
+def main(input_path, tilemap_path=None, selected_palettes=None, transparent_color=(0,0,0), extra_transparent_tiles=0, tile_width=None, origin=None, end=None, output_size=None, save_preview=False, keep_temp=False, keep_transparent=False, bpp=4, start_index=0, palette_size=256, rotation_mode=False):
     use_tilemap = tilemap_path is not None
     temp_dir = "temp"
     os.makedirs(temp_dir, exist_ok=True)
@@ -246,78 +246,126 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
             tile_width=tile_width,
         )
 
-    else:  # bpp == 8
-        print(translator.tr("status_processing_8bpp"), flush=True)
+    else:  # bpp == 8 or rotation_mode
+        if rotation_mode:
+            print(translator.tr("status_processing_8bpp"), flush=True)
 
-        if start_index < 0 or start_index > 255:
-            raise ValueError(translator.tr("error_start_index_8bpp"))
-        if palette_size < 1 or palette_size > 256:
-            raise ValueError(translator.tr("error_palette_size"))
-        if start_index + palette_size > 256:
-            raise ValueError(translator.tr("error_palette_overflow"))
+            try:
+                img = Image.open(input_path)
+                w, h = img.size
+            except Exception as e:
+                raise RuntimeError(translator.tr("error_loading_image", e=e))
 
-        try:
-            img = Image.open(input_path)
-            w, h = img.size
-        except Exception as e:
-            raise RuntimeError(translator.tr("error_loading_image", e=e))
+            origin_parsed = parse_pair(origin, w, h) if origin else (0, 0)
+            end_parsed = parse_pair(end, w, h) if end else None
+            output_size_parsed = parse_size(output_size)
 
-        origin_parsed = parse_pair(origin, w, h) if origin else (0, 0)
-        end_parsed = parse_pair(end, w, h) if end else None
-        output_size_parsed = parse_size(output_size)
+            cropped_img = apply_crop_and_resize(img, origin_parsed, end_parsed, output_size_parsed, w, h)
+            if cropped_img is None:
+                raise RuntimeError("Failed to crop/resize image. Check origin and output size.")
 
-        cropped_img = apply_crop_and_resize(img, origin_parsed, end_parsed, output_size_parsed, w, h)
-        if cropped_img is None:
-            raise RuntimeError("Failed to crop/resize image. Check origin and output size.")
+            temp_input = os.path.join(temp_dir, "input_cropped.png")
+            cropped_img.save(temp_input)
 
-        temp_input = os.path.join(temp_dir, "input_cropped.png")
-        cropped_img.save(temp_input)
-        print(translator.tr("image_saved_cropped"), flush=True)
+            arr = np.array(cropped_img)
+            r_ch, g_ch, b_ch, a_ch = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
+            tc = transparent_color
+            mask = (r_ch == tc[0]) & (g_ch == tc[1]) & (b_ch == tc[2]) & (a_ch > 128)
+            if np.sum(mask) > 0:
+                arr[mask] = [MARKER_COLOR[0], MARKER_COLOR[1], MARKER_COLOR[2], 255]
+                cropped_img = Image.fromarray(arr)
 
-        print(translator.tr("splitting_groups"), flush=True)
+            print(translator.tr("quantizing_internal"), flush=True)
+            try:
+                quantized_img, palette_colors = quantize_to_n_colors_8bpp(
+                    cropped_img,
+                    palette_size,
+                    start_index=start_index,
+                    transparent_color=transparent_color,
+                    keep_transparent=keep_transparent
+                )
+            except Exception as e:
+                raise RuntimeError(translator.tr("error_quantizing", e=e))
 
-        arr = np.array(cropped_img)
-        r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
-        tc = transparent_color
-        mask = (r == tc[0]) & (g == tc[1]) & (b == tc[2]) & (a > 128)
-        count = np.sum(mask)
-        if count > 0:
-            arr[mask, 0] = MARKER_COLOR[0]
-            arr[mask, 1] = MARKER_COLOR[1]
-            arr[mask, 2] = MARKER_COLOR[2]
-            arr[mask, 3] = 255
-            cropped_img = Image.fromarray(arr)
-        marker_img = cropped_img
-
-        marker_path = os.path.join(temp_dir, "01_marker.png")
-        marker_img.save(marker_path)
-
-        print(translator.tr("quantizing_internal"), flush=True)
-        try:
-            quantized_img, palette_colors = quantize_to_n_colors_8bpp(
-                marker_img,
-                palette_size,
-                start_index=start_index,
-                transparent_color=transparent_color,
-                keep_transparent=keep_transparent
+            clean_output()
+            generate_final_assets_rotation(
+                quantized_img,
+                extra_transparent_tiles=extra_transparent_tiles,
+                tile_width=tile_width,
             )
-        except Exception as e:
-            raise RuntimeError(translator.tr("error_quantizing", e=e))
 
-        quantized_path = os.path.join(temp_dir, "02_quantized.png")
-        quantized_img.save(quantized_path)
+        else:  # bpp == 8
+            print(translator.tr("status_processing_8bpp"), flush=True)
 
-        reconstructed_path = os.path.join(temp_dir, "reconstructed.png")
-        quantized_img.save(reconstructed_path)
+            if start_index < 0 or start_index > 255:
+                raise ValueError(translator.tr("error_start_index_8bpp"))
+            if palette_size < 1 or palette_size > 256:
+                raise ValueError(translator.tr("error_palette_size"))
+            if start_index + palette_size > 256:
+                raise ValueError(translator.tr("error_palette_overflow"))
 
-        clean_output()
-        generate_final_assets_8bpp(
-            quantized_img,
-            start_index=start_index,
-            palette_size=palette_size,
-            extra_transparent_tiles=extra_transparent_tiles,
-            tile_width=tile_width,
-        )
+            try:
+                img = Image.open(input_path)
+                w, h = img.size
+            except Exception as e:
+                raise RuntimeError(translator.tr("error_loading_image", e=e))
+
+            origin_parsed = parse_pair(origin, w, h) if origin else (0, 0)
+            end_parsed = parse_pair(end, w, h) if end else None
+            output_size_parsed = parse_size(output_size)
+
+            cropped_img = apply_crop_and_resize(img, origin_parsed, end_parsed, output_size_parsed, w, h)
+            if cropped_img is None:
+                raise RuntimeError("Failed to crop/resize image. Check origin and output size.")
+
+            temp_input = os.path.join(temp_dir, "input_cropped.png")
+            cropped_img.save(temp_input)
+            print(translator.tr("image_saved_cropped"), flush=True)
+
+            print(translator.tr("splitting_groups"), flush=True)
+
+            arr = np.array(cropped_img)
+            r, g, b, a = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2], arr[:, :, 3]
+            tc = transparent_color
+            mask = (r == tc[0]) & (g == tc[1]) & (b == tc[2]) & (a > 128)
+            count = np.sum(mask)
+            if count > 0:
+                arr[mask, 0] = MARKER_COLOR[0]
+                arr[mask, 1] = MARKER_COLOR[1]
+                arr[mask, 2] = MARKER_COLOR[2]
+                arr[mask, 3] = 255
+                cropped_img = Image.fromarray(arr)
+            marker_img = cropped_img
+
+            marker_path = os.path.join(temp_dir, "01_marker.png")
+            marker_img.save(marker_path)
+
+            print(translator.tr("quantizing_internal"), flush=True)
+            try:
+                quantized_img, palette_colors = quantize_to_n_colors_8bpp(
+                    marker_img,
+                    palette_size,
+                    start_index=start_index,
+                    transparent_color=transparent_color,
+                    keep_transparent=keep_transparent
+                )
+            except Exception as e:
+                raise RuntimeError(translator.tr("error_quantizing", e=e))
+
+            quantized_path = os.path.join(temp_dir, "02_quantized.png")
+            quantized_img.save(quantized_path)
+
+            reconstructed_path = os.path.join(temp_dir, "reconstructed.png")
+            quantized_img.save(reconstructed_path)
+
+            clean_output()
+            generate_final_assets_8bpp(
+                quantized_img,
+                start_index=start_index,
+                palette_size=palette_size,
+                extra_transparent_tiles=extra_transparent_tiles,
+                tile_width=tile_width,
+            )
 
     tilemap_width = cropped_img.width // 8
     tilemap_height = cropped_img.height // 8

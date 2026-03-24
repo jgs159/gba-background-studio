@@ -86,6 +86,7 @@ def load_conversion_results(main_window):
 
     bpp_index = int(main_window.config_manager.get('CONVERSION', 'bpp', '0'))
     main_window.current_bpp = 8 if bpp_index == 1 else 4
+    main_window.current_rotation_mode = main_window.config_manager.getboolean('CONVERSION', 'rotation_mode', False)
     main_window.start_index = int(main_window.config_manager.get('CONVERSION', 'start_index', '0'))
 
     tilemap_width  = int(main_window.config_manager.get('CONVERSION', 'tilemap_width',  '32'))

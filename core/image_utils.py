@@ -71,43 +71,12 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
         config = ConfigManager()
         tilemap_width = int(config.get('CONVERSION', 'tilemap_width', '32'))
         tilemap_height = int(config.get('CONVERSION', 'tilemap_height', '32'))
+        is_rotation = config.getboolean('CONVERSION', 'rotation_mode', False)
 
         tc_str = config.get('CONVERSION', 'transparent_color', '0,0,0').strip()
         transparent_color = tuple(map(int, tc_str.split(','))) if tc_str else (0, 0, 0)
 
         palette_rgb = [(0, 0, 0)] * 256
-        pal_files = sorted(f for f in os.listdir(output_dir)
-                           if f.startswith('palette_') and f.endswith('.pal'))
-        for pal_file in pal_files:
-            stem = pal_file[len('palette_'):-len('.pal')]
-            try:
-                slot_or_index = int(stem)
-                is_8bpp_pal = len(stem) == 3
-                with open(os.path.join(output_dir, pal_file), 'r', encoding='utf-8') as pf:
-                    plines = [l.strip() for l in pf
-                              if l.strip() and not l.startswith(('JASC-PAL', '0100'))]
-                count = int(plines[0])
-                if is_8bpp_pal:
-                    start = slot_or_index
-                    for i in range(1, min(1 + count, len(plines))):
-                        idx = start + (i - 1)
-                        if idx < 256:
-                            palette_rgb[idx] = tuple(map(int, plines[i].split()))
-                    if keep_transparent:
-                        tc = (
-                            min(transparent_color[0] // 8 * 8, 248),
-                            min(transparent_color[1] // 8 * 8, 248),
-                            min(transparent_color[2] // 8 * 8, 248)
-                        )
-                        palette_rgb[0] = tc
-                else:
-                    slot = slot_or_index
-                    for i in range(1, min(1 + count, len(plines))):
-                        idx = slot * 16 + (i - 1)
-                        if idx < 256:
-                            palette_rgb[idx] = tuple(map(int, plines[i].split()))
-            except Exception:
-                pass
 
         with Image.open(tiles_path) as tiles_img:
             if tiles_img.mode != 'P':
@@ -119,59 +88,95 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
             ts_width_px, ts_height_px = tiles_img.size
             ts_width_tiles = ts_width_px // 8
             ts_height_tiles = ts_height_px // 8
-            if not palette_rgb or all(c == (0,0,0) for c in palette_rgb):
-                full_palette = tiles_img.getpalette()
-                if full_palette:
-                    for i in range(min(256, len(full_palette) // 3)):
-                        palette_rgb[i] = (full_palette[i*3], full_palette[i*3+1], full_palette[i*3+2])
+            full_palette = tiles_img.getpalette()
+            if full_palette:
+                for i in range(min(256, len(full_palette) // 3)):
+                    palette_rgb[i] = (full_palette[i*3], full_palette[i*3+1], full_palette[i*3+2])
+
+        bpp = int(config.get('CONVERSION', 'bpp', '0'))
+        if not is_rotation and bpp == 0:
+            pal_files = sorted(f for f in os.listdir(output_dir)
+                               if f.startswith('palette_') and f.endswith('.pal'))
+            for pal_file in pal_files:
+                stem = pal_file[len('palette_'):-len('.pal')]
+                try:
+                    slot = int(stem)
+                    if len(stem) == 3:
+                        continue
+                    with open(os.path.join(output_dir, pal_file), 'r', encoding='utf-8') as pf:
+                        plines = [l.strip() for l in pf
+                                  if l.strip() and not l.startswith(('JASC-PAL', '0100'))]
+                    count = int(plines[0])
+                    for i in range(1, min(1 + count, len(plines))):
+                        idx = slot * 16 + (i - 1)
+                        if idx < 256:
+                            palette_rgb[idx] = tuple(map(int, plines[i].split()))
+                except Exception:
+                    pass
+            if keep_transparent:
+                tc = (
+                    min(transparent_color[0] // 8 * 8, 248),
+                    min(transparent_color[1] // 8 * 8, 248),
+                    min(transparent_color[2] // 8 * 8, 248)
+                )
+                palette_rgb[0] = tc
 
         with open(map_path, "rb") as f:
             map_bytes = f.read()
-        
-        num_entries = len(map_bytes) // 2
+
+        is_rotation = config.getboolean('CONVERSION', 'rotation_mode', False)
         total_tiles_needed = tilemap_width * tilemap_height
-
-        if tilemap_width > 32 and tilemap_height >= 32:
-            blocks_x = tilemap_width // 32
-            blocks_y = tilemap_height // 32
-            positions = [None] * total_tiles_needed
-            idx = 0
-            for by in range(blocks_y):
-                for bx in range(blocks_x):
-                    for ty in range(32):
-                        for tx in range(32):
-                            positions[idx] = ((bx * 32 + tx) * 8, (by * 32 + ty) * 8)
-                            idx += 1
-        else:
-            positions = [
-                ((i % tilemap_width) * 8, (i // tilemap_width) * 8)
-                for i in range(total_tiles_needed)
-            ]
-
         preview_array = np.zeros((tilemap_height * 8, tilemap_width * 8), dtype=np.uint8)
 
-        for i in range(min(num_entries, total_tiles_needed)):
-            entry = int.from_bytes(map_bytes[i*2:i*2+2], "little")
-            tile_idx = entry & 0x03FF
-            h_flip = (entry >> 10) & 1
-            v_flip = (entry >> 11) & 1
-            pal_slot = (entry >> 12) & 0xF
+        if is_rotation:
+            for i in range(min(len(map_bytes), total_tiles_needed)):
+                tile_idx = map_bytes[i]
+                if tile_idx >= ts_width_tiles * ts_height_tiles:
+                    continue
+                src_x = (tile_idx % ts_width_tiles) * 8
+                src_y = (tile_idx // ts_width_tiles) * 8
+                dst_x = (i % tilemap_width) * 8
+                dst_y = (i // tilemap_width) * 8
+                preview_array[dst_y:dst_y+8, dst_x:dst_x+8] = tileset_data[src_y:src_y+8, src_x:src_x+8]
+        else:
+            num_entries = len(map_bytes) // 2
+            if tilemap_width > 32 and tilemap_height >= 32:
+                blocks_x = tilemap_width // 32
+                blocks_y = tilemap_height // 32
+                positions = [None] * total_tiles_needed
+                idx = 0
+                for by in range(blocks_y):
+                    for bx in range(blocks_x):
+                        for ty in range(32):
+                            for tx in range(32):
+                                positions[idx] = ((bx * 32 + tx) * 8, (by * 32 + ty) * 8)
+                                idx += 1
+            else:
+                positions = [
+                    ((i % tilemap_width) * 8, (i // tilemap_width) * 8)
+                    for i in range(total_tiles_needed)
+                ]
 
-            if tile_idx >= ts_width_tiles * ts_height_tiles:
-                continue
+            for i in range(min(num_entries, total_tiles_needed)):
+                entry = int.from_bytes(map_bytes[i*2:i*2+2], "little")
+                tile_idx = entry & 0x03FF
+                h_flip = (entry >> 10) & 1
+                v_flip = (entry >> 11) & 1
+                pal_slot = (entry >> 12) & 0xF
 
-            tx = (tile_idx % ts_width_tiles) * 8
-            ty = (tile_idx // ts_width_tiles) * 8
+                if tile_idx >= ts_width_tiles * ts_height_tiles:
+                    continue
 
-            tile_data = tileset_data[ty:ty+8, tx:tx+8].copy()
-            if h_flip:
-                tile_data = np.fliplr(tile_data)
-            if v_flip:
-                tile_data = np.flipud(tile_data)
+                src_x = (tile_idx % ts_width_tiles) * 8
+                src_y = (tile_idx // ts_width_tiles) * 8
+                tile_data = tileset_data[src_y:src_y+8, src_x:src_x+8].copy()
+                if h_flip:
+                    tile_data = np.fliplr(tile_data)
+                if v_flip:
+                    tile_data = np.flipud(tile_data)
 
-            px, py = positions[i]
-            
-            preview_array[py:py+8, px:px+8] = tile_data + (pal_slot * 16)
+                px, py = positions[i]
+                preview_array[py:py+8, px:px+8] = tile_data + (pal_slot * 16)
 
         final_preview = Image.fromarray(preview_array, mode="P")
 

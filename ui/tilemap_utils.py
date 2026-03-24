@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QPushButton, QCheckBox
 )
 from PySide6.QtCore import Qt
+from core.config import ROT_SIZES, ROT_SIZES_SET
 
 
 class TilemapUtils:
@@ -136,6 +137,20 @@ class TilemapUtils:
         new_h = self.tilemap_height_spin.value()
 
         if not self.tilemap_data or (new_w == self.tilemap_width and new_h == self.tilemap_height):
+            return
+
+        is_rot = getattr(self.main_window, 'current_rotation_mode', False) if self.main_window else False
+        if is_rot:
+            if (new_w, new_h) not in ROT_SIZES_SET:
+                chosen = self._ask_rotation_size(new_w, new_h)
+                self.tilemap_width_spin.setValue(self.tilemap_width)
+                self.tilemap_height_spin.setValue(self.tilemap_height)
+                if chosen is None:
+                    return
+                new_w, new_h = chosen
+                self.tilemap_width_spin.setValue(new_w)
+                self.tilemap_height_spin.setValue(new_h)
+            self._resize_rotation_tilemap(new_w, new_h)
             return
 
         old_w = self.tilemap_width
@@ -408,3 +423,81 @@ class TilemapUtils:
 
     def enable_tilemap_controls(self):
         self._set_tilemap_controls_enabled(True)
+
+    def _ask_rotation_size(self, attempted_w, attempted_h):
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogButtonBox
+        dlg = QDialog(self.main_window if self.main_window else None)
+        dlg.setWindowTitle("Invalid Rotation Mode Size")
+        dlg.setFixedWidth(320)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(
+            f"<b>{attempted_w}×{attempted_h}</b> is not a valid Rotation/Scaling mode size.<br>"
+            "Please choose one of the valid sizes:"
+        ))
+        lst = QListWidget()
+        labels = ["16×16 (128×128 px)", "32×32 (256×256 px)",
+                  "64×64 (512×512 px)", "128×128 (1024×1024 px)"]
+        for lbl in labels:
+            lst.addItem(lbl)
+        lst.setCurrentRow(0)
+        layout.addWidget(lst)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        return ROT_SIZES[lst.currentRow()]
+
+    def _resize_rotation_tilemap(self, new_w, new_h):
+        old_w, old_h = self.tilemap_width, self.tilemap_height
+        old_data = self.tilemap_data
+
+        new_data = bytearray(new_w * new_h)
+        for y in range(min(old_h, new_h)):
+            for x in range(min(old_w, new_w)):
+                new_data[y * new_w + x] = old_data[y * old_w + x]
+
+        new_data = bytes(new_data)
+        self.tilemap_data  = new_data
+        self.tilemap_width  = new_w
+        self.tilemap_height = new_h
+        self.tilemap_width_spin.setValue(new_w)
+        self.tilemap_height_spin.setValue(new_h)
+
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open(os.path.join('output', 'map.bin'), 'wb') as f:
+            f.write(new_data)
+
+        if hasattr(self.main_window, 'config_manager'):
+            self.main_window.config_manager.set('CONVERSION', 'tilemap_width',  str(new_w))
+            self.main_window.config_manager.set('CONVERSION', 'tilemap_height', str(new_h))
+
+        for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+            other = getattr(self.main_window, attr, None)
+            if other and other is not self:
+                other.tilemap_data   = new_data
+                other.tilemap_width  = new_w
+                other.tilemap_height = new_h
+                other.tilemap_width_spin.setValue(new_w)
+                other.tilemap_height_spin.setValue(new_h)
+
+        if hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='tilemap_resize', editor_type='tiles',
+                data={'old_w': old_w, 'old_h': old_h,
+                      'new_w': new_w, 'new_h': new_h,
+                      'old_data': old_data, 'new_data': new_data},
+                description=f"Tilemap resized from {old_w}x{old_h} to {new_w}x{new_h}"
+            )
+
+        save_preview = keep_transparent = False
+        if hasattr(self.main_window, 'config_manager'):
+            save_preview     = self.main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False)
+            keep_transparent = self.main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False)
+
+        from core.image_utils import create_gbagfx_preview
+        result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
+        if result and hasattr(self.main_window, 'refresh_preview_display'):
+            self.main_window.refresh_preview_display()

@@ -6,6 +6,12 @@ class ConversionDialogConfig:
             return
         try:
             config = self.parent().config_manager
+            rotation_mode = config.getboolean('CONVERSION', 'rotation_mode', False)
+            self.mode_combo.blockSignals(True)
+            self.mode_combo.setCurrentIndex(1 if rotation_mode else 0)
+            self.mode_combo.blockSignals(False)
+            self.on_mode_changed()
+
             bpp_index = int(config.get('CONVERSION', 'bpp', '0'))
             if 0 <= bpp_index <= 1:
                 self.bpp_combo.setCurrentIndex(bpp_index)
@@ -69,6 +75,7 @@ class ConversionDialogConfig:
             config = self.parent().config_manager
             
             config.set('CONVERSION', 'bpp', str(self.bpp_combo.currentIndex()))
+            config.set('CONVERSION', 'rotation_mode', '1' if self.mode_combo.currentIndex() == 1 else '0')
             
             if self.bpp_combo.currentIndex() == 0:
                 config.set('CONVERSION', 'use_palettes', str(self.use_palettes_radio.isChecked()))

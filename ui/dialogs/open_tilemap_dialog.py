@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton
 )
 
+from core.config import ROT_SIZES as _ROT_SIZES
 
 def _get_possible_dimensions(total_tiles):
     priority_w = [20, 32, 64]
@@ -33,15 +34,15 @@ class OpenTilemapDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Open Tilemap")
         self.setModal(True)
-        self.setFixedSize(280, 160)
+        self.setFixedSize(300, 180)
 
         layout = QVBoxLayout(self)
 
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Mode:"))
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("Text Mode")
-        self.mode_combo.setEnabled(False)
+        self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.mode_combo)
         layout.addLayout(mode_row)
 
@@ -61,27 +62,62 @@ class OpenTilemapDialog(QDialog):
         size_row = QHBoxLayout()
         size_row.addWidget(QLabel("Size (tiles):"))
         self.size_combo = QComboBox()
-        self._dims = _get_possible_dimensions(total_tiles)
-        if self._dims:
-            for w, h in self._dims:
-                self.size_combo.addItem(f"{w} × {h}  ({w*8}×{h*8} px)", (w, h))
-        else:
-            self.size_combo.addItem(f"{total_tiles} × 1", (total_tiles, 1))
+        self._total_bytes = total_tiles  # raw byte count
+        self._total_tiles = total_tiles // 2  # for text mode (2 bytes/entry)
+        self._text_dims = _get_possible_dimensions(self._total_tiles)
+        self._populate_text_sizes()
         size_row.addWidget(self.size_combo)
         layout.addLayout(size_row)
 
         btn_row = QHBoxLayout()
-        ok_btn = QPushButton("Open")
+        self._ok_btn = QPushButton("Open")
         cancel_btn = QPushButton("Cancel")
-        ok_btn.setDefault(True)
-        ok_btn.clicked.connect(self.accept)
+        self._ok_btn.setDefault(True)
+        self._ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
         btn_row.addStretch()
-        btn_row.addWidget(ok_btn)
+        btn_row.addWidget(self._ok_btn)
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
 
+    def _populate_text_sizes(self):
+        self.size_combo.clear()
+        if self._text_dims:
+            for w, h in self._text_dims:
+                self.size_combo.addItem(f"{w} × {h}  ({w*8}×{h*8} px)", (w, h))
+        else:
+            self.size_combo.addItem(f"{self._total_tiles} × 1", (self._total_tiles, 1))
+
+    def _populate_rot_sizes(self):
+        self.size_combo.clear()
+        valid = [(w, h) for w, h in _ROT_SIZES if w * h == self._total_bytes]
+        if valid:
+            for w, h in valid:
+                self.size_combo.addItem(f"{w}×{h}  ({w*8}×{h*8} px)", (w, h))
+            self.size_combo.setEnabled(True)
+            self._ok_btn.setEnabled(True)
+        else:
+            self.size_combo.addItem("No valid rotation size matches this file")
+            self.size_combo.setEnabled(False)
+            self._ok_btn.setEnabled(False)
+
+    def _on_mode_changed(self, index):
+        is_rot = index == 1
+        if is_rot:
+            self.bpp_combo.setCurrentIndex(1)
+            self.bpp_combo.setEnabled(False)
+            self._populate_rot_sizes()
+        else:
+            current_bpp = getattr(self.parent(), 'current_bpp', 4) if self.parent() else 4
+            self.bpp_combo.setEnabled(current_bpp != 8)
+            if current_bpp != 8:
+                self.bpp_combo.setCurrentIndex(0)
+            self.size_combo.setEnabled(True)
+            self._ok_btn.setEnabled(True)
+            self._populate_text_sizes()
+
     def get_values(self):
-        bpp = 4 if self.bpp_combo.currentIndex() == 0 else 8
+        is_rot = self.mode_combo.currentIndex() == 1
+        bpp = 8 if (is_rot or self.bpp_combo.currentIndex() == 1) else 4
         w, h = self.size_combo.currentData()
-        return w, h, bpp
+        return w, h, bpp, is_rot

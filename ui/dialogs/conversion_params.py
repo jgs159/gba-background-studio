@@ -3,7 +3,8 @@ def get_conversion_parameters(
     image_path, output_size, is_8bpp, palettes, transparent_color,
     extra_transparent, tileset_width, origin, img_width_tiles, img_height_tiles,
     custom_width, custom_height, start_index, palette_size,
-    save_preview, keep_temp, keep_transparent, external_tilemap=None
+    save_preview, keep_temp, keep_transparent, external_tilemap=None,
+    is_rotation_mode=False
 ): 
     if output_size == "Custom":
         w = custom_width
@@ -14,7 +15,12 @@ def get_conversion_parameters(
         h = img_height_tiles
         output_size_str = f"{w}t,{h}t"
     else:
-        output_size_str = output_size.split()[0].lower()
+        import re
+        m = re.match(r'(\d+)[x×](\d+)', output_size)
+        if m:
+            output_size_str = f"{m.group(1)}t,{m.group(2)}t"
+        else:
+            output_size_str = output_size.split()[0].lower()
 
     trans_rgb = tuple(map(int, transparent_color.split(','))) if transparent_color.strip() else (0, 0, 0)
 
@@ -44,7 +50,8 @@ def get_conversion_parameters(
             'keep_transparent': keep_transparent,
             'bpp': 8,
             'start_index': start_index,
-            'palette_size': palette_size_val
+            'palette_size': palette_size_val,
+            'rotation_mode': is_rotation_mode
         }
     else:
         if external_tilemap:
@@ -69,5 +76,6 @@ def get_conversion_parameters(
             'keep_transparent': keep_transparent,
             'bpp': 4,
             'start_index': 0,
-            'palette_size': 256
+            'palette_size': 256,
+            'rotation_mode': is_rotation_mode
         }
