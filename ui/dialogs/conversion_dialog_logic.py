@@ -14,6 +14,21 @@ from .gba_compatibility_dialog import GBACompatibilityDialog
 from PIL import Image as PilImage
 
 class ConversionDialogLogic:
+    def on_mode_changed(self):
+        is_rot = self.mode_combo.currentIndex() == 1
+        if is_rot:
+            self.bpp_combo.setCurrentIndex(1)
+        self.bpp_combo.setEnabled(not is_rot)
+        self.PRESETS = self.PRESETS_ROT if is_rot else self.PRESETS_TEXT
+        self.output_combo.blockSignals(True)
+        self.output_combo.clear()
+        for label in self.PRESETS.keys():
+            self.output_combo.addItem(label)
+        self.output_combo.blockSignals(False)
+        self.output_combo.setCurrentIndex(0)
+        self.on_output_size_changed()
+        self.on_bpp_changed()
+
     def _handle_start_index_change(self, value):
         self.palette_size.update()
         QTimer.singleShot(10, self.update_8bpp_size)
@@ -177,9 +192,10 @@ class ConversionDialogLogic:
         tilemap_path = None
         palettes_to_use = []
         
+        is_rot = self.mode_combo.currentIndex() == 1
         is_8bpp = self.bpp_combo.currentIndex() == 1
-        
-        if not is_8bpp:
+
+        if not is_8bpp and not is_rot:
             if self.use_tilemap_radio.isChecked():
                 tilemap_path = self.tilemap_path_edit.text().strip()
                 if not tilemap_path:
@@ -191,7 +207,7 @@ class ConversionDialogLogic:
             else:
                 palettes_to_use = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
 
-        if self.output_combo.currentText() == "Custom":
+        if not is_rot and self.output_combo.currentText() == "Custom":
             w = self.custom_width.value()
             h = self.custom_height.value()
             if w > 32:
@@ -275,7 +291,8 @@ class ConversionDialogLogic:
                     save_preview,
                     keep_temp,
                     keep_transparent,
-                    tilemap_path
+                    tilemap_path,
+                    is_rot
                 )
                 
                 converter_main(**params)

@@ -195,7 +195,6 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     if not is_gui_mode():
         print(translator.tr("palette_saved"))
 
-    # === Save tilemap.bin ===
     map_path = os.path.join(output_dir, "map.bin")
     reorganized = reorganized = reorganize_tilemap_for_gba_bg(tile_map, img_w, img_h)
     with open(map_path, "wb") as f:
@@ -209,7 +208,6 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     if not is_gui_mode():
         print(translator.tr("tilemap_saved"))
 
-    # === Generate tiles.png ===
     n = total_tiles
     if tile_width is not None and 1 <= tile_width <= 64:
         cols = tile_width
@@ -302,7 +300,6 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     tiles_path = os.path.join(output_dir, "tiles.png")
     tiles_img.save(tiles_path)
 
-    # === Final message ===
     real_unique = total_tiles - extra_transparent_tiles
     if not is_gui_mode():
         if extra_transparent_tiles > 0:
@@ -322,12 +319,86 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
     if not is_gui_mode():
         print(translator.tr("local_palette_usage", counts=sorted_counts))
 
+def generate_final_assets_rotation(img, extra_transparent_tiles=0, tile_width=None):
+    img_w, img_h = img.size
+    tiles = extract_tiles_rgba(img)
+    n_tiles = len(tiles)
+
+    from core.app_mode import is_gui_mode
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+
+    raw_pal = img.getpalette()
+    saved_palette = []
+    for i in range(0, min(len(raw_pal), 768), 3):
+        r, g, b = raw_pal[i], raw_pal[i+1], raw_pal[i+2]
+        r_gba, g_gba, b_gba = rgb_to_gba_rounded((r, g, b))
+        saved_palette.append((r_gba, g_gba, b_gba))
+    pal_path = os.path.join(output_dir, "palette_016.pal")
+    with open(pal_path, "w") as f:
+        f.write("JASC-PAL\n0100\n")
+        f.write(f"{len(saved_palette)}\n")
+        for r, g, b in saved_palette:
+            f.write(f"{int(r)} {int(g)} {int(b)}\n")
+
+    unique_tiles = []
+    tile_map = []
+    seen = {}
+    empty_tile = np.zeros((8, 8), dtype=np.uint8)
+    empty_key = tuple(empty_tile.flatten())
+
+    unique_tiles.append(empty_tile)
+    seen[empty_key] = 0
+    for _ in range(extra_transparent_tiles):
+        unique_tiles.append(empty_tile.copy())
+
+    for tile in tiles:
+        tile_data = np.array(tile)
+        key = tuple(tile_data.flatten())
+        if key in seen:
+            tile_map.append(seen[key])
+        else:
+            new_id = len(unique_tiles)
+            if new_id > 255:
+                raise ValueError(translator.tr("error_rotation_tileset_too_big", n=new_id + 1))
+            unique_tiles.append(tile_data)
+            seen[key] = new_id
+            tile_map.append(new_id)
+
+    total_tiles = len(unique_tiles)
+
+    map_path = os.path.join(output_dir, "map.bin")
+    with open(map_path, "wb") as f:
+        for idx in tile_map:
+            f.write(bytes([idx & 0xFF]))
+    if not is_gui_mode():
+        print(translator.tr("tilemap_saved"))
+
+    n = total_tiles
+    if tile_width is not None and 1 <= tile_width <= 64:
+        cols = tile_width
+    else:
+        import math
+        cols = min(16, n)
+    rows = (n + cols - 1) // cols
+
+    tiles_img = Image.new("P", (cols * 8, rows * 8))
+    tiles_img.putpalette(img.getpalette())
+    for idx, tile_data in enumerate(unique_tiles):
+        x = (idx % cols) * 8
+        y = (idx // cols) * 8
+        tile_img = Image.fromarray(tile_data.astype(np.uint8), mode="P")
+        tiles_img.paste(tile_img, (x, y))
+    tiles_img.save(os.path.join(output_dir, "tiles.png"))
+
+    if not is_gui_mode():
+        print(translator.tr("process_completed", n=total_tiles))
+
 def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent_tiles=0, tile_width=None):
     img_w, img_h = img.size
     tiles = extract_tiles_rgba(img)
     n_tiles = len(tiles)
 
-    # === 1. Save final palette ===
     from core.app_mode import is_gui_mode
     if not is_gui_mode():
         print(translator.tr("extracting_palettes"), flush=True)
@@ -358,7 +429,6 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
     if not is_gui_mode():
         print(translator.tr("palette_saved"))
 
-    # === 2. Detection of unique tiles with H/V flip ===
     if not is_gui_mode():
         print(translator.tr("generating_assets"), flush=True)
     unique_tiles = []
@@ -379,7 +449,6 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
         t_vflip = np.flipud(t_original)
         t_hvflip = np.fliplr(t_vflip)
 
-        # === Prioritize: original → hflip → vflip → hvflip ===
         candidates = [
             (t_original, 0, 0),
             (t_hflip,    1, 0),
@@ -406,7 +475,6 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
     if total_tiles > 1024:
         raise ValueError(translator.tr("error_tileset_too_big", n=total_tiles))
 
-    # === 3. Save tilemap.bin ===
     map_path = os.path.join(output_dir, "map.bin")
     tile_map_list = [tile_map[i] if i in tile_map else (0, 0, 0, 0) for i in range(n_tiles)]
     reorganized = reorganize_tilemap_for_gba_bg(tile_map_list, img_w, img_h)
@@ -420,7 +488,6 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
     if not is_gui_mode():
         print(translator.tr("tilemap_saved"))
 
-    # === 4. Generate tiles.png ===
     n = total_tiles
     if tile_width is not None and 1 <= tile_width <= 64:
         cols = tile_width
@@ -475,7 +542,6 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
     tiles_path = os.path.join(output_dir, "tiles.png")
     tiles_img.save(tiles_path)
 
-    # === Final message ===
     real_unique = total_tiles - extra_transparent_tiles
     if not is_gui_mode():
         if extra_transparent_tiles > 0:

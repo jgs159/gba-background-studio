@@ -378,93 +378,80 @@ class EditTilesTab(TilemapUtils, QWidget):
         local_y = tile_y % 32
         return (block_y * blocks_x + block_x) * 1024 + local_y * 32 + local_x
 
+    def _is_rotation(self):
+        return getattr(self.main_window, 'current_rotation_mode', False) if self.main_window else False
+
+    def _entry_size(self):
+        return 1 if self._is_rotation() else 2
+
+    def _read_entry(self, tile_index):
+        if self._is_rotation():
+            return self.tilemap_data[tile_index], 0, 0, 0
+        entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
+        return entry & 0x3FF, bool(entry & (1 << 10)), bool(entry & (1 << 11)), (entry >> 12) & 0xF
+
+    def _write_entry(self, data, tile_index, tile_id, h_flip, v_flip, pal_id):
+        if self._is_rotation():
+            data[tile_index] = tile_id & 0xFF
+        else:
+            entry = tile_id & 0x3FF
+            if h_flip: entry |= (1 << 10)
+            if v_flip: entry |= (1 << 11)
+            entry |= (pal_id << 12)
+            data[tile_index * 2] = entry & 0xFF
+            data[tile_index * 2 + 1] = (entry >> 8) & 0xFF
+
     def on_tilemap_right_click(self, tile_x, tile_y):
         if not self.tilemap_data:
             return
-
         tile_index = self._tilemap_index(tile_x, tile_y)
-
-        if 0 <= tile_index < len(self.tilemap_data) // 2:
-            entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-
-            tile_id = entry & 0x3FF
-            self.selected_tile_id = tile_id
-
-            h_flip_from_map = bool(entry & (1 << 10))
-            v_flip_from_map = bool(entry & (1 << 11))
-
-            tx = (tile_id % self.tiles_per_row)
-            ty = (tile_id // self.tiles_per_row)
-            self.highlight_selected_tile(tx, ty)
-
-            self.flip_h_checkbox.setChecked(h_flip_from_map)
-            self.flip_v_checkbox.setChecked(v_flip_from_map)
-
-            self.on_tilemap_hover(tile_x, tile_y)
+        es = self._entry_size()
+        if tile_index * es + es > len(self.tilemap_data):
+            return
+        tile_id, h_flip, v_flip, _ = self._read_entry(tile_index)
+        self.selected_tile_id = tile_id
+        tx = tile_id % self.tiles_per_row
+        ty = tile_id // self.tiles_per_row
+        self.highlight_selected_tile(tx, ty)
+        self.flip_h_checkbox.setChecked(h_flip)
+        self.flip_v_checkbox.setChecked(v_flip)
+        self.on_tilemap_hover(tile_x, tile_y)
 
     def edit_tile_at(self, tile_x, tile_y):
         if not self.tilemap_data:
             return
-
         tile_index = self._tilemap_index(tile_x, tile_y)
-
-        if tile_index >= len(self.tilemap_data) // 2:
+        es = self._entry_size()
+        if tile_index * es + es > len(self.tilemap_data):
             return
 
-        old_entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-        
-        new_h_flip = self.flip_h_checkbox.isChecked()
-        new_v_flip = self.flip_v_checkbox.isChecked()
+        old_tile_id, old_h, old_v, old_pal = self._read_entry(tile_index)
+        new_h = self.flip_h_checkbox.isChecked()
+        new_v = self.flip_v_checkbox.isChecked()
+
+        if old_tile_id == self.selected_tile_id and old_h == new_h and old_v == new_v:
+            return
 
         old_state = {
-            'tile_x': tile_x,
-            'tile_y': tile_y,
-            'old_tile_id': old_entry & 0x3FF,
-            'old_palette_id': (old_entry >> 12) & 0xF,
-            'old_h_flip': bool(old_entry & (1 << 10)),
-            'old_v_flip': bool(old_entry & (1 << 11)),
+            'tile_x': tile_x, 'tile_y': tile_y,
+            'old_tile_id': old_tile_id, 'old_palette_id': old_pal,
+            'old_h_flip': old_h, 'old_v_flip': old_v,
             'new_tile_id': self.selected_tile_id,
-            'new_h_flip': new_h_flip,
-            'new_v_flip': new_v_flip
+            'new_h_flip': new_h, 'new_v_flip': new_v
         }
 
-        current_tile_id = old_entry & 0x3FF
-        current_palette_id = (old_entry >> 12) & 0xF
-        current_h_flip = bool(old_entry & (1 << 10))
-        current_v_flip = bool(old_entry & (1 << 11))
-
-        if (current_tile_id == self.selected_tile_id and 
-            current_h_flip == new_h_flip and 
-            current_v_flip == new_v_flip):
-            return
-
-        palette_flags = current_palette_id << 12
-        
-        new_entry = self.selected_tile_id & 0x3FF
-        
-        if new_h_flip:
-            new_entry |= (1 << 10)
-        
-        if new_v_flip:
-            new_entry |= (1 << 11)
-            
-        new_entry |= palette_flags
-
         tilemap_data = bytearray(self.tilemap_data)
-        tilemap_data[tile_index * 2] = new_entry & 0xFF
-        tilemap_data[tile_index * 2 + 1] = (new_entry >> 8) & 0xFF
+        self._write_entry(tilemap_data, tile_index, self.selected_tile_id, new_h, new_v, old_pal)
         self.tilemap_data = bytes(tilemap_data)
 
         if self.main_window and hasattr(self.main_window, 'history_manager'):
             self.main_window.history_manager.record_state(
-                state_type='tile_change',
-                editor_type='tiles',
+                state_type='tile_change', editor_type='tiles',
                 data=old_state,
-                description=f"Tile changed at ({tile_x}, {tile_y}) with flips"
+                description=f"Tile changed at ({tile_x}, {tile_y})"
             )
 
         self.update_single_tile_visual(tile_x, tile_y, sync_palettes=False)
-
         if self.main_window and hasattr(self.main_window, 'edit_palettes_tab'):
             self.main_window.edit_palettes_tab.tilemap_data = self.tilemap_data
             self.main_window.edit_palettes_tab.update_single_tile_replica(tile_x, tile_y)
@@ -472,22 +459,17 @@ class EditTilesTab(TilemapUtils, QWidget):
     def update_single_tile_visual(self, tile_x, tile_y, sync_palettes=True):
         if not self.tileset_img or not self.tilemap_data:
             return
-
         tile_index = self._tilemap_index(tile_x, tile_y)
-        if tile_index >= len(self.tilemap_data) // 2:
+        es = self._entry_size()
+        if tile_index * es + es > len(self.tilemap_data):
             return
 
-        entry = self.tilemap_data[tile_index * 2] | (self.tilemap_data[tile_index * 2 + 1] << 8)
-        tile_id = entry & 0x3FF
-        h_flip = bool(entry & (1 << 10))
-        v_flip = bool(entry & (1 << 11))
-
+        tile_id, h_flip, v_flip, _ = self._read_entry(tile_index)
         tx = (tile_id % self.tiles_per_row) * 8
         ty = (tile_id // self.tiles_per_row) * 8
-        
         if tx + 8 > self.tileset_img.width or ty + 8 > self.tileset_img.height:
             return
-            
+
         tile = self.tileset_img.crop((tx, ty, tx + 8, ty + 8))
         if h_flip:
             tile = tile.transpose(PilImage.FLIP_LEFT_RIGHT)
@@ -528,12 +510,13 @@ class EditTilesTab(TilemapUtils, QWidget):
             self.tile_width_spin.setValue(initial_width)
         self._on_tileset_width_preview(initial_width)
         self.highlight_selected_tile(0, 0)
-        
+
+        is_rot = getattr(self.main_window, 'current_rotation_mode', False) if self.main_window else False
         if hasattr(self, 'tile_width_spin'):
             self.tile_width_spin.setEnabled(True)
-            self.flip_h_checkbox.setEnabled(True)
-            self.flip_v_checkbox.setEnabled(True)
-            
+            self.flip_h_checkbox.setEnabled(not is_rot)
+            self.flip_v_checkbox.setEnabled(not is_rot)
+
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tileset")
@@ -546,6 +529,9 @@ class EditTilesTab(TilemapUtils, QWidget):
                 self.tileset_img = f.copy()
         self.tiles_per_row = self.tileset_img.width // 8 if self.tileset_img else 16
 
+        is_rot = getattr(self.main_window, 'current_rotation_mode', False) if self.main_window else False
+        entry_size = 1 if is_rot else 2
+
         if preview_path:
             try:
                 with PilImage.open(preview_path) as f:
@@ -554,9 +540,9 @@ class EditTilesTab(TilemapUtils, QWidget):
                 self.tilemap_height = preview_img.height // 8
             except:
                 self.tilemap_width = 32
-                self.tilemap_height = (len(tilemap_data) // 2 + 31) // 32
+                self.tilemap_height = (len(tilemap_data) // entry_size + 31) // 32
         else:
-            total_tiles = len(tilemap_data) // 2
+            total_tiles = len(tilemap_data) // entry_size
             if total_tiles == 256:
                 self.tilemap_width = 16
                 self.tilemap_height = 16

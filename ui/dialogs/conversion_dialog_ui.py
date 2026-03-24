@@ -67,6 +67,7 @@ class ConversionDialogUI:
         params_group = QGroupBox("Conversion Parameters")
         form_layout = QFormLayout()
 
+        self.create_mode_selector(form_layout)
         self.create_bpp_selector(form_layout)
         self.create_palette_selector(form_layout)
         self.create_8bpp_params(form_layout)
@@ -90,6 +91,12 @@ class ConversionDialogUI:
         self.create_buttons(right_layout)
 
         return right_panel
+
+    def create_mode_selector(self, form_layout):
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
+        self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
+        form_layout.addRow("BG Mode:", self.mode_combo)
 
     def create_bpp_selector(self, form_layout):
         self.bpp_combo = QComboBox()
@@ -275,7 +282,7 @@ class ConversionDialogUI:
     def create_buttons(self, right_layout):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
         cancel_btn = QPushButton("Cancel")
         self.convert_btn = QPushButton("Convert")
         self.convert_btn.setDefault(True)

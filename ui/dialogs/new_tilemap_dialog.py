@@ -1,8 +1,10 @@
 # ui/dialogs/new_tilemap_dialog.py
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QSpinBox, QComboBox, QPushButton
+    QSpinBox, QComboBox, QPushButton, QStackedWidget, QWidget, QFormLayout
 )
+
+from core.config import ROT_SIZES as _ROT_SIZES
 
 
 class NewTilemapDialog(QDialog):
@@ -10,15 +12,15 @@ class NewTilemapDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("New Tilemap")
         self.setModal(True)
-        self.setFixedSize(260, 160)
+        self.setFixedSize(280, 200)
 
         layout = QVBoxLayout(self)
 
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Mode:"))
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("Text Mode")
-        self.mode_combo.setEnabled(False)
+        self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.mode_combo)
         layout.addLayout(mode_row)
 
@@ -36,21 +38,30 @@ class NewTilemapDialog(QDialog):
         bpp_row.addWidget(self.bpp_combo)
         layout.addLayout(bpp_row)
 
-        w_row = QHBoxLayout()
-        w_row.addWidget(QLabel("Width (tiles):"))
+        self.size_stack = QStackedWidget()
+
+        text_page = QWidget()
+        text_layout = QFormLayout(text_page)
         self.width_spin = QSpinBox()
         self.width_spin.setRange(1, 64)
         self.width_spin.setValue(32)
-        w_row.addWidget(self.width_spin)
-        layout.addLayout(w_row)
-
-        h_row = QHBoxLayout()
-        h_row.addWidget(QLabel("Height (tiles):"))
         self.height_spin = QSpinBox()
         self.height_spin.setRange(1, 256)
         self.height_spin.setValue(32)
-        h_row.addWidget(self.height_spin)
-        layout.addLayout(h_row)
+        text_layout.addRow("Width (tiles):", self.width_spin)
+        text_layout.addRow("Height (tiles):", self.height_spin)
+        self.size_stack.addWidget(text_page)
+
+        rot_page = QWidget()
+        rot_layout = QHBoxLayout(rot_page)
+        rot_layout.addWidget(QLabel("Size:"))
+        self.rot_size_combo = QComboBox()
+        for w, h in _ROT_SIZES:
+            self.rot_size_combo.addItem(f"{w}×{h}  ({w*8}×{h*8} px)", (w, h))
+        rot_layout.addWidget(self.rot_size_combo)
+        self.size_stack.addWidget(rot_page)
+
+        layout.addWidget(self.size_stack)
 
         btn_row = QHBoxLayout()
         ok_btn = QPushButton("Create")
@@ -63,6 +74,22 @@ class NewTilemapDialog(QDialog):
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
 
+    def _on_mode_changed(self, index):
+        is_rot = index == 1
+        self.size_stack.setCurrentIndex(1 if is_rot else 0)
+        if is_rot:
+            self.bpp_combo.setCurrentIndex(1)
+            self.bpp_combo.setEnabled(False)
+        else:
+            current_bpp = getattr(self.parent(), 'current_bpp', 4) if self.parent() else 4
+            self.bpp_combo.setEnabled(current_bpp != 8)
+            if current_bpp != 8:
+                self.bpp_combo.setCurrentIndex(0)
+
     def get_values(self):
+        is_rot = self.mode_combo.currentIndex() == 1
+        if is_rot:
+            w, h = self.rot_size_combo.currentData()
+            return w, h, 8, True
         bpp = 4 if self.bpp_combo.currentIndex() == 0 else 8
-        return self.width_spin.value(), self.height_spin.value(), bpp
+        return self.width_spin.value(), self.height_spin.value(), bpp, False

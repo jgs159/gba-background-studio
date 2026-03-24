@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QPixmap, QBrush, QColor
 from core.image_utils import pil_to_qimage
 from core.palette_utils import generate_grayscale_palette
+from core.config import ROT_SIZES_SET as _ROT_SIZES
 
 
 class PaletteApplyDialog(QDialog):
@@ -135,6 +136,7 @@ def load_last_output_files(main_window):
         main_window.conversion_palette_count = len([p for p in selected.split(',') if p.strip()]) if main_window.current_bpp == 4 else 16
         is_8bpp = main_window.current_bpp == 8
         palette_count = len([p for p in selected.split(',') if p.strip()])
+        main_window.current_rotation_mode = main_window.config_manager.getboolean('CONVERSION', 'rotation_mode', False)
         
         with open(tilemap_path, 'rb') as f:
             tilemap_data = f.read()
@@ -511,47 +513,59 @@ def open_tilemap(main_window):
 
     try:
         with open(file_path, 'rb') as f:
-            tilemap_data = f.read()
+            raw_data = f.read()
     except Exception as e:
         QMessageBox.warning(main_window, "Error", f"Could not read file:\n{e}")
         return
 
-    if len(tilemap_data) < 2 or len(tilemap_data) % 2 != 0:
-        QMessageBox.warning(main_window, "Invalid Tilemap",
-                            "File size is not valid (must be a multiple of 2 bytes).")
+    if len(raw_data) == 0:
+        QMessageBox.warning(main_window, "Invalid Tilemap", "File is empty.")
         return
 
-    total_tiles = len(tilemap_data) // 2
+    can_be_text = len(raw_data) % 2 == 0
+    total_tiles_text = len(raw_data) // 2 if can_be_text else 0
 
-    dlg = OpenTilemapDialog(total_tiles, main_window)
+    dlg = OpenTilemapDialog(len(raw_data), main_window)
     if dlg.exec() != QDialog.Accepted:
         return
 
-    w, h, bpp = dlg.get_values()
+    w, h, bpp, is_rot = dlg.get_values()
 
-    tiles_path = "output/tiles.png"
-    if os.path.exists(tiles_path):
-        try:
-            with PilImage.open(tiles_path) as img:
-                tileset_tile_count = (img.width // 8) * (img.height // 8)
-        except Exception:
-            tileset_tile_count = None
+    if is_rot:
+        tilemap_data = raw_data
+        expected = w * h
+        if len(tilemap_data) != expected:
+            QMessageBox.warning(
+                main_window, "Tilemap Incompatible",
+                f"Expected {expected} bytes for {w}×{h} rotation tilemap, got {len(tilemap_data)}."
+            )
+            return
+    else:
+        if not can_be_text:
+            QMessageBox.warning(main_window, "Invalid Tilemap",
+                                "File size is not valid for Text Mode (must be a multiple of 2 bytes).")
+            return
+        tilemap_data = raw_data
+        tiles_path = "output/tiles.png"
+        if os.path.exists(tiles_path):
+            try:
+                with PilImage.open(tiles_path) as img:
+                    tileset_tile_count = (img.width // 8) * (img.height // 8)
+            except Exception:
+                tileset_tile_count = None
 
-        if tileset_tile_count is not None:
-            max_tile_idx = 0
-            for i in range(total_tiles):
-                entry = tilemap_data[i * 2] | (tilemap_data[i * 2 + 1] << 8)
-                tile_id = entry & 0x3FF
-                if tile_id > max_tile_idx:
-                    max_tile_idx = tile_id
-
-            if max_tile_idx >= tileset_tile_count:
-                QMessageBox.warning(
-                    main_window, "Tilemap Incompatible",
-                    f"The tilemap references tile index {max_tile_idx}, but the current "
-                    f"tileset only has {tileset_tile_count} tiles (0–{tileset_tile_count - 1})."
+            if tileset_tile_count is not None:
+                max_tile_idx = max(
+                    (tilemap_data[i * 2] | (tilemap_data[i * 2 + 1] << 8)) & 0x3FF
+                    for i in range(total_tiles_text)
                 )
-                return
+                if max_tile_idx >= tileset_tile_count:
+                    QMessageBox.warning(
+                        main_window, "Tilemap Incompatible",
+                        f"The tilemap references tile index {max_tile_idx}, but the current "
+                        f"tileset only has {tileset_tile_count} tiles (0–{tileset_tile_count - 1})."
+                    )
+                    return
 
     os.makedirs('output', exist_ok=True)
     shutil.copy2(file_path, 'output/map.bin')
@@ -560,8 +574,10 @@ def open_tilemap(main_window):
         main_window.config_manager.set('CONVERSION', 'tilemap_width',  str(w))
         main_window.config_manager.set('CONVERSION', 'tilemap_height', str(h))
         main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
+        main_window.config_manager.set('CONVERSION', 'rotation_mode', '1' if is_rot else '0')
 
     main_window.current_bpp = bpp
+    main_window.current_rotation_mode = is_rot
 
     et = main_window.edit_tiles_tab
     et.tilemap_data   = tilemap_data
@@ -594,9 +610,10 @@ def open_tilemap(main_window):
         et.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
 
         main_window.edit_palettes_tab.display_tilemap_replica(et.edit_tilemap_scene)
-        main_window.edit_palettes_tab.update_palette_overlay(
-            et.edit_tilemap_scene, tilemap_data, w, h
-        )
+        if not is_rot:
+            main_window.edit_palettes_tab.update_palette_overlay(
+                et.edit_tilemap_scene, tilemap_data, w, h
+            )
 
         from .view_ops import apply_zoom_to_view
         apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
@@ -618,39 +635,42 @@ def new_tilemap(main_window):
     if dlg.exec() != QDialog.Accepted:
         return
 
-    w, h, bpp = dlg.get_values()
+    w, h, bpp, is_rot = dlg.get_values()
 
-    requires_gba_adjustment = False
-    adjusted_w, adjusted_h = w, h
-    if w > 32:
-        if w != 64:
-            requires_gba_adjustment = True
-            adjusted_w = 64
-        if h % 32 != 0:
-            requires_gba_adjustment = True
-            adjusted_h = ((h + 31) // 32) * 32
-
-    if requires_gba_adjustment:
-        compat_dlg = GBACompatibilityDialog(w, h, adjusted_w, adjusted_h, main_window)
-        if not compat_dlg.exec():
-            return
-        w, h = adjusted_w, adjusted_h
-
-    raw_data = b'\x00\x00' * (w * h)
-
-    if w > 32:
-        tile_list = [(0, 0, 0, 0)] * (w * h)
-        reorganized = reorganize_tilemap_for_gba_bg(tile_list, w * 8, h * 8)
-        final_data = bytearray()
-        for tile_id, hf, vf, pal in reorganized:
-            entry = tile_id & 0x3FF
-            if hf: entry |= (1 << 10)
-            if vf: entry |= (1 << 11)
-            entry |= (pal << 12)
-            final_data.extend(entry.to_bytes(2, 'little'))
-        tilemap_data = bytes(final_data)
+    if is_rot:
+        tilemap_data = bytes(w * h)
     else:
-        tilemap_data = raw_data
+        requires_gba_adjustment = False
+        adjusted_w, adjusted_h = w, h
+        if w > 32:
+            if w != 64:
+                requires_gba_adjustment = True
+                adjusted_w = 64
+            if h % 32 != 0:
+                requires_gba_adjustment = True
+                adjusted_h = ((h + 31) // 32) * 32
+
+        if requires_gba_adjustment:
+            compat_dlg = GBACompatibilityDialog(w, h, adjusted_w, adjusted_h, main_window)
+            if not compat_dlg.exec():
+                return
+            w, h = adjusted_w, adjusted_h
+
+        raw_data = b'\x00\x00' * (w * h)
+
+        if w > 32:
+            tile_list = [(0, 0, 0, 0)] * (w * h)
+            reorganized = reorganize_tilemap_for_gba_bg(tile_list, w * 8, h * 8)
+            final_data = bytearray()
+            for tile_id, hf, vf, pal in reorganized:
+                entry = tile_id & 0x3FF
+                if hf: entry |= (1 << 10)
+                if vf: entry |= (1 << 11)
+                entry |= (pal << 12)
+                final_data.extend(entry.to_bytes(2, 'little'))
+            tilemap_data = bytes(final_data)
+        else:
+            tilemap_data = raw_data
 
     import os
     os.makedirs('output', exist_ok=True)
@@ -661,6 +681,9 @@ def new_tilemap(main_window):
         main_window.config_manager.set('CONVERSION', 'tilemap_width',  str(w))
         main_window.config_manager.set('CONVERSION', 'tilemap_height', str(h))
         main_window.config_manager.set('CONVERSION', 'bpp', str(bpp))
+
+    main_window.current_bpp = bpp
+    main_window.current_rotation_mode = is_rot
 
     tiles_path   = 'output/tiles.png' if os.path.exists('output/tiles.png') else None
     preview_path = 'temp/preview/preview.png' if os.path.exists('temp/preview/preview.png') else None
@@ -677,7 +700,6 @@ def new_tilemap(main_window):
 
     save_preview    = main_window.config_manager.getboolean('SETTINGS', 'save_preview_files', False) if hasattr(main_window, 'config_manager') else False
     keep_transparent = main_window.config_manager.getboolean('SETTINGS', 'keep_transparent_color', False) if hasattr(main_window, 'config_manager') else False
-    palette_colors = main_window.edit_palettes_tab.palette_colors if hasattr(main_window, 'edit_palettes_tab') else None
     result = create_gbagfx_preview(save_preview=save_preview, keep_transparent=keep_transparent)
     if result:
         main_window.refresh_preview_display()
@@ -694,11 +716,7 @@ def save_tilemap(main_window):
     if dlg.exec() != QDialog.Accepted:
         return
 
-    bpp = dlg.get_values()
-
-    if hasattr(main_window, 'config_manager'):
-        main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
-    main_window.current_bpp = bpp
+    bpp, is_rot, converted = dlg.get_values()
 
     target_path, _ = QFileDialog.getSaveFileName(
         main_window, "Save Tilemap", "map", "Binary Files (*.bin);;All Files (*)"
@@ -707,7 +725,11 @@ def save_tilemap(main_window):
         return
 
     try:
-        shutil.copy2(source_path, target_path)
+        if converted is not None:
+            with open(target_path, 'wb') as f:
+                f.write(converted)
+        else:
+            shutil.copy2(source_path, target_path)
         QMessageBox.information(main_window, "Save Tilemap",
                                 f"Tilemap saved to:\n{target_path}")
     except Exception as e:
@@ -758,26 +780,48 @@ def save_selection(main_window):
         dlg = SaveTilemapDialog(main_window)
         if dlg.exec() != QDialog.Accepted:
             return
-        bpp = dlg.get_values()
+        bpp, is_rot, _converted = dlg.get_values()
+
+        if is_rot:
+            if (sel_w, sel_h) not in _ROT_SIZES:
+                valid = ', '.join(f'{w}×{h}' for w, h in sorted(_ROT_SIZES))
+                QMessageBox.warning(
+                    main_window, "Invalid Rotation Size",
+                    f"Selection {sel_w}×{sel_h} is not a valid Rotation/Scaling mode size.\n"
+                    f"Valid sizes: {valid}."
+                )
+                return
 
         tilemap_data = et.tilemap_data
         tilemap_w    = et.tilemap_width
+        is_rot_map   = getattr(main_window, 'current_rotation_mode', False)
 
         def tilemap_index(tx, ty):
-            if tilemap_w <= 32:
+            if is_rot_map or tilemap_w <= 32:
                 return ty * tilemap_w + tx
             bx, by = tx // 32, ty // 32
             bxs = tilemap_w // 32
             return (by * bxs + bx) * 1024 + (ty % 32) * 32 + (tx % 32)
 
+        entry_size = 1 if is_rot_map else 2
         sel_data = bytearray()
         for row in range(y1, y2 + 1):
             for col in range(x1, x2 + 1):
                 idx = tilemap_index(col, row)
-                if idx * 2 + 1 < len(tilemap_data):
-                    sel_data.extend(tilemap_data[idx*2:idx*2+2])
+                if idx * entry_size + entry_size <= len(tilemap_data):
+                    sel_data.extend(tilemap_data[idx*entry_size:idx*entry_size+entry_size])
                 else:
-                    sel_data.extend(b'\x00\x00')
+                    sel_data.extend(b'\x00' * entry_size)
+
+        if is_rot != is_rot_map:
+            converted_sel = bytearray()
+            if is_rot_map and not is_rot:
+                for b in sel_data:
+                    converted_sel.extend(bytes([b & 0xFF, 0]))
+            else:
+                for i in range(0, len(sel_data), 2):
+                    converted_sel.append(sel_data[i] & 0xFF)
+            sel_data = converted_sel
 
         target_path, _ = QFileDialog.getSaveFileName(
             main_window, "Save Selection", "selection", "Binary Files (*.bin);;All Files (*)"
