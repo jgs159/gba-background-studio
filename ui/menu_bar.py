@@ -16,28 +16,28 @@ class MenuBar:
         # File menu
         file_menu = self.menu_bar.addMenu(self.main_window.translator.tr("file_menu"))
         
-        action_open_image = file_menu.addAction(self.main_window.translator.tr("open_image"))
-        action_open_image.setShortcut("Ctrl+O")
-        action_open_image.triggered.connect(self.main_window.open_image_for_conversion)
+        self.action_open_image = file_menu.addAction(self.main_window.translator.tr("open_image"))
+        self.action_open_image.setShortcut("Ctrl+O")
+        self.action_open_image.triggered.connect(self.main_window.open_image_for_conversion)
         
         file_menu.addSeparator()
         
-        action_export_files = file_menu.addAction(self.main_window.translator.tr("export_files"))
-        action_export_files.setShortcut("Ctrl+E")
-        action_export_files.triggered.connect(self.export_files)
+        self.action_export_files = file_menu.addAction(self.main_window.translator.tr("export_files"))
+        self.action_export_files.setShortcut("Ctrl+E")
+        self.action_export_files.triggered.connect(self.export_files)
         
         file_menu.addSeparator()
         
-        action_exit = file_menu.addAction(self.main_window.translator.tr("exit_app"))
-        action_exit.setShortcut("Ctrl+Q")
-        action_exit.triggered.connect(self.main_window.close)
+        self.action_exit = file_menu.addAction(self.main_window.translator.tr("exit_app"))
+        self.action_exit.setShortcut("Ctrl+Q")
+        self.action_exit.triggered.connect(self.main_window.close)
 
         # Tileset menu
         tileset_menu = self.menu_bar.addMenu(self.main_window.translator.tr("tileset_menu"))
         
-        action_open_tileset = tileset_menu.addAction(self.main_window.translator.tr("open_tileset"))
-        action_open_tileset.setShortcut("Ctrl+I")
-        action_open_tileset.triggered.connect(self.main_window.open_tileset)
+        self.action_open_tileset = tileset_menu.addAction(self.main_window.translator.tr("open_tileset"))
+        self.action_open_tileset.setShortcut("Ctrl+T")
+        self.action_open_tileset.triggered.connect(self.main_window.open_tileset)
         
         self.action_save_tileset = tileset_menu.addAction(self.main_window.translator.tr("save_tileset"))
         self.action_save_tileset.setShortcut("Ctrl+S")
@@ -63,6 +63,7 @@ class MenuBar:
         self.action_save_tilemap.setEnabled(False)
         
         self.action_save_selection = tilemap_menu.addAction(self.main_window.translator.tr("save_selection"))
+        self.action_save_selection.setShortcut("Ctrl+Shift+B")
         self.action_save_selection.triggered.connect(self.main_window.save_selection)
         self.action_save_selection.setEnabled(False)
 
@@ -72,7 +73,6 @@ class MenuBar:
         self.action_open_palette = palette_menu.addAction(self.main_window.translator.tr("open_palette"))
         self.action_open_palette.setShortcut("Ctrl+P")
         self.action_open_palette.triggered.connect(self.main_window.open_palette)
-        self.action_open_palette.setEnabled(True)
         
         self.action_save_palette = palette_menu.addAction(self.main_window.translator.tr("save_palette"))
         self.action_save_palette.setShortcut("Ctrl+Shift+P")
@@ -96,23 +96,26 @@ class MenuBar:
         view_menu = self.menu_bar.addMenu(self.main_window.translator.tr("view_menu"))
         
         # Tab navigation
-        view_menu.addAction(self.main_window.translator.tr("preview_tab_menu")).triggered.connect(lambda: self.main_window.main_tabs.setCurrentIndex(0))
-        view_menu.addAction(self.main_window.translator.tr("edit_tiles_tab_menu")).triggered.connect(lambda: self.main_window.main_tabs.setCurrentIndex(1))
-        view_menu.addAction(self.main_window.translator.tr("edit_palettes_tab_menu")).triggered.connect(lambda: self.main_window.main_tabs.setCurrentIndex(2))
+        self.action_preview_tab = view_menu.addAction(self.main_window.translator.tr("preview_tab_menu"))
+        self.action_preview_tab.triggered.connect(lambda: self.main_window.main_tabs.setCurrentIndex(0))
+        self.action_edit_tiles_tab = view_menu.addAction(self.main_window.translator.tr("edit_tiles_tab_menu"))
+        self.action_edit_tiles_tab.triggered.connect(lambda: self.main_window.main_tabs.setCurrentIndex(1))
+        self.action_edit_palettes_tab = view_menu.addAction(self.main_window.translator.tr("edit_palettes_tab_menu"))
+        self.action_edit_palettes_tab.triggered.connect(lambda: self.main_window.main_tabs.setCurrentIndex(2))
         
         view_menu.addSeparator()
         
-        action_reset_zoom = view_menu.addAction(self.main_window.translator.tr("reset_zoom"))
-        action_reset_zoom.setShortcut("Ctrl+0")
-        action_reset_zoom.triggered.connect(self.main_window.reset_zoom)
+        self.action_reset_zoom = view_menu.addAction(self.main_window.translator.tr("reset_zoom"))
+        self.action_reset_zoom.setShortcut("Ctrl+0")
+        self.action_reset_zoom.triggered.connect(self.main_window.reset_zoom)
         
-        action_zoom_in = view_menu.addAction(self.main_window.translator.tr("zoom_in"))
-        action_zoom_in.setShortcut("Ctrl++")
-        action_zoom_in.triggered.connect(self.main_window.zoom_in)
+        self.action_zoom_in = view_menu.addAction(self.main_window.translator.tr("zoom_in"))
+        self.action_zoom_in.setShortcut("Ctrl++")
+        self.action_zoom_in.triggered.connect(self.main_window.zoom_in)
         
-        action_zoom_out = view_menu.addAction(self.main_window.translator.tr("zoom_out"))
-        action_zoom_out.setShortcut("Ctrl+-")
-        action_zoom_out.triggered.connect(self.main_window.zoom_out)
+        self.action_zoom_out = view_menu.addAction(self.main_window.translator.tr("zoom_out"))
+        self.action_zoom_out.setShortcut("Ctrl+-")
+        self.action_zoom_out.triggered.connect(self.main_window.zoom_out)
         
         view_menu.addSeparator()
         
@@ -124,7 +127,7 @@ class MenuBar:
         grid_visible = self.main_window.config_manager.getboolean('SETTINGS', 'show_grid', False)
         self.action_grid.setChecked(grid_visible)
         self.action_grid.triggered.connect(self.main_window.toggle_grid)
-        
+
         view_menu.addSeparator()
         
         self.action_status_bar = view_menu.addAction(self.main_window.translator.tr("status_bar_toggle"))
@@ -136,7 +139,8 @@ class MenuBar:
         settings_menu = self.menu_bar.addMenu(self.main_window.translator.tr("settings_menu"))
         
         # Language submenu
-        language_menu = QMenu(self.main_window.translator.tr("language_menu"), self.main_window)
+        self.language_menu = QMenu(self.main_window.translator.tr("language_menu"), self.main_window)
+        language_menu = self.language_menu
         self.language_actions = {}
         languages = {
             "english": "English",
@@ -162,21 +166,29 @@ class MenuBar:
         settings_menu.addMenu(language_menu)
         
         # Theme submenu
-        theme_menu = QMenu(self.main_window.translator.tr("theme_menu"), self.main_window)
+        self.theme_menu = QMenu(self.main_window.translator.tr("theme_menu"), self.main_window)
+        theme_menu = self.theme_menu
         self.theme_actions = {}
         themes = {
-            "light": "Light",
-            "dark": "Dark"
+            "light": "theme_light",
+            "dark": "theme_dark"
         }
         
         for theme_code, theme_name in themes.items():
-            action = theme_menu.addAction(theme_name)
+            action = theme_menu.addAction(self.main_window.translator.tr(theme_name))
             action.setCheckable(True)
             action.triggered.connect(lambda checked, t=theme_code: self.main_window.change_theme(t))
             self.theme_actions[theme_code] = action
         
         settings_menu.addMenu(theme_menu)
-        
+
+        settings_menu.addSeparator()
+
+        self.action_display_settings = settings_menu.addAction(
+            self.main_window.translator.tr("display_settings")
+        )
+        self.action_display_settings.triggered.connect(self.main_window.open_display_settings)
+
         settings_menu.addSeparator()
         
         # Option's Settings
@@ -209,11 +221,62 @@ class MenuBar:
         # Help menu
         help_menu = self.menu_bar.addMenu(self.main_window.translator.tr("help_menu"))
         
-        action_about = help_menu.addAction(self.main_window.translator.tr("about"))
-        action_about.triggered.connect(self.main_window.show_about)
+        self.action_about = help_menu.addAction(self.main_window.translator.tr("about"))
+        self.action_about.triggered.connect(self.main_window.show_about)
         
-        action_contribute = help_menu.addAction(self.main_window.translator.tr("contribute"))
-        action_contribute.triggered.connect(self.main_window.show_contribute)
+        self.action_contribute = help_menu.addAction(self.main_window.translator.tr("contribute"))
+        self.action_contribute.triggered.connect(self.main_window.show_contribute)
+
+    def retranslate_menus(self):
+        tr = self.main_window.translator.tr
+        menus = self.menu_bar.actions()
+        labels = ["file_menu", "tileset_menu", "tilemap_menu", "palette_menu",
+                  "edit_menu", "view_menu", "settings_menu", "help_menu"]
+        for action, key in zip(menus, labels):
+            action.setText(tr(key))
+
+        # File
+        self.action_open_image.setText(tr("open_image"))
+        self.action_export_files.setText(tr("export_files"))
+        self.action_exit.setText(tr("exit_app"))
+        # Tileset
+        self.action_open_tileset.setText(tr("open_tileset"))
+        self.action_save_tileset.setText(tr("save_tileset"))
+        # Tilemap
+        self.action_open_tilemap.setText(tr("open_tilemap"))
+        self.action_new_tilemap.setText(tr("new_tilemap"))
+        self.action_save_tilemap.setText(tr("save_tilemap"))
+        self.action_save_selection.setText(tr("save_selection"))
+        # Palette
+        self.action_open_palette.setText(tr("open_palette"))
+        self.action_save_palette.setText(tr("save_palette"))
+        # Edit
+        self.action_undo.setText(tr("undo"))
+        self.action_redo.setText(tr("redo"))
+        # View
+        self.action_preview_tab.setText(tr("preview_tab_menu"))
+        self.action_edit_tiles_tab.setText(tr("edit_tiles_tab_menu"))
+        self.action_edit_palettes_tab.setText(tr("edit_palettes_tab_menu"))
+        self.action_reset_zoom.setText(tr("reset_zoom"))
+        self.action_zoom_in.setText(tr("zoom_in"))
+        self.action_zoom_out.setText(tr("zoom_out"))
+        self.action_grid.setText(tr("grid_toggle"))
+        self.action_display_settings.setText(tr("display_settings"))
+        self.action_status_bar.setText(tr("status_bar_toggle"))
+        # Settings submenus
+        self.language_menu.setTitle(tr("language_menu"))
+        self.theme_menu.setTitle(tr("theme_menu"))
+        self.theme_actions["light"].setText(tr("theme_light"))
+        self.theme_actions["dark"].setText(tr("theme_dark"))
+        self.action_save_preview.setText(tr("save_preview"))
+        self.action_keep_transparent.setText(tr("keep_transparent"))
+        self.action_keep_temp.setText(tr("keep_temp"))
+        self.action_load_last_output.setText(tr("load_last_output"))
+        self.action_save_conversion_params.setText(tr("save_conversion_params"))
+        self.action_show_success_dialog.setText(tr("show_success_dialog"))
+        # Help
+        self.action_about.setText(tr("about"))
+        self.action_contribute.setText(tr("contribute"))
 
     def export_files(self):
         output_dir = "output"

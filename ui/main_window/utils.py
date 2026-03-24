@@ -20,11 +20,4 @@ def retranslate_ui(main_window):
     main_window.main_tabs.setTabText(0, main_window.translator.tr("preview_tab"))
     main_window.main_tabs.setTabText(1, main_window.translator.tr("edit_tiles_tab"))
     main_window.main_tabs.setTabText(2, main_window.translator.tr("edit_palettes_tab"))
-    
-    recreate_menu(main_window)
-
-def recreate_menu(main_window):
-    main_window.menu_bar.menu_bar.clear()
-    main_window.menu_bar.create_menus()
-    from .config import apply_configuration_to_menu
-    apply_configuration_to_menu(main_window)
+    main_window.menu_bar.retranslate_menus()

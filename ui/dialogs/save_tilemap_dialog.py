@@ -64,7 +64,7 @@ def _rotation_to_text(tilemap_data, w, h):
 
 
 class SaveTilemapDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, sel_w=None, sel_h=None):
         super().__init__(parent)
         self.setWindowTitle("Save Tilemap")
         self.setModal(True)
@@ -74,8 +74,8 @@ class SaveTilemapDialog(QDialog):
         self._current_bpp = getattr(parent, 'current_bpp', 4) if parent else 4
         et = getattr(parent, 'edit_tiles_tab', None) if parent else None
         self._tilemap_data = getattr(et, 'tilemap_data', None)
-        self._w = getattr(et, 'tilemap_width',  0)
-        self._h = getattr(et, 'tilemap_height', 0)
+        self._w = sel_w if sel_w is not None else getattr(et, 'tilemap_width',  0)
+        self._h = sel_h if sel_h is not None else getattr(et, 'tilemap_height', 0)
         if not self._tilemap_data:
             import os
             map_path = os.path.join('output', 'map.bin')
@@ -84,25 +84,28 @@ class SaveTilemapDialog(QDialog):
                     self._tilemap_data = _f.read()
 
         self._switch_blocked_reason = None
+        self._can_switch = True
+        
         if self._current_rot:
             if not _is_rot_text_compatible(self._w, self._h):
                 self._switch_blocked_reason = (
                     f"Cannot convert to Text Mode: {self._w}×{self._h} is not a valid "
                     f"GBA text BG size. Valid: W≤32 any H, or 64×(multiple of 32)."
                 )
+                self._can_switch = False
         else:
             if not _is_text_rot_compatible(self._w, self._h):
                 self._switch_blocked_reason = (
                     f"Cannot convert to Rotation Mode: {self._w}×{self._h} is not compatible. "
                     f"Valid sizes: 32×32 or 64×64."
                 )
+                self._can_switch = False
             elif self._tilemap_data and _has_flips(self._tilemap_data):
                 self._switch_blocked_reason = (
                     "Cannot convert to Rotation Mode: tilemap contains flipped tiles. "
                     "Remove all flips before exporting."
                 )
-
-        self._can_switch = self._switch_blocked_reason is None
+                self._can_switch = False
 
         layout = QVBoxLayout(self)
 
@@ -110,8 +113,12 @@ class SaveTilemapDialog(QDialog):
         mode_row.addWidget(QLabel("Mode:"))
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
-        self.mode_combo.setCurrentIndex(1 if self._current_rot else 0)
-        self.mode_combo.setEnabled(self._can_switch)
+        if not self._can_switch:
+            self.mode_combo.setCurrentIndex(1 if self._current_rot else 0)
+            self.mode_combo.setEnabled(False)
+        else:
+            self.mode_combo.setCurrentIndex(1 if self._current_rot else 0)
+            self.mode_combo.setEnabled(True)
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.mode_combo)
         layout.addLayout(mode_row)
@@ -132,7 +139,6 @@ class SaveTilemapDialog(QDialog):
         self._info_label.setWordWrap(True)
         self._info_label.setStyleSheet("QLabel { font-size: 8pt; }")
         layout.addWidget(self._info_label)
-        self._update_info()
 
         btn_row = QHBoxLayout()
         self._save_btn = QPushButton("Save")
@@ -144,9 +150,12 @@ class SaveTilemapDialog(QDialog):
         btn_row.addWidget(self._save_btn)
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
+        
+        self._update_info()
 
     def _on_mode_changed(self, index):
         is_rot = index == 1
+        
         if is_rot:
             self.bpp_combo.setCurrentIndex(1)
             self.bpp_combo.setEnabled(False)
@@ -161,16 +170,18 @@ class SaveTilemapDialog(QDialog):
         converting = is_rot_selected != self._current_rot
 
         if not self._can_switch and self._switch_blocked_reason:
-            self._info_label.setStyleSheet("QLabel { font-size: 8pt; color: #cc0000; }")
-            self._info_label.setText(f"⚠️ {self._switch_blocked_reason}")
+            self._info_label.setStyleSheet("QLabel { font-size: 8pt; color: #888; }")
+            self._info_label.setText(f"ℹ️ {self._switch_blocked_reason}")
+            self._save_btn.setEnabled(True)
             return
 
+        self._save_btn.setEnabled(True)
+        self._info_label.setStyleSheet("QLabel { font-size: 8pt; color: #555; }")
+
         if not converting:
-            self._info_label.setStyleSheet("QLabel { font-size: 8pt; color: #555; }")
             self._info_label.setText("")
             return
 
-        self._info_label.setStyleSheet("QLabel { font-size: 8pt; color: #555; }")
         if self._current_rot and not is_rot_selected:
             self._info_label.setText(
                 "ℹ️ Rotation→Text: 1-byte entries expanded to 2 bytes "

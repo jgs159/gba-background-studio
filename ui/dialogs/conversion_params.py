@@ -2,7 +2,8 @@
 def get_conversion_parameters(
     image_path, output_size, is_8bpp, palettes, transparent_color,
     extra_transparent, tileset_width, origin, img_width_tiles, img_height_tiles,
-    custom_width, custom_height, start_index, palette_size,
+    custom_width, custom_height, output_width_tiles, output_height_tiles,
+    start_index, palette_size,
     save_preview, keep_temp, keep_transparent, external_tilemap=None,
     is_rotation_mode=False
 ): 
@@ -15,12 +16,9 @@ def get_conversion_parameters(
         h = img_height_tiles
         output_size_str = f"{w}t,{h}t"
     else:
-        import re
-        m = re.match(r'(\d+)[x×](\d+)', output_size)
-        if m:
-            output_size_str = f"{m.group(1)}t,{m.group(2)}t"
-        else:
-            output_size_str = output_size.split()[0].lower()
+        w = output_width_tiles
+        h = output_height_tiles
+        output_size_str = f"{w}t,{h}t"
 
     trans_rgb = tuple(map(int, transparent_color.split(','))) if transparent_color.strip() else (0, 0, 0)
 

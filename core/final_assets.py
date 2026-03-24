@@ -73,6 +73,23 @@ def revert_gba_tilemap_reorganization(tilemap_data, old_width_tiles, old_height_
     
     return bytes(new_data)
 
+def _calc_tileset_cols(n):
+    if n <= 0:
+        return 1
+    best_cols = n
+    best_score = float('inf')
+    for c in range(1, min(65, n + 1)):
+        r = (n + c - 1) // c
+        padding = c * r - n
+        score = padding * 10 + abs(c - r) + (max(0, r - 32) * 10000)
+        if c >= r:
+            score -= 5
+        if score < best_score:
+            best_score = score
+            best_cols = c
+    return best_cols
+
+
 def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transparent_tiles=0, tile_width=None):
     import os
     import numpy as np
@@ -209,46 +226,8 @@ def generate_final_assets_4bpp(img, pal_indices, selected_palettes, extra_transp
         print(translator.tr("tilemap_saved"))
 
     n = total_tiles
-    if tile_width is not None and 1 <= tile_width <= 64:
-        cols = tile_width
-    else:
-        best_cols = 1
-        best_score = float('inf')
-        for c in range(1, min(65, n + 1)):
-            r = (n + c - 1) // c
-            if r > 32:
-                continue
-            if c < r:
-                continue
-            padding = c * r - n
-            if padding > 4:
-                continue
-            score = padding * 100 + abs(c - r)
-            if c > r:
-                score -= 100
-            if c >= r:
-                score -= 50
-            if score < best_score:
-                best_score = score
-                best_cols = c
-        if best_score == float('inf'):
-            for c in range(1, min(65, n + 1)):
-                r = (n + c - 1) // c
-                if c < r:
-                    continue
-                padding = c * r - n
-                score = padding * 100 + abs(c - r) + (max(0, r - 32) * 1000)
-                if c > r:
-                    score -= 100
-                if score < best_score:
-                    best_score = score
-                    best_cols = c
-        cols = best_cols
-
+    cols = tile_width if (tile_width is not None and 1 <= tile_width <= 64) else _calc_tileset_cols(n)
     rows = (n + cols - 1) // cols
-    if rows > 32:
-        rows = 32
-        cols = (n + rows - 1) // rows
 
     img_width = cols * 8
     img_height = rows * 8
@@ -375,11 +354,7 @@ def generate_final_assets_rotation(img, extra_transparent_tiles=0, tile_width=No
         print(translator.tr("tilemap_saved"))
 
     n = total_tiles
-    if tile_width is not None and 1 <= tile_width <= 64:
-        cols = tile_width
-    else:
-        import math
-        cols = min(16, n)
+    cols = tile_width if (tile_width is not None and 1 <= tile_width <= 64) else _calc_tileset_cols(n)
     rows = (n + cols - 1) // cols
 
     tiles_img = Image.new("P", (cols * 8, rows * 8))
@@ -489,43 +464,7 @@ def generate_final_assets_8bpp(img, start_index, palette_size, extra_transparent
         print(translator.tr("tilemap_saved"))
 
     n = total_tiles
-    if tile_width is not None and 1 <= tile_width <= 64:
-        cols = tile_width
-    else:
-        best_cols = 1
-        best_score = float('inf')
-        for c in range(1, min(65, n + 1)):
-            r = (n + c - 1) // c
-            if r > 32:
-                continue
-            if c < r:
-                continue
-            padding = c * r - n
-            if padding > 4:
-                continue
-            score = padding * 100 + abs(c - r)
-            if c > r:
-                score -= 100
-            if c >= r:
-                score -= 50
-            if score < best_score:
-                best_score = score
-                best_cols = c
-        
-        if best_score == float('inf'):
-            for c in range(1, min(65, n + 1)):
-                r = (n + c - 1) // c
-                if c < r:
-                    continue
-                padding = c * r - n
-                score = padding * 100 + abs(c - r) + (max(0, r - 32) * 1000)
-                if c > r:
-                    score -= 100
-                if score < best_score:
-                    best_score = score
-                    best_cols = c
-
-    cols = best_cols
+    cols = tile_width if (tile_width is not None and 1 <= tile_width <= 64) else _calc_tileset_cols(n)
     rows = (n + cols - 1) // cols
     img_width = cols * 8
     img_height = rows * 8

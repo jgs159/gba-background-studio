@@ -93,7 +93,7 @@ class GBABackgroundStudio(QMainWindow):
         self.main_tabs.addTab(self.edit_tiles_tab, self.translator.tr("edit_tiles_tab"))
         self.main_tabs.addTab(self.edit_palettes_tab, self.translator.tr("edit_palettes_tab"))
 
-        self.custom_status_bar = CustomStatusBar()
+        self.custom_status_bar = CustomStatusBar(translator=self.translator)
         main_layout.addWidget(self.custom_status_bar)
 
         self.custom_status_bar.update_status(
@@ -239,7 +239,12 @@ class GBABackgroundStudio(QMainWindow):
             self.edit_tiles_tab.edit_tilemap_scene.addPixmap(preview_pixmap)
             self.edit_tiles_tab.edit_tilemap_scene.setSceneRect(preview_pixmap.rect())
             
-            self.edit_palettes_tab.display_tilemap_replica(self.preview_tab.preview_image_scene)
+            self.edit_palettes_tab.tilemap_data = self.edit_tiles_tab.tilemap_data
+            self.edit_palettes_tab.tilemap_width = preview_img.width // 8
+            self.edit_palettes_tab.tilemap_height = preview_img.height // 8
+            self.edit_tiles_tab.tilemap_width = self.edit_palettes_tab.tilemap_width
+            self.edit_tiles_tab.tilemap_height = self.edit_palettes_tab.tilemap_height
+            self.edit_palettes_tab.display_tilemap_replica(self.edit_tiles_tab.edit_tilemap_scene)
             
             if hasattr(self, 'apply_zoom_to_all'):
                 self.apply_zoom_to_all()
@@ -661,6 +666,11 @@ class GBABackgroundStudio(QMainWindow):
     def toggle_grid(self, checked):
         from .config import toggle_grid
         toggle_grid(self, checked)
+
+    def open_display_settings(self):
+        from ui.dialogs.display_settings_dialog import DisplaySettingsDialog
+        dlg = DisplaySettingsDialog(self, parent=self)
+        dlg.exec()
     
     def toggle_status_bar(self, checked):
         from .config import toggle_status_bar

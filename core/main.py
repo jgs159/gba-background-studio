@@ -402,7 +402,7 @@ def cli_main():
         epilog=translator.tr("help_epilog"),
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("input", help="Input image (PNG)")
+    parser.add_argument("input", help="Input image (PNG or BMP)")
     parser.add_argument("--selected-palettes", type=str, default="0", help='Comma-separated list of palette indices to use: "0,1,3,6,7,8" (only for 4bpp)')
     parser.add_argument("--transparent-color", type=str, default="0,0,0", help='Transparent color "R,G,B" (e.g. "192,200,164")')
     parser.add_argument("--tilemap", type=str, help="Tilemap .bin file with palette per tile (optional)")

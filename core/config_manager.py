@@ -23,8 +23,14 @@ class ConfigManager:
                 'save_conversion_params': 'False',
                 'show_success_dialog': 'True'
             }
+            self.config['DISPLAY'] = {
+                'grid_color': '255,255,255',
+                'grid_alpha': '180',
+                'overlay_text_color': '0,0,0',
+                'overlay_alpha': '76'
+            }
             self.config['CONVERSION'] = {
-                'bpp': '4',
+                'bpp': '0',
                 'use_palettes': 'True',
                 'selected_palettes': '0',
                 'transparent_color': '0,0,0',
@@ -36,6 +42,7 @@ class ConfigManager:
                 'custom_height': '20',
                 'tilemap_width': '32',
                 'tilemap_height': '20',
+                'rotation_mode': '0',
                 'start_index': '0',
                 'palette_size': '1'
             }

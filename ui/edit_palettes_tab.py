@@ -38,6 +38,8 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.tilemap_data = None
         self.overlay_items = {}
         self.palette_colors = [(0, 0, 0)] * 256
+        self._overlay_text_color = QColor(0, 0, 0)
+        self._overlay_alpha = 0.3
         self.selection_rect = None
         self.palette_rects = []
 
@@ -703,6 +705,16 @@ class EditPalettesTab(TilemapUtils, QWidget):
         painter.end()
         self._pixmap_item.setPixmap(scene_pixmap)
 
+    def set_overlay_text_color(self, r, g, b):
+        self._overlay_text_color = QColor(r, g, b)
+        for rect_item, text_item in self.overlay_items.values():
+            text_item.setDefaultTextColor(self._overlay_text_color)
+
+    def set_overlay_alpha(self, alpha):
+        self._overlay_alpha = alpha / 255.0
+        for rect_item, _ in self.overlay_items.values():
+            rect_item.setOpacity(self._overlay_alpha)
+
     def update_palette_overlay_for_tile(self, tile_x, tile_y, palette_id):
         x = tile_x * 8
         y = tile_y * 8
@@ -719,12 +731,12 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
         rect_item = self.edit_tilemap2_scene.addRect(x, y, 8, 8, QPen(Qt.NoPen), QBrush(color))
         rect_item.setZValue(1)
-        rect_item.setOpacity(0.3)
+        rect_item.setOpacity(self._overlay_alpha)
 
         font = QFont("Arial", 5, QFont.Normal)
         text_item = self.edit_tilemap2_scene.addText(f"{palette_id:X}")
         text_item.setFont(font)
-        text_item.setDefaultTextColor(QColor(0, 0, 0))
+        text_item.setDefaultTextColor(self._overlay_text_color)
         rect = text_item.boundingRect()
         text_item.setPos(x + (8 - rect.width()) / 2, y + (8 - rect.height()) * 0.5)
         text_item.setZValue(2)
@@ -735,38 +747,44 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.edit_tilemap2_scene.clear()
         self.overlay_items.clear()
         self._tilemap_items = {}
-        
-        if source_scene.items():
-            item = source_scene.items()[0]
-            pixmap = item.pixmap()
-            
+
+        pixmap_item = None
+        for item in source_scene.items():
+            if hasattr(item, 'pixmap'):
+                pixmap_item = item
+                break
+
+        if pixmap_item:
+            pixmap = pixmap_item.pixmap()
             self._pixmap_item = self.edit_tilemap2_scene.addPixmap(pixmap)
             self.edit_tilemap2_scene.setSceneRect(pixmap.rect())
-            
+
             if hasattr(self.main_window, 'edit_tiles_tab'):
                 tiles_tab = self.main_window.edit_tiles_tab
                 tiles_tab.edit_tilemap_scene.clear()
                 tiles_tab.edit_tilemap_scene.addPixmap(pixmap)
                 tiles_tab.edit_tilemap_scene.setSceneRect(pixmap.rect())
-                
+
                 if self.main_window and hasattr(self.main_window, 'grid_manager'):
                     if self.main_window.grid_manager.is_grid_visible():
                         self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
-        
-        if (not self._is_rotation() and
-                hasattr(self, 'tilemap_data') and self.tilemap_data and 
-                hasattr(self, 'tilemap_width') and self.tilemap_width > 0 and
-                hasattr(self, 'tilemap_height') and self.tilemap_height > 0):
-            
-            for y in range(self.tilemap_height):
-                for x in range(self.tilemap_width):
-                    idx = self._tilemap_index(x, y)
-                    if idx >= len(self.tilemap_data) // 2:
-                        continue
-                    entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
-                    palette_id = (entry >> 12) & 0xF
-                    self.update_palette_overlay_for_tile(x, y, palette_id)
-        
+
+        if not self._is_rotation() and hasattr(self, 'tilemap_data') and self.tilemap_data:
+            scene_rect = self.edit_tilemap2_scene.sceneRect()
+            w = int(scene_rect.width()) // 8
+            h = int(scene_rect.height()) // 8
+            if w > 0 and h > 0:
+                self.tilemap_width = w
+                self.tilemap_height = h
+                for y in range(h):
+                    for x in range(w):
+                        idx = self._tilemap_index(x, y)
+                        if idx >= len(self.tilemap_data) // 2:
+                            continue
+                        entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
+                        palette_id = (entry >> 12) & 0xF
+                        self.update_palette_overlay_for_tile(x, y, palette_id)
+
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():
                 self.main_window.grid_manager.update_grid_for_view("tilemap_palettes")
