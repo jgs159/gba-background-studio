@@ -1,6 +1,10 @@
 # ui/shared_utils.py
-from PySide6.QtWidgets import QGraphicsView, QRubberBand
+from PySide6.QtWidgets import QGraphicsView
+from PySide6.QtGui import QPen, QColor
 from PySide6.QtCore import Qt, QRect, QPoint, QSize
+
+_SEL_PEN = QPen(QColor(255, 255, 0), 2.0)
+_SEL_PEN.setCosmetic(True)
 
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, parent=None):
@@ -17,7 +21,7 @@ class CustomGraphicsView(QGraphicsView):
         self.on_selection_complete = None
         self.on_selection_hover = None
         self._sel_origin = None
-        self._rubber_band = None
+        self._sel_drag_item = None  # live yellow rect during drag
 
     def _scene_tile(self, pos):
         scene_rect = self.scene().sceneRect()
@@ -30,21 +34,27 @@ class CustomGraphicsView(QGraphicsView):
         scene_p2 = self.mapFromScene((tx + 1) * 8, (ty + 1) * 8)
         return scene_p1, scene_p2
 
+    def _remove_drag_item(self):
+        try:
+            if self._sel_drag_item is not None and self._sel_drag_item.scene():
+                self.scene().removeItem(self._sel_drag_item)
+        except RuntimeError:
+            pass
+        self._sel_drag_item = None
+
     def mousePressEvent(self, event):
         if self.selection_mode and event.button() == Qt.LeftButton:
             scene_pos = self.mapToScene(event.pos())
             if self.scene() and self.scene().sceneRect().isValid():
                 tx, ty = self._scene_tile(scene_pos)
                 self._sel_tile_origin = (tx, ty)
-                snapped = self.mapFromScene(tx * 8, ty * 8)
-                self._sel_origin = snapped
+                self._sel_origin = (tx, ty)
+                self._remove_drag_item()
+                self._sel_drag_item = self.scene().addRect(tx * 8, ty * 8, 8, 8, _SEL_PEN)
+                self._sel_drag_item.setZValue(201)
             else:
-                self._sel_origin = event.pos()
+                self._sel_origin = None
                 self._sel_tile_origin = None
-            if not self._rubber_band:
-                self._rubber_band = QRubberBand(QRubberBand.Rectangle, self)
-            self._rubber_band.setGeometry(QRect(self._sel_origin, QSize()))
-            self._rubber_band.show()
             event.accept()
             return
         if event.button() == Qt.LeftButton:
@@ -73,19 +83,20 @@ class CustomGraphicsView(QGraphicsView):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self.selection_mode and self._sel_origin is not None and self._rubber_band:
+        if self.selection_mode and self._sel_origin is not None:
             scene_pos = self.mapToScene(event.pos())
             if self.scene() and self.scene().sceneRect().isValid():
+                ox, oy = self._sel_origin
                 tx2, ty2 = self._scene_tile(scene_pos)
-                snapped_end = self.mapFromScene((tx2 + 1) * 8, (ty2 + 1) * 8)
-                self._rubber_band.setGeometry(QRect(self._sel_origin, snapped_end).normalized())
-                if self.on_selection_hover and hasattr(self, '_sel_tile_origin') and self._sel_tile_origin:
-                    ox, oy = self._sel_tile_origin
-                    x1, x2 = min(ox, tx2), max(ox, tx2)
-                    y1, y2 = min(oy, ty2), max(oy, ty2)
+                x1, x2 = min(ox, tx2), max(ox, tx2)
+                y1, y2 = min(oy, ty2), max(oy, ty2)
+                self._remove_drag_item()
+                w = (x2 - x1 + 1) * 8
+                h = (y2 - y1 + 1) * 8
+                self._sel_drag_item = self.scene().addRect(x1 * 8, y1 * 8, w, h, _SEL_PEN)
+                self._sel_drag_item.setZValue(201)
+                if self.on_selection_hover:
                     self.on_selection_hover(x1, y1, x2, y2)
-            else:
-                self._rubber_band.setGeometry(QRect(self._sel_origin, event.pos()).normalized())
             event.accept()
             return
         pos = self.mapToScene(event.pos())
@@ -118,8 +129,7 @@ class CustomGraphicsView(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         if self.selection_mode and event.button() == Qt.LeftButton and self._sel_origin is not None:
-            if self._rubber_band:
-                self._rubber_band.hide()
+            self._remove_drag_item()
             scene_p2 = self.mapToScene(event.pos())
             if self.scene() and self.scene().sceneRect().isValid() and hasattr(self, '_sel_tile_origin') and self._sel_tile_origin:
                 ox, oy = self._sel_tile_origin

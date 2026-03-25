@@ -97,6 +97,8 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
         if not is_rotation and bpp == 0:
             pal_files = sorted(f for f in os.listdir(output_dir)
                                if f.startswith('palette_') and f.endswith('.pal'))
+            if pal_files:
+                palette_rgb = [(0, 0, 0)] * 256
             for pal_file in pal_files:
                 stem = pal_file[len('palette_'):-len('.pal')]
                 try:
@@ -113,13 +115,13 @@ def create_gbagfx_preview(save_preview=False, keep_transparent=False):
                             palette_rgb[idx] = tuple(map(int, plines[i].split()))
                 except Exception:
                     pass
-            if keep_transparent:
-                tc = (
-                    min(transparent_color[0] // 8 * 8, 248),
-                    min(transparent_color[1] // 8 * 8, 248),
-                    min(transparent_color[2] // 8 * 8, 248)
-                )
-                palette_rgb[0] = tc
+        elif not is_rotation and bpp == 1 and keep_transparent:
+            tc = (
+                min(transparent_color[0] // 8 * 8, 248),
+                min(transparent_color[1] // 8 * 8, 248),
+                min(transparent_color[2] // 8 * 8, 248)
+            )
+            palette_rgb[0] = tc
 
         with open(map_path, "rb") as f:
             map_bytes = f.read()

@@ -7,6 +7,11 @@ from PySide6.QtGui import QPixmap
 
 
 def on_tab_changed(main_window, index):
+    if hasattr(main_window, 'context_toolbar'):
+        if index == main_window.context_toolbar._placeholder_index:
+            main_window.main_tabs.setCurrentIndex(0)
+            return
+
     current_tab = main_window.main_tabs.widget(index)
     
     if hasattr(main_window, 'edit_tiles_tab') and hasattr(main_window.edit_tiles_tab, 'edit_tilemap_view'):
@@ -14,6 +19,9 @@ def on_tab_changed(main_window, index):
     if hasattr(main_window, 'edit_palettes_tab') and hasattr(main_window.edit_palettes_tab, 'edit_tilemap2_view'):
         main_window.hover_manager.hide_hover(main_window.edit_palettes_tab.edit_tilemap2_view)
     
+    if hasattr(main_window, 'context_toolbar'):
+        main_window.context_toolbar.show_for_tab(index)
+
     if current_tab == main_window.edit_tiles_tab:
         update_hover_from_current_cursor(main_window)
         main_window.edit_tiles_tab.update_status_bar(-1, -1)
@@ -127,6 +135,27 @@ def load_conversion_results(main_window):
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
 
+    if os.path.exists(palette_path):
+        palette_colors = [(0, 0, 0)] * 256
+        try:
+            with open(palette_path, 'r', encoding='utf-8') as f:
+                lines = [line.strip() for line in f
+                        if line.strip() and not line.startswith(("JASC-PAL", "0100"))]
+            if lines:
+                color_count = int(lines[0])
+                for i in range(1, min(1 + color_count, 257)):
+                    r, g, b = map(int, lines[i].split())
+                    palette_colors[i - 1] = (r, g, b)
+            main_window.preview_tab.display_palette_colors(palette_colors)
+            if hasattr(main_window, 'edit_palettes_tab'):
+                main_window.edit_palettes_tab.display_palette_colors(palette_colors)
+        except Exception as e:
+            print(f"Error loading palette: {e}")
+            grayscale_colors = generate_grayscale_palette()
+            main_window.preview_tab.display_palette_colors(grayscale_colors)
+            if hasattr(main_window, 'edit_palettes_tab'):
+                main_window.edit_palettes_tab.display_palette_colors(grayscale_colors)
+
     if os.path.exists(preview_path):
         preview_img = PilImage.open(preview_path)
         preview_qimg = pil_to_qimage(preview_img)
@@ -150,33 +179,17 @@ def load_conversion_results(main_window):
             main_window.preview_tab.preview_image_scene.items()[0]
         )
 
-    if os.path.exists(palette_path):
-        palette_colors = [(0, 0, 0)] * 256
-        try:
-            with open(palette_path, 'r', encoding='utf-8') as f:
-                lines = [line.strip() for line in f
-                        if line.strip() and not line.startswith(("JASC-PAL", "0100"))]
-            if lines:
-                color_count = int(lines[0])
-                for i in range(1, min(1 + color_count, 257)):
-                    r, g, b = map(int, lines[i].split())
-                    palette_colors[i - 1] = (r, g, b)
-            main_window.preview_tab.display_palette_colors(palette_colors)
-            if hasattr(main_window, 'edit_palettes_tab'):
-                main_window.edit_palettes_tab.display_palette_colors(palette_colors)
-        except Exception as e:
-            print(f"Error loading palette: {e}")
-            grayscale_colors = generate_grayscale_palette()
-            main_window.preview_tab.display_palette_colors(grayscale_colors)
-            if hasattr(main_window, 'edit_palettes_tab'):
-                main_window.edit_palettes_tab.display_palette_colors(grayscale_colors)
-
     main_window.menu_bar.action_save_tileset.setEnabled(True)
+    from .file_ops import _update_convert_actions
+    _update_convert_actions(main_window)
     main_window.menu_bar.action_open_tilemap.setEnabled(True)
     main_window.menu_bar.action_new_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
     main_window.menu_bar.action_save_selection.setEnabled(True)
     main_window.menu_bar.action_save_palette.setEnabled(True)
+
+    if hasattr(main_window, 'context_toolbar'):
+        main_window.context_toolbar.show_for_tab(main_window.main_tabs.currentIndex())
 
     main_window.tileset_from_conversion = True
 
@@ -191,3 +204,17 @@ def load_conversion_results(main_window):
         keep_transparent=main_window.keep_transparent_color
     )
     main_window.refresh_preview_display()
+
+    if os.path.exists(palette_path):
+        try:
+            with open(palette_path, 'r', encoding='utf-8') as f:
+                plines = [l.strip() for l in f
+                          if l.strip() and not l.startswith(('JASC-PAL', '0100'))]
+            if plines:
+                palette_colors = [(0, 0, 0)] * 256
+                for i in range(1, min(1 + int(plines[0]), 257)):
+                    palette_colors[i - 1] = tuple(map(int, plines[i].split()))
+                main_window.preview_tab.display_palette_colors(palette_colors)
+                main_window.edit_palettes_tab.display_palette_colors(palette_colors)
+        except Exception as e:
+            print(f"Error reloading palette after preview: {e}")
