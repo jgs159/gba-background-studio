@@ -129,7 +129,6 @@ def load_last_output_files(main_window):
             tiles_img = f.copy()
         main_window.display_tileset(tiles_img)
         main_window.menu_bar.action_save_tileset.setEnabled(True)
-        _update_convert_actions(main_window)
         main_window.menu_bar.action_open_tilemap.setEnabled(True)
         main_window.menu_bar.action_new_tilemap.setEnabled(True)
         main_window.tileset_from_conversion = True
@@ -144,6 +143,7 @@ def load_last_output_files(main_window):
         main_window.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path if os.path.exists(preview_path) else None)
         main_window.menu_bar.action_save_tilemap.setEnabled(True)
         main_window.menu_bar.action_save_selection.setEnabled(True)
+        _update_convert_actions(main_window)
 
         if hasattr(main_window, 'history_manager'):
             main_window.history_manager.clear()
@@ -397,8 +397,253 @@ def _reset_palette(main_window):
 
 def _update_convert_actions(main_window):
     is_8bpp = getattr(main_window, 'current_bpp', 4) == 8
-    main_window.menu_bar.action_convert_to_4bpp.setEnabled(is_8bpp)
+    is_rot  = getattr(main_window, 'current_rotation_mode', False)
+    main_window.menu_bar.action_convert_to_4bpp.setEnabled(is_8bpp and not is_rot)
     main_window.menu_bar.action_convert_to_8bpp.setEnabled(not is_8bpp)
+    et = getattr(main_window, 'edit_tiles_tab', None)
+    has_tileset = et is not None and bool(getattr(et, 'tileset_img', None))
+    has_tilemap = et is not None and bool(getattr(et, 'tilemap_data', None))
+    main_window.menu_bar.action_optimize_tiles.setEnabled(has_tileset and not is_rot)
+    main_window.menu_bar.action_deoptimize_tiles.setEnabled(has_tileset and not is_rot)
+    main_window.menu_bar.action_convert_to_text_mode.setEnabled(has_tilemap and is_rot)
+    main_window.menu_bar.action_convert_to_rot_mode.setEnabled(has_tilemap and not is_rot)
+
+
+def _apply_mode_conversion(main_window, mode):
+    """Shared implementation for convert_to_text_mode and convert_to_rot_mode."""
+    from core.tile_optimizer import convert_text_to_rotation, convert_rotation_to_text
+    from PySide6.QtWidgets import QMessageBox
+
+    et = main_window.edit_tiles_tab
+    if not et.tileset_img or not et.tilemap_data:
+        return
+
+    tr = main_window.translator.tr
+    title     = tr('convert_to_text_mode' if mode == 'to_text' else 'convert_to_rot_mode')
+    confirm   = tr('convert_to_text_mode_confirm' if mode == 'to_text' else 'convert_to_rot_mode_confirm')
+    result_key = 'convert_to_text_mode_result' if mode == 'to_text' else 'convert_to_rot_mode_result'
+
+    reply = QMessageBox.question(main_window, title, confirm, QMessageBox.Yes | QMessageBox.No)
+    if reply != QMessageBox.Yes:
+        return
+
+    # Text Mode supports max 64x64 tiles
+    if mode == 'to_text' and (et.tilemap_width > 64 or et.tilemap_height > 64):
+        QMessageBox.critical(
+            main_window, title,
+            tr('convert_to_text_mode_too_large',
+               w=et.tilemap_width, h=et.tilemap_height)
+        )
+        return
+
+    # Rotation/Scaling requires exact predefined dimensions
+    from core.config import ROT_SIZES_SET
+    if mode == 'to_rot' and (et.tilemap_width, et.tilemap_height) not in ROT_SIZES_SET:
+        valid = ', '.join(f'{w}x{h}' for w, h in sorted(ROT_SIZES_SET))
+        QMessageBox.critical(
+            main_window, title,
+            tr('convert_to_rot_mode_invalid_size',
+               w=et.tilemap_width, h=et.tilemap_height, valid=valid)
+        )
+        return
+
+    def tilemap_index(tx, ty):
+        w = et.tilemap_width
+        if w <= 32:
+            return ty * w + tx
+        bx, by = tx // 32, ty // 32
+        return (by * (w // 32) + bx) * 1024 + (ty % 32) * 32 + (tx % 32)
+
+    old_tileset = et.tileset_img
+    old_tilemap = et.tilemap_data
+
+    if mode == 'to_text':
+        new_ts, new_tm, old_count, new_count = convert_rotation_to_text(
+            et.tileset_img, et.tilemap_data, et.tilemap_width, et.tilemap_height
+        )
+    else:
+        new_ts, new_tm, old_count, new_count = convert_text_to_rotation(
+            et.tileset_img, et.tilemap_data,
+            et.tilemap_width, et.tilemap_height, tilemap_index
+        )
+        if new_ts is None:
+            QMessageBox.critical(main_window, title,
+                                 tr('convert_to_rot_mode_too_many', n=new_count))
+            return
+
+    # Update mode flags
+    new_is_rot = (mode == 'to_rot')
+    main_window.current_rotation_mode = new_is_rot
+    if new_is_rot:
+        main_window.current_bpp = 8
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'rotation_mode', '1' if new_is_rot else '0')
+        if new_is_rot:
+            main_window.config_manager.set('CONVERSION', 'bpp', '1')
+
+    # Update both tabs
+    for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+        tab = getattr(main_window, attr, None)
+        if tab:
+            tab.tilemap_data = new_tm
+
+    # Reload tileset
+    et.tileset_img = new_ts
+    et.tileset_img_original = new_ts
+    total = (new_ts.width // 8) * (new_ts.height // 8)
+    w = et.tiles_per_row if et.tiles_per_row > 0 else new_ts.width // 8
+    et.render_tileset_with_padding(w, (total + w - 1) // w, total)
+
+    # Save files
+    os.makedirs('output', exist_ok=True)
+    new_ts.save('output/tiles.png')
+    with open('output/map.bin', 'wb') as f:
+        f.write(new_tm)
+
+    # Record history
+    if hasattr(main_window, 'history_manager'):
+        main_window.history_manager.record_state(
+            state_type='tile_optimizer',
+            editor_type='tiles',
+            data={
+                'old_tilemap': old_tilemap,
+                'new_tilemap': new_tm,
+                'old_tileset_bytes': old_tileset.tobytes(),
+                'old_tileset_size': old_tileset.size,
+                'old_tileset_palette': old_tileset.getpalette(),
+                'new_tileset_bytes': new_ts.tobytes(),
+                'new_tileset_size': new_ts.size,
+                'new_tileset_palette': new_ts.getpalette(),
+                'w': et.tilemap_width, 'h': et.tilemap_height,
+            },
+            description=tr(result_key, old=old_count, new=new_count)
+        )
+
+    main_window._save_map_and_refresh()
+    _update_convert_actions(main_window)
+    QMessageBox.information(main_window, title, tr(result_key, old=old_count, new=new_count))
+
+
+def convert_to_text_mode(main_window):
+    _apply_mode_conversion(main_window, 'to_text')
+
+
+def convert_to_rot_mode(main_window):
+    _apply_mode_conversion(main_window, 'to_rot')
+
+
+def _apply_tile_optimizer(main_window, mode):
+    """Shared implementation for optimize/deoptimize tiles."""
+    from core.tile_optimizer import optimize_tiles, deoptimize_tiles
+    from PySide6.QtWidgets import QMessageBox
+
+    et = main_window.edit_tiles_tab
+    if not et.tileset_img:
+        return
+
+    tr = main_window.translator.tr
+    title = tr(mode + '_tiles')
+
+    # Confirmation dialog
+    reply = QMessageBox.question(
+        main_window, title,
+        tr(mode + '_tiles_confirm'),
+        QMessageBox.Yes | QMessageBox.No
+    )
+    if reply != QMessageBox.Yes:
+        return
+
+    fn = optimize_tiles if mode == 'optimize' else deoptimize_tiles
+    result_key    = mode + '_tiles_result'
+    no_change_key = mode + '_tiles_no_change'
+    too_many_key  = 'deoptimize_tiles_too_many'
+
+    def tilemap_index(tx, ty):
+        w = et.tilemap_width
+        if w <= 32:
+            return ty * w + tx
+        bx, by = tx // 32, ty // 32
+        return (by * (w // 32) + bx) * 1024 + (ty % 32) * 32 + (tx % 32)
+
+    old_tileset = et.tileset_img
+    old_tilemap = et.tilemap_data
+
+    new_tileset, new_tilemap, old_count, new_count = fn(
+        et.tileset_img, et.tilemap_data,
+        et.tilemap_width, et.tilemap_height, tilemap_index
+    )
+
+    # Count only tiles actually referenced in the tilemap (not padding)
+    if et.tilemap_data:
+        old_count = len(set(
+            (et.tilemap_data[i*2] | (et.tilemap_data[i*2+1] << 8)) & 0x3FF
+            for i in range(et.tilemap_width * et.tilemap_height)
+        ))
+        new_count = len(set(
+            (new_tilemap[i*2] | (new_tilemap[i*2+1] << 8)) & 0x3FF
+            for i in range(et.tilemap_width * et.tilemap_height)
+        )) if new_tilemap else new_count
+
+    # Tile count limit check (only relevant for deoptimize)
+    if mode == 'deoptimize' and new_count > 1024:
+        QMessageBox.critical(main_window, title, tr(too_many_key, n=new_count))
+        return
+
+    if new_count == old_count and new_tilemap == old_tilemap:
+        QMessageBox.information(main_window, title, tr(no_change_key))
+        return
+
+    # Reload tileset display
+    et.tileset_img = new_tileset
+    et.tileset_img_original = new_tileset
+    total = (new_tileset.width // 8) * (new_tileset.height // 8)
+    w = et.tiles_per_row if et.tiles_per_row > 0 else new_tileset.width // 8
+    et.render_tileset_with_padding(w, (total + w - 1) // w, total)
+
+    # Update tilemap in both tabs
+    for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+        tab = getattr(main_window, attr, None)
+        if tab and new_tilemap:
+            tab.tilemap_data = new_tilemap
+
+    # Save files after render
+    os.makedirs('output', exist_ok=True)
+    new_tileset.save('output/tiles.png')
+    if new_tilemap:
+        with open('output/map.bin', 'wb') as f:
+            f.write(new_tilemap)
+
+    # Record history
+    if hasattr(main_window, 'history_manager'):
+        main_window.history_manager.record_state(
+            state_type='tile_optimizer',
+            editor_type='tiles',
+            data={
+                'old_tilemap': old_tilemap,
+                'new_tilemap': new_tilemap,
+                'old_tileset_bytes': old_tileset.tobytes(),
+                'old_tileset_size': old_tileset.size,
+                'old_tileset_palette': old_tileset.getpalette(),
+                'new_tileset_bytes': new_tileset.tobytes(),
+                'new_tileset_size': new_tileset.size,
+                'new_tileset_palette': new_tileset.getpalette(),
+                'w': et.tilemap_width, 'h': et.tilemap_height,
+            },
+            description=tr(result_key, old=old_count, new=new_count)
+        )
+
+    if new_tilemap:
+        main_window._save_map_and_refresh()
+
+    QMessageBox.information(main_window, title, tr(result_key, old=old_count, new=new_count))
+
+
+def optimize_tiles(main_window):
+    _apply_tile_optimizer(main_window, 'optimize')
+
+
+def deoptimize_tiles(main_window):
+    _apply_tile_optimizer(main_window, 'deoptimize')
 
 
 def convert_to_4bpp(main_window):

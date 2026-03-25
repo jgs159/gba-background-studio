@@ -299,6 +299,8 @@ class GBABackgroundStudio(QMainWindow):
                 self.apply_tilemap_cut(state, is_undo)
             elif state['type'] in ('tilemap_transform', 'tilemap_paste'):
                 self.apply_tilemap_cut(state, is_undo)
+            elif state['type'] == 'tile_optimizer':
+                self.apply_tile_optimizer(state, is_undo)
             elif state['type'] == 'tilemap_shift':
                 self.apply_tilemap_shift(state, is_undo)
             elif state['type'] == 'tileset_reshape':
@@ -379,6 +381,32 @@ class GBABackgroundStudio(QMainWindow):
 
         if self.edit_tiles_tab.tileset_img:
             self.edit_tiles_tab.tileset_img.save("output/tiles.png")
+
+    def apply_tile_optimizer(self, state, is_undo):
+        import os
+        from PIL import Image as PilImage
+        import numpy as np
+        data = state['data']
+        tilemap = data['old_tilemap'] if is_undo else data['new_tilemap']
+        ts_bytes  = data['old_tileset_bytes']   if is_undo else data['new_tileset_bytes']
+        ts_size   = data['old_tileset_size']     if is_undo else data['new_tileset_size']
+        ts_pal    = data['old_tileset_palette']  if is_undo else data['new_tileset_palette']
+        arr = np.frombuffer(ts_bytes, dtype=np.uint8).reshape(ts_size[1], ts_size[0])
+        tileset = PilImage.fromarray(arr, mode='P')
+        tileset.putpalette(ts_pal)
+        os.makedirs('output', exist_ok=True)
+        tileset.save('output/tiles.png')
+        with open('output/map.bin', 'wb') as f:
+            f.write(tilemap)
+        et = self.edit_tiles_tab
+        et.tileset_img = tileset
+        et.tileset_img_original = tileset
+        et.tilemap_data = tilemap
+        self.edit_palettes_tab.tilemap_data = tilemap
+        total = (tileset.width // 8) * (tileset.height // 8)
+        w = et.tiles_per_row if et.tiles_per_row > 0 else tileset.width // 8
+        et.render_tileset_with_padding(w, (total + w - 1) // w, total)
+        self._save_map_and_refresh()
 
     def apply_tilemap_cut(self, state, is_undo):
         data = state['data']
@@ -643,6 +671,22 @@ class GBABackgroundStudio(QMainWindow):
     def convert_to_8bpp(self):
         from .file_ops import convert_to_8bpp
         convert_to_8bpp(self)
+
+    def convert_to_text_mode(self):
+        from .file_ops import convert_to_text_mode
+        convert_to_text_mode(self)
+
+    def convert_to_rot_mode(self):
+        from .file_ops import convert_to_rot_mode
+        convert_to_rot_mode(self)
+
+    def optimize_tiles(self):
+        from .file_ops import optimize_tiles
+        optimize_tiles(self)
+
+    def deoptimize_tiles(self):
+        from .file_ops import deoptimize_tiles
+        deoptimize_tiles(self)
 
     def open_tileset(self):
         from .file_ops import open_tileset
