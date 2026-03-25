@@ -4,15 +4,221 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from core.config import ROT_SIZES, ROT_SIZES_SET
+from utils.translator import Translator
+
+translator = Translator()
 
 
 class TilemapUtils:
     def setup_tilemap_interaction(self):
-        self.tilemap_view.on_tile_drawing  = self.on_tilemap_drawing
-        self.tilemap_view.on_tile_selected = self.on_tilemap_right_click
-        self.tilemap_view.on_tile_hover    = self.on_tilemap_hover
-        self.tilemap_view.on_tile_leave    = self.on_tilemap_leave
-        self.tilemap_view.on_tile_release  = self.on_tilemap_release
+        self._tilemap_sel_area = None
+        self._tilemap_sel_area_item = None
+        self._pal_sel_items = []
+        self._pal_sel_palette_id = -1
+        self._pal_sel_origin = None
+        self.tilemap_view.on_tile_drawing       = self._on_tile_drawing_dispatch
+        self.tilemap_view.on_tile_selected      = self._on_tile_selected_dispatch
+        self.tilemap_view.on_tile_hover         = self.on_tilemap_hover
+        self.tilemap_view.on_tile_leave         = self.on_tilemap_leave
+        self.tilemap_view.on_tile_release       = self._on_tile_release_dispatch
+        self.tilemap_view.on_selection_complete = self._on_area_selection_complete
+
+    def _toolbar(self):
+        return getattr(getattr(self, 'main_window', None), 'context_toolbar', None)
+
+    def _select_area_active(self):
+        tb = self._toolbar()
+        return tb is not None and hasattr(self, 'edit_tileset_view') and tb.btn_select_rect.isChecked()
+
+    def _pal_select_area_active(self):
+        tb = self._toolbar()
+        return tb is not None and not hasattr(self, 'edit_tileset_view') and tb.btn_pal_select_rect.isChecked()
+
+    def _wand_active(self):
+        tb = self._toolbar()
+        return tb is not None and not hasattr(self, 'edit_tileset_view') and tb.btn_pencil_pal.isChecked()
+
+    def _fill_active(self):
+        tb = self._toolbar()
+        return tb is not None and not hasattr(self, 'edit_tileset_view') and tb.btn_fill.isChecked()
+
+    def _get_palette_id_at(self, tile_x, tile_y):
+        if not self.tilemap_data:
+            return -1
+        idx = self._tilemap_index(tile_x, tile_y) if hasattr(self, '_tilemap_index') else tile_y * self.tilemap_width + tile_x
+        if idx * 2 + 2 > len(self.tilemap_data):
+            return -1
+        entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
+        return (entry >> 12) & 0xF
+
+    def _select_tiles_by_palette(self, palette_id):
+        from PySide6.QtGui import QPen, QColor
+        self._clear_pal_selection()
+        if not self.tilemap_data or self.tilemap_width == 0 or self.tilemap_height == 0:
+            return
+        self._pal_sel_palette_id = palette_id
+        pen = QPen(QColor(255, 255, 0), 2.0)
+        pen.setCosmetic(True)
+        get_idx = (self._tilemap_index if hasattr(self, '_tilemap_index')
+                   else lambda x, y: y * self.tilemap_width + x)
+        for ty in range(self.tilemap_height):
+            for tx in range(self.tilemap_width):
+                idx = get_idx(tx, ty)
+                if idx * 2 + 2 > len(self.tilemap_data):
+                    continue
+                entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
+                if (entry >> 12) & 0xF == palette_id:
+                    item = self.tilemap_scene.addRect(tx * 8, ty * 8, 8, 8, pen)
+                    item.setZValue(200)
+                    self._pal_sel_items.append(item)
+        self.tilemap_view.viewport().update()
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_pal_selection_changed(bool(self._pal_sel_items))
+
+    def _flood_fill_by_palette(self, start_x, start_y, palette_id):
+        from PySide6.QtGui import QPen, QColor
+        from collections import deque
+        self._clear_pal_selection()
+        if not self.tilemap_data or self.tilemap_width == 0 or self.tilemap_height == 0:
+            return
+        self._pal_sel_palette_id = palette_id
+        self._pal_sel_origin = (start_x, start_y)
+        pen = QPen(QColor(255, 255, 0), 2.0)
+        pen.setCosmetic(True)
+        get_idx = (self._tilemap_index if hasattr(self, '_tilemap_index')
+                   else lambda x, y: y * self.tilemap_width + x)
+        visited = set()
+        queue = deque([(start_x, start_y)])
+        while queue:
+            tx, ty = queue.popleft()
+            if (tx, ty) in visited:
+                continue
+            if not (0 <= tx < self.tilemap_width and 0 <= ty < self.tilemap_height):
+                continue
+            idx = get_idx(tx, ty)
+            if idx * 2 + 2 > len(self.tilemap_data):
+                continue
+            entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
+            if (entry >> 12) & 0xF != palette_id:
+                continue
+            visited.add((tx, ty))
+            item = self.tilemap_scene.addRect(tx * 8, ty * 8, 8, 8, pen)
+            item.setZValue(200)
+            self._pal_sel_items.append(item)
+            queue.extend([(tx+1, ty), (tx-1, ty), (tx, ty+1), (tx, ty-1)])
+        self.tilemap_view.viewport().update()
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_pal_selection_changed(bool(self._pal_sel_items))
+
+    def _clear_pal_selection(self):
+        for item in self._pal_sel_items:
+            try:
+                if item.scene():
+                    self.tilemap_scene.removeItem(item)
+            except RuntimeError:
+                pass
+        self._pal_sel_items = []
+        self._pal_sel_palette_id = -1
+        self._pal_sel_origin = None
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_pal_selection_changed(False)
+
+    def _restore_pal_selection(self):
+        if self._pal_sel_palette_id < 0:
+            return
+        if self._pal_sel_origin is not None:
+            self._flood_fill_by_palette(*self._pal_sel_origin, self._pal_sel_palette_id)
+        else:
+            self._select_tiles_by_palette(self._pal_sel_palette_id)
+
+    def set_area_selection_mode(self, active: bool):
+        self.tilemap_view.selection_mode = active
+        if not active:
+            self._clear_tilemap_area_selection()
+
+    def _on_area_selection_complete(self, x1, y1, x2, y2):
+        self._clear_tilemap_selection()
+        self._tilemap_sel_area = (x1, y1, x2, y2)
+        self._draw_tilemap_area_rect(x1, y1, x2, y2)
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_area_selected(True)
+
+    def _clear_tilemap_area_selection(self):
+        self._tilemap_sel_area = None
+        try:
+            if self._tilemap_sel_area_item is not None:
+                if self._tilemap_sel_area_item.scene():
+                    self.tilemap_scene.removeItem(self._tilemap_sel_area_item)
+        except RuntimeError:
+            pass
+        self._tilemap_sel_area_item = None
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_area_selected(False)
+
+    def _draw_tilemap_area_rect(self, x1, y1, x2, y2):
+        from PySide6.QtGui import QPen, QColor
+        try:
+            if self._tilemap_sel_area_item is not None:
+                if self._tilemap_sel_area_item.scene():
+                    self.tilemap_scene.removeItem(self._tilemap_sel_area_item)
+        except RuntimeError:
+            pass
+        self._tilemap_sel_area_item = None
+        pen = QPen(QColor(255, 255, 0), 2.0)
+        pen.setCosmetic(True)
+        w = (x2 - x1 + 1) * 8
+        h = (y2 - y1 + 1) * 8
+        self._tilemap_sel_area_item = self.tilemap_scene.addRect(x1 * 8, y1 * 8, w, h, pen)
+        self._tilemap_sel_area_item.setZValue(200)
+        self.tilemap_view.viewport().update()
+
+    def _restore_tilemap_area_selection(self):
+        if self._tilemap_sel_area is not None:
+            self._draw_tilemap_area_rect(*self._tilemap_sel_area)
+
+    def _on_tile_release_dispatch(self):
+        self.on_tilemap_release()
+        self._restore_tilemap_selection()
+
+    def _restore_tilemap_selection(self):
+        self._restore_tilemap_area_selection()
+        self._restore_pal_selection()
+
+    def _on_tile_drawing_dispatch(self, tile_x, tile_y):
+        if self._select_area_active() or self._pal_select_area_active():
+            pass
+        elif self._wand_active():
+            pal_id = self._get_palette_id_at(tile_x, tile_y)
+            if pal_id >= 0:
+                self._select_tiles_by_palette(pal_id)
+        elif self._fill_active():
+            pal_id = self._get_palette_id_at(tile_x, tile_y)
+            if pal_id >= 0:
+                self._flood_fill_by_palette(tile_x, tile_y, pal_id)
+        else:
+            self.on_tilemap_drawing(tile_x, tile_y)
+
+    def _on_tile_selected_dispatch(self, tile_x, tile_y):
+        if self._select_area_active() or self._pal_select_area_active():
+            self._clear_tilemap_area_selection()
+        elif self._wand_active() or self._fill_active():
+            self._clear_pal_selection()
+        else:
+            self.on_tilemap_right_click(tile_x, tile_y)
+
+    def _set_tilemap_selection(self, tile_x, tile_y):
+        pass
+
+    def _clear_tilemap_selection(self):
+        self._clear_tilemap_area_selection()
+
+    def _draw_tilemap_selection_rect(self, tile_x, tile_y):
+        pass
 
     def on_tilemap_release(self):
         pass
@@ -109,7 +315,7 @@ class TilemapUtils:
                 state_type='tilemap_shift',
                 editor_type='tiles',
                 data={'old_data': old_data, 'new_data': new_data, 'w': w, 'h': h},
-                description=f"Tilemap shifted {direction}"
+                description=translator.tr('tilemap_shift_desc', direction=direction)
             )
 
         import os
@@ -189,11 +395,9 @@ class TilemapUtils:
                 self.tilemap_width_spin.setValue(final_new_w)
                 self.tilemap_height_spin.setValue(final_new_h)
 
-                # Adjusted dimensions equal current ones — nothing to change
                 if final_new_w == old_w and final_new_h == old_h:
                     return
 
-                # old_data may be GBA-reorganized if old_w > 32 — revert to linear first
                 if old_w > 32:
                     from core.final_assets import revert_gba_tilemap_reorganization
                     linear_old = revert_gba_tilemap_reorganization(old_data, old_w, old_h, old_w, old_h)
@@ -323,7 +527,7 @@ class TilemapUtils:
                     'new_w': final_new_w, 'new_h': final_new_h,
                     'old_data': old_data, 'new_data': final_new_data
                 },
-                description=f"Tilemap resized from {old_w}x{old_h} to {final_new_w}x{final_new_h}"
+                description=translator.tr('tilemap_resize_desc', old_w=old_w, old_h=old_h, new_w=final_new_w, new_h=final_new_h)
             )
 
         from core.image_utils import create_gbagfx_preview
@@ -354,7 +558,7 @@ class TilemapUtils:
             lbl.setStyleSheet("QLabel { border: none; }")
             return lbl
 
-        row.addWidget(_label("Width:"))
+        row.addWidget(_label(translator.tr("tilemap_width_label")))
         self.tilemap_width_spin = QSpinBox()
         self.tilemap_width_spin.setRange(1, 999)
         self.tilemap_width_spin.setValue(32)
@@ -363,7 +567,7 @@ class TilemapUtils:
         self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         row.addWidget(self.tilemap_width_spin)
 
-        row.addWidget(_label("Height:"))
+        row.addWidget(_label(translator.tr("tilemap_height_label")))
         self.tilemap_height_spin = QSpinBox()
         self.tilemap_height_spin.setRange(1, 999)
         self.tilemap_height_spin.setValue(32)
@@ -372,7 +576,7 @@ class TilemapUtils:
         self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         row.addWidget(self.tilemap_height_spin)
 
-        self.resize_button = QPushButton("Resize")
+        self.resize_button = QPushButton(translator.tr("tilemap_resize_btn"))
         self.resize_button.setFixedWidth(50)
         self.resize_button.setFixedHeight(20)
         self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
@@ -393,7 +597,7 @@ class TilemapUtils:
         self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
         self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
 
-        self.move_label = QLabel("Move")
+        self.move_label = QLabel(translator.tr("tilemap_move_label"))
         self.move_label.setStyleSheet("QLabel { border: none; }")
 
         row.addWidget(self.btn_left)
@@ -402,7 +606,7 @@ class TilemapUtils:
         row.addWidget(self.btn_down)
         row.addWidget(self.btn_right)
 
-        self.cyclic_checkbox = QCheckBox("Cyclic Shift")
+        self.cyclic_checkbox = QCheckBox(translator.tr("tilemap_cyclic_shift"))
         self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.cyclic_checkbox.setFixedHeight(18)
         row.addWidget(self.cyclic_checkbox)
@@ -427,12 +631,11 @@ class TilemapUtils:
     def _ask_rotation_size(self, attempted_w, attempted_h):
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogButtonBox
         dlg = QDialog(self.main_window if self.main_window else None)
-        dlg.setWindowTitle("Invalid Rotation Mode Size")
+        dlg.setWindowTitle(translator.tr("invalid_rot_size_title_dialog"))
         dlg.setFixedWidth(320)
         layout = QVBoxLayout(dlg)
         layout.addWidget(QLabel(
-            f"<b>{attempted_w}×{attempted_h}</b> is not a valid Rotation/Scaling mode size.<br>"
-            "Please choose one of the valid sizes:"
+            translator.tr("invalid_rot_size_message", w=attempted_w, h=attempted_h)
         ))
         lst = QListWidget()
         labels = ["16×16 (128×128 px)", "32×32 (256×256 px)",
@@ -489,7 +692,7 @@ class TilemapUtils:
                 data={'old_w': old_w, 'old_h': old_h,
                       'new_w': new_w, 'new_h': new_h,
                       'old_data': old_data, 'new_data': new_data},
-                description=f"Tilemap resized from {old_w}x{old_h} to {new_w}x{new_h}"
+                description=translator.tr('tilemap_resize_desc', old_w=old_w, old_h=old_h, new_w=new_w, new_h=new_h)
             )
 
         save_preview = keep_transparent = False

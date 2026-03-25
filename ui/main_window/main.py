@@ -83,6 +83,7 @@ class GBABackgroundStudio(QMainWindow):
 
         self.main_tabs = QTabWidget()
         self.main_tabs.setTabPosition(QTabWidget.North)
+        self.main_tabs.setStyleSheet("QTabBar::tab { min-height: 32px; }")
         main_layout.addWidget(self.main_tabs)
 
         self.preview_tab = PreviewTab(self)
@@ -92,6 +93,9 @@ class GBABackgroundStudio(QMainWindow):
         self.main_tabs.addTab(self.preview_tab, self.translator.tr("preview_tab"))
         self.main_tabs.addTab(self.edit_tiles_tab, self.translator.tr("edit_tiles_tab"))
         self.main_tabs.addTab(self.edit_palettes_tab, self.translator.tr("edit_palettes_tab"))
+
+        from .toolbar import ContextToolbar
+        self.context_toolbar = ContextToolbar(self, self.main_tabs)
 
         self.custom_status_bar = CustomStatusBar(translator=self.translator)
         main_layout.addWidget(self.custom_status_bar)
@@ -248,6 +252,10 @@ class GBABackgroundStudio(QMainWindow):
             
             if hasattr(self, 'apply_zoom_to_all'):
                 self.apply_zoom_to_all()
+
+            for tab in (self.edit_tiles_tab, self.edit_palettes_tab):
+                if hasattr(tab, '_restore_tilemap_selection'):
+                    tab._restore_tilemap_selection()
                 
         except Exception as e:
             print(f"Error refreshing preview display: {e}")
@@ -285,6 +293,8 @@ class GBABackgroundStudio(QMainWindow):
                 
             elif state['type'] == 'tilemap_resize':
                 self.apply_tilemap_resize(state, is_undo)
+            elif state['type'] in ('pal_replace', 'pal_swap'):
+                self.apply_pal_tilemap_op(state, is_undo)
             elif state['type'] == 'tilemap_shift':
                 self.apply_tilemap_shift(state, is_undo)
             elif state['type'] == 'tileset_reshape':
@@ -365,6 +375,26 @@ class GBABackgroundStudio(QMainWindow):
 
         if self.edit_tiles_tab.tileset_img:
             self.edit_tiles_tab.tileset_img.save("output/tiles.png")
+
+    def apply_pal_tilemap_op(self, state, is_undo):
+        data = state['data']
+        new_data = data['old_data'] if is_undo else data['new_data']
+        self.edit_tiles_tab.tilemap_data = new_data
+        self.edit_palettes_tab.tilemap_data = new_data
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(new_data)
+        # Rebuild overlay from scratch
+        ep = self.edit_palettes_tab
+        for ty in range(ep.tilemap_height):
+            for tx in range(ep.tilemap_width):
+                idx = ep._tilemap_index(tx, ty)
+                if idx * 2 + 2 > len(new_data):
+                    continue
+                entry = new_data[idx * 2] | (new_data[idx * 2 + 1] << 8)
+                ep.update_palette_overlay_for_tile(tx, ty, (entry >> 12) & 0xF)
+        self._save_map_and_refresh()
 
     def apply_tilemap_shift(self, state, is_undo):
         data = state['data']
@@ -591,6 +621,14 @@ class GBABackgroundStudio(QMainWindow):
         from .file_ops import open_image_for_conversion
         open_image_for_conversion(self)
     
+    def convert_to_4bpp(self):
+        from .file_ops import convert_to_4bpp
+        convert_to_4bpp(self)
+
+    def convert_to_8bpp(self):
+        from .file_ops import convert_to_8bpp
+        convert_to_8bpp(self)
+
     def open_tileset(self):
         from .file_ops import open_tileset
         open_tileset(self)

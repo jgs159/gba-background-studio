@@ -65,7 +65,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        header = QLabel("Edit Palettes")
+        header = QLabel(translator.tr("tab_header_edit_palettes"))
         header.setFont(QFont("Arial", 10, QFont.Bold))
         header.setStyleSheet("QLabel { background: #555; color: white; padding: 4px; border-radius: 4px; }")
         header.setFixedHeight(30)
@@ -95,7 +95,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        palettes_label = QLabel("Palettes")
+        palettes_label = QLabel(translator.tr("section_palettes"))
         palettes_label.setFont(QFont("Arial", 9, QFont.Bold))
         palettes_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(palettes_label)
@@ -433,7 +433,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        tilemap_label = QLabel("Tilemap")
+        tilemap_label = QLabel(translator.tr("section_tilemap"))
         tilemap_label.setFont(QFont("Arial", 9, QFont.Bold))
         tilemap_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(tilemap_label)
@@ -548,7 +548,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
     def on_tilemap_drawing(self, tile_x, tile_y):
         self.finalize_color_editing()
-        if self.selected_palette_id is None or not self.tilemap_data or self._is_rotation():
+        if self.selected_palette_id is None or not self.tilemap_data or self._palette_edit_disabled():
             return
         self.on_tilemap_hover(tile_x, tile_y)
         self.edit_palette_at(tile_x, tile_y)
@@ -569,9 +569,15 @@ class EditPalettesTab(TilemapUtils, QWidget):
     def _is_rotation(self):
         return getattr(self.main_window, 'current_rotation_mode', False) if self.main_window else False
 
+    def _is_8bpp(self):
+        return getattr(self.main_window, 'current_bpp', 4) == 8 if self.main_window else False
+
+    def _palette_edit_disabled(self):
+        return self._is_rotation() or self._is_8bpp()
+
     def on_tilemap_right_click(self, tile_x, tile_y):
         self.finalize_color_editing()
-        if not self.tilemap_data or self._is_rotation():
+        if not self.tilemap_data or self._palette_edit_disabled():
             return
         tile_index = self._tilemap_index(tile_x, tile_y)
         if 0 <= tile_index < len(self.tilemap_data) // 2:
@@ -593,6 +599,133 @@ class EditPalettesTab(TilemapUtils, QWidget):
         current_tab = self.main_window.main_tabs.widget(index)
         if current_tab != self:
             self.finalize_color_editing()
+
+    def _apply_pal_replace(self):
+        if not self.tilemap_data:
+            return
+        dst_id = self.selected_palette_id
+        old_data = self.tilemap_data
+        new_data = bytearray(old_data)
+        affected = []
+
+        if self._tilemap_sel_area is not None:
+            x1, y1, x2, y2 = self._tilemap_sel_area
+            for ty in range(y1, y2 + 1):
+                for tx in range(x1, x2 + 1):
+                    idx = self._tilemap_index(tx, ty)
+                    if idx * 2 + 2 > len(new_data):
+                        continue
+                    entry = new_data[idx * 2] | (new_data[idx * 2 + 1] << 8)
+                    if (entry >> 12) & 0xF == dst_id:
+                        continue
+                    entry = (entry & 0x0FFF) | (dst_id << 12)
+                    new_data[idx * 2]     = entry & 0xFF
+                    new_data[idx * 2 + 1] = (entry >> 8) & 0xFF
+                    affected.append((tx, ty))
+            if not affected:
+                return
+            src_desc = f"area ({x1},{y1})-({x2},{y2})"
+        else:
+            if not self._pal_sel_items:
+                return
+            src_id = self._pal_sel_palette_id
+            if src_id == dst_id:
+                return
+            for item in self._pal_sel_items:
+                try:
+                    r = item.rect()
+                    tx = int(r.x()) // 8
+                    ty = int(r.y()) // 8
+                except RuntimeError:
+                    continue
+                idx = self._tilemap_index(tx, ty)
+                if idx * 2 + 2 > len(new_data):
+                    continue
+                entry = new_data[idx * 2] | (new_data[idx * 2 + 1] << 8)
+                entry = (entry & 0x0FFF) | (dst_id << 12)
+                new_data[idx * 2]     = entry & 0xFF
+                new_data[idx * 2 + 1] = (entry >> 8) & 0xFF
+                affected.append((tx, ty))
+            src_desc = f"palette {src_id}"
+
+        self._commit_tilemap_op(bytes(new_data), old_data, affected,
+                                'pal_replace',
+                                f"Replace palette {src_desc} -> {dst_id}")
+
+    def _apply_pal_swap(self):
+        if not self.tilemap_data:
+            return
+        dst_id = self.selected_palette_id
+
+        if self._tilemap_sel_area is not None:
+            x1, y1, x2, y2 = self._tilemap_sel_area
+            src_id = None
+            for ty in range(y1, y2 + 1):
+                for tx in range(x1, x2 + 1):
+                    idx = self._tilemap_index(tx, ty)
+                    if idx * 2 + 2 > len(self.tilemap_data):
+                        continue
+                    entry = self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8)
+                    src_id = (entry >> 12) & 0xF
+                    break
+                if src_id is not None:
+                    break
+            if src_id is None or src_id == dst_id:
+                return
+        else:
+            if not self._pal_sel_items:
+                return
+            src_id = self._pal_sel_palette_id
+            if src_id == dst_id:
+                return
+
+        old_data = self.tilemap_data
+        new_data = bytearray(old_data)
+        affected = []
+        for ty in range(self.tilemap_height):
+            for tx in range(self.tilemap_width):
+                idx = self._tilemap_index(tx, ty)
+                if idx * 2 + 2 > len(new_data):
+                    continue
+                entry = new_data[idx * 2] | (new_data[idx * 2 + 1] << 8)
+                pal = (entry >> 12) & 0xF
+                if pal == src_id:
+                    entry = (entry & 0x0FFF) | (dst_id << 12)
+                elif pal == dst_id:
+                    entry = (entry & 0x0FFF) | (src_id << 12)
+                else:
+                    continue
+                new_data[idx * 2]     = entry & 0xFF
+                new_data[idx * 2 + 1] = (entry >> 8) & 0xFF
+                affected.append((tx, ty))
+        self._commit_tilemap_op(bytes(new_data), old_data, affected,
+                                'pal_swap',
+                                f"Swap palettes {src_id} <-> {dst_id}")
+
+    def _commit_tilemap_op(self, new_data, old_data, affected_tiles, state_type, description):
+        import os
+        self.tilemap_data = new_data
+        if self.main_window and hasattr(self.main_window, 'edit_tiles_tab'):
+            self.main_window.edit_tiles_tab.tilemap_data = new_data
+        for tx, ty in affected_tiles:
+            idx = self._tilemap_index(tx, ty)
+            entry = new_data[idx * 2] | (new_data[idx * 2 + 1] << 8)
+            self.update_palette_overlay_for_tile(tx, ty, (entry >> 12) & 0xF)
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(new_data)
+        if self.main_window and hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type=state_type,
+                editor_type='palettes',
+                data={'old_data': old_data, 'new_data': new_data,
+                      'w': self.tilemap_width, 'h': self.tilemap_height},
+                description=description
+            )
+        if self.main_window and hasattr(self.main_window, '_save_map_and_refresh'):
+            self.main_window._save_map_and_refresh()
+        self._clear_pal_selection()
+        self._clear_tilemap_area_selection()
 
     def _tilemap_index(self, tile_x, tile_y):
         w = self.tilemap_width
@@ -769,7 +902,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                     if self.main_window.grid_manager.is_grid_visible():
                         self.main_window.grid_manager.update_grid_for_view("tilemap_edit")
 
-        if not self._is_rotation() and hasattr(self, 'tilemap_data') and self.tilemap_data:
+        if not self._palette_edit_disabled() and hasattr(self, 'tilemap_data') and self.tilemap_data:
             scene_rect = self.edit_tilemap2_scene.sceneRect()
             w = int(scene_rect.width()) // 8
             h = int(scene_rect.height()) // 8
@@ -866,9 +999,6 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.edit_tilemap2_view.scale(factor, factor)
 
     def display_palette_colors(self, colors, enable_editor=True):
-        is_rot = self._is_rotation()
-        if is_rot:
-            enable_editor = False
 
         self.palette_colors = [(r, g, b) for r, g, b in colors]
         self.draw_full_palette(self.palette_colors)
@@ -882,11 +1012,14 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
         if hasattr(self, '_palette_op_btns'):
             for btn in self._palette_op_btns:
-                btn.setEnabled(enable_editor)
+                btn.setEnabled(True)
             if not enable_editor:
                 for btn in self._palette_op_btns:
                     btn.setChecked(False)
                 self._on_palette_op_mode_changed()
+
+        self.selected_palette_id = 0
+        self.highlight_selected_palette(0, 0)
 
         if self.main_window and hasattr(self.main_window, 'grid_manager'):
             if self.main_window.grid_manager.is_grid_visible():

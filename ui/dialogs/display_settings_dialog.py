@@ -31,6 +31,14 @@ def _make_separator():
     return line
 
 
+def _parse_color(value: str) -> QColor:
+    try:
+        r, g, b = [int(x) for x in value.split(',')]
+        return QColor(r, g, b)
+    except Exception:
+        return QColor(0, 0, 0)
+
+
 class DisplaySettingsDialog(QDialog):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
@@ -47,7 +55,7 @@ class DisplaySettingsDialog(QDialog):
         layout.addWidget(QLabel(f"<b>{tr('grid_color')}</b>"))
         grid_color_row = QHBoxLayout()
         cfg = main_window.config_manager
-        gc = self._parse_color(cfg.get('DISPLAY', 'grid_color', '255,255,255'))
+        gc = _parse_color(cfg.get('DISPLAY', 'grid_color', '255,255,255'))
         self._grid_color_btn = ColorButton(gc)
         self._grid_color_btn.clicked.connect(self._pick_grid_color)
         grid_color_row.addWidget(QLabel(tr('color') + ":"))
@@ -74,7 +82,7 @@ class DisplaySettingsDialog(QDialog):
         # --- Overlay text color ---
         layout.addWidget(QLabel(f"<b>{tr('overlay_text_color')}</b>"))
         overlay_color_row = QHBoxLayout()
-        oc = self._parse_color(cfg.get('DISPLAY', 'overlay_text_color', '0,0,0'))
+        oc = _parse_color(cfg.get('DISPLAY', 'overlay_text_color', '0,0,0'))
         self._overlay_color_btn = ColorButton(oc)
         self._overlay_color_btn.clicked.connect(self._pick_overlay_color)
         overlay_color_row.addWidget(QLabel(tr('color') + ":"))
@@ -109,13 +117,6 @@ class DisplaySettingsDialog(QDialog):
             'overlay_color': oc,
             'overlay_alpha': oa,
         }
-
-    def _parse_color(value: str) -> QColor:
-        try:
-            r, g, b = [int(x) for x in value.split(',')]
-            return QColor(r, g, b)
-        except Exception:
-            return QColor(0, 0, 0)
 
     def _pick_grid_color(self):
         color = QColorDialog.getColor(self._grid_color_btn.color(), self)

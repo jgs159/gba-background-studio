@@ -129,6 +129,7 @@ def load_last_output_files(main_window):
             tiles_img = f.copy()
         main_window.display_tileset(tiles_img)
         main_window.menu_bar.action_save_tileset.setEnabled(True)
+        _update_convert_actions(main_window)
         main_window.menu_bar.action_open_tilemap.setEnabled(True)
         main_window.menu_bar.action_new_tilemap.setEnabled(True)
         main_window.tileset_from_conversion = True
@@ -190,9 +191,19 @@ def load_last_output_files(main_window):
         main_window.menu_bar.action_save_palette.setEnabled(True)
         main_window.sync_palettes_tab()
 
+        ep = main_window.edit_palettes_tab
+        et = main_window.edit_tiles_tab
+        if getattr(et, 'tilemap_data', None):
+            ep.toggle_tilemap_controls_enabled(True)
+            ep.tilemap_width_spin.setValue(et.tilemap_width)
+            ep.tilemap_height_spin.setValue(et.tilemap_height)
+
         if hasattr(main_window, 'output_loaded_for_zoom'):
             main_window.output_loaded_for_zoom = True
-            
+
+        if hasattr(main_window, 'context_toolbar'):
+            main_window.context_toolbar.show_for_tab(main_window.main_tabs.currentIndex())
+
         return True
         
     except Exception as e:
@@ -269,6 +280,9 @@ def _apply_palette_colors(main_window, colors):
         r, g, b = palette_tab.palette_colors[idx]
         palette_tab.color_editor.set_color(idx, r, g, b)
     main_window.menu_bar.action_save_palette.setEnabled(True)
+
+    if hasattr(main_window, 'context_toolbar'):
+        main_window.context_toolbar.on_palette_loaded()
 
     QMessageBox.information(
         main_window,
@@ -380,6 +394,201 @@ def _reset_palette(main_window):
         main_window.preview_tab.display_palette_colors(grayscale)
 
     main_window.menu_bar.action_save_palette.setEnabled(False)
+
+def _update_convert_actions(main_window):
+    is_8bpp = getattr(main_window, 'current_bpp', 4) == 8
+    main_window.menu_bar.action_convert_to_4bpp.setEnabled(is_8bpp)
+    main_window.menu_bar.action_convert_to_8bpp.setEnabled(not is_8bpp)
+
+
+def convert_to_4bpp(main_window):
+    from PySide6.QtWidgets import QMessageBox
+    from core.main import main as converter_main
+    from ui.dialogs.convert_bpp_dialogs import Convert4BppDialog
+    import sys
+
+    preview_path = 'temp/preview/preview.png'
+    if not os.path.exists(preview_path):
+        QMessageBox.warning(main_window, main_window.translator.tr("convert_to_4bpp"),
+                            main_window.translator.tr("convert_to_4bpp_error_no_preview"))
+        return
+
+    with PilImage.open(preview_path) as img:
+        color_count = len(set(img.convert('RGB').getdata()))
+        w_tiles = img.width  // 8
+        h_tiles = img.height // 8
+
+    if color_count > 16:
+        reply = QMessageBox.warning(
+            main_window,
+            main_window.translator.tr("convert_to_4bpp"),
+            main_window.translator.tr("convert_to_4bpp_warn_colors", count=color_count),
+            QMessageBox.Ok | QMessageBox.Cancel
+        )
+        if reply != QMessageBox.Ok:
+            return
+
+    dlg = Convert4BppDialog(color_count, parent=main_window)
+    if dlg.exec() != Convert4BppDialog.Accepted:
+        return
+    selected_palettes = dlg.selected_palettes()
+
+    reply = QMessageBox.warning(
+        main_window,
+        main_window.translator.tr("convert_to_4bpp"),
+        main_window.translator.tr("convert_irreversible_warning"),
+        QMessageBox.Ok | QMessageBox.Cancel
+    )
+    if reply != QMessageBox.Ok:
+        return
+
+    keep_transparent = getattr(main_window, 'keep_transparent_color', False)
+    save_preview     = getattr(main_window, 'save_preview_files', False)
+    keep_temp        = getattr(main_window, 'keep_temp_files', False)
+
+    tc_str = main_window.config_manager.get('CONVERSION', 'transparent_color', '0,0,0').strip() if hasattr(main_window, 'config_manager') else '0,0,0'
+    transparent_color = tuple(map(int, tc_str.split(','))) if tc_str else (0, 0, 0)
+    try:
+        with PilImage.open(preview_path) as _pi:
+            _pal = _pi.getpalette()
+            if _pal:
+                transparent_color = (_pal[0], _pal[1], _pal[2])
+    except Exception:
+        pass
+
+    rgba_tmp = os.path.join('temp', '_conv4bpp_input.png')
+    os.makedirs('temp', exist_ok=True)
+    with PilImage.open(preview_path) as img:
+        img.convert('RGBA').save(rgba_tmp)
+
+    params = {
+        'input_path':              rgba_tmp,
+        'tilemap_path':            None,
+        'selected_palettes':       selected_palettes,
+        'transparent_color':       transparent_color,
+        'extra_transparent_tiles': 0,
+        'tile_width':              None,
+        'origin':                  '0,0',
+        'end':                     None,
+        'output_size':             f'{w_tiles}t,{h_tiles}t',
+        'save_preview':            save_preview,
+        'keep_temp':               keep_temp,
+        'keep_transparent':        keep_transparent,
+        'bpp':                     4,
+        'start_index':             0,
+        'palette_size':            256,
+        'rotation_mode':           False,
+    }
+
+    old_stdout = sys.stdout
+    sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+    try:
+        converter_main(**params)
+    finally:
+        sys.stdout.close()
+        sys.stdout = old_stdout
+
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'bpp', '0')
+        main_window.config_manager.set('CONVERSION', 'rotation_mode', '0')
+        main_window.config_manager.set('CONVERSION', 'selected_palettes',
+                                       ','.join(str(p) for p in selected_palettes))
+    main_window.current_bpp = 4
+    main_window.current_rotation_mode = False
+    main_window.load_conversion_results()
+
+
+def convert_to_8bpp(main_window):
+    from PySide6.QtWidgets import QMessageBox
+    from core.main import main as converter_main
+    from ui.dialogs.convert_bpp_dialogs import Convert8BppDialog
+    import sys
+
+    preview_path = 'temp/preview/preview.png'
+    if not os.path.exists(preview_path):
+        QMessageBox.warning(main_window, main_window.translator.tr("convert_to_8bpp"),
+                            main_window.translator.tr("convert_to_8bpp_error_no_preview"))
+        return
+
+    dlg = Convert8BppDialog(parent=main_window)
+    if dlg.exec() != Convert8BppDialog.Accepted:
+        return
+    start_index, palette_size = dlg.get_values()
+
+    reply = QMessageBox.warning(
+        main_window,
+        main_window.translator.tr("convert_to_8bpp"),
+        main_window.translator.tr("convert_irreversible_warning"),
+        QMessageBox.Ok | QMessageBox.Cancel
+    )
+    if reply != QMessageBox.Ok:
+        return
+
+    keep_transparent = getattr(main_window, 'keep_transparent_color', False)
+    save_preview     = getattr(main_window, 'save_preview_files', False)
+    keep_temp        = getattr(main_window, 'keep_temp_files', False)
+
+    tc_str = main_window.config_manager.get('CONVERSION', 'transparent_color', '0,0,0').strip() if hasattr(main_window, 'config_manager') else '0,0,0'
+    transparent_color = tuple(map(int, tc_str.split(','))) if tc_str else (0, 0, 0)
+    try:
+        _tmap = open('output/map.bin', 'rb').read()
+        _slots = set()
+        for _i in range(0, len(_tmap) - 1, 2):
+            _entry = _tmap[_i] | (_tmap[_i+1] << 8)
+            _slots.add((_entry >> 12) & 0xF)
+        if _slots:
+            _pal_file = os.path.join('output', f'palette_{min(_slots):02d}.pal')
+            if os.path.exists(_pal_file):
+                with open(_pal_file, 'r', encoding='utf-8') as _pf:
+                    _plines = [l.strip() for l in _pf
+                               if l.strip() and not l.startswith(('JASC-PAL', '0100'))]
+                if len(_plines) > 1:
+                    transparent_color = tuple(map(int, _plines[1].split()))
+    except Exception:
+        pass
+
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'transparent_color',
+                                       f'{transparent_color[0]},{transparent_color[1]},{transparent_color[2]}')
+
+    with PilImage.open(preview_path) as img:
+        w_tiles = img.width  // 8
+        h_tiles = img.height // 8
+
+    params = {
+        'input_path':              preview_path,
+        'tilemap_path':            None,
+        'selected_palettes':       None,
+        'transparent_color':       transparent_color,
+        'extra_transparent_tiles': 0,
+        'tile_width':              None,
+        'origin':                  '0,0',
+        'end':                     None,
+        'output_size':             f'{w_tiles}t,{h_tiles}t',
+        'save_preview':            save_preview,
+        'keep_temp':               keep_temp,
+        'keep_transparent':        True,
+        'bpp':                     8,
+        'start_index':             start_index,
+        'palette_size':            palette_size,
+        'rotation_mode':           False,
+    }
+
+    old_stdout = sys.stdout
+    sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+    try:
+        converter_main(**params)
+    finally:
+        sys.stdout.close()
+        sys.stdout = old_stdout
+
+    if hasattr(main_window, 'config_manager'):
+        main_window.config_manager.set('CONVERSION', 'bpp', '1')
+        main_window.config_manager.set('CONVERSION', 'rotation_mode', '0')
+    main_window.current_bpp = 8
+    main_window.current_rotation_mode = False
+    main_window.load_conversion_results()
+
 
 def open_tileset(main_window):
     file_path, _ = QFileDialog.getOpenFileName(

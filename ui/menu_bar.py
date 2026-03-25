@@ -43,6 +43,18 @@ class MenuBar:
         self.action_save_tileset.setShortcut("Ctrl+S")
         self.action_save_tileset.triggered.connect(self.main_window.save_tileset)
         self.action_save_tileset.setEnabled(False)
+
+        tileset_menu.addSeparator()
+
+        self.action_convert_to_4bpp = tileset_menu.addAction(self.main_window.translator.tr("convert_to_4bpp"))
+        self.action_convert_to_4bpp.setShortcut("Ctrl+4")
+        self.action_convert_to_4bpp.triggered.connect(self.main_window.convert_to_4bpp)
+        self.action_convert_to_4bpp.setEnabled(False)
+
+        self.action_convert_to_8bpp = tileset_menu.addAction(self.main_window.translator.tr("convert_to_8bpp"))
+        self.action_convert_to_8bpp.setShortcut("Ctrl+8")
+        self.action_convert_to_8bpp.triggered.connect(self.main_window.convert_to_8bpp)
+        self.action_convert_to_8bpp.setEnabled(False)
         
         # Tilemap menu
         tilemap_menu = self.menu_bar.addMenu(self.main_window.translator.tr("tilemap_menu"))
@@ -242,6 +254,8 @@ class MenuBar:
         # Tileset
         self.action_open_tileset.setText(tr("open_tileset"))
         self.action_save_tileset.setText(tr("save_tileset"))
+        self.action_convert_to_4bpp.setText(tr("convert_to_4bpp"))
+        self.action_convert_to_8bpp.setText(tr("convert_to_8bpp"))
         # Tilemap
         self.action_open_tilemap.setText(tr("open_tilemap"))
         self.action_new_tilemap.setText(tr("new_tilemap"))
