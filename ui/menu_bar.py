@@ -46,6 +46,18 @@ class MenuBar:
 
         tileset_menu.addSeparator()
 
+        self.action_optimize_tiles = tileset_menu.addAction(self.main_window.translator.tr("optimize_tiles"))
+        self.action_optimize_tiles.setShortcut("Ctrl+Alt+O")
+        self.action_optimize_tiles.triggered.connect(self.main_window.optimize_tiles)
+        self.action_optimize_tiles.setEnabled(False)
+
+        self.action_deoptimize_tiles = tileset_menu.addAction(self.main_window.translator.tr("deoptimize_tiles"))
+        self.action_deoptimize_tiles.setShortcut("Ctrl+Alt+D")
+        self.action_deoptimize_tiles.triggered.connect(self.main_window.deoptimize_tiles)
+        self.action_deoptimize_tiles.setEnabled(False)
+
+        tileset_menu.addSeparator()
+
         self.action_convert_to_4bpp = tileset_menu.addAction(self.main_window.translator.tr("convert_to_4bpp"))
         self.action_convert_to_4bpp.setShortcut("Ctrl+4")
         self.action_convert_to_4bpp.triggered.connect(self.main_window.convert_to_4bpp)
@@ -78,6 +90,16 @@ class MenuBar:
         self.action_save_selection.setShortcut("Ctrl+Shift+B")
         self.action_save_selection.triggered.connect(self.main_window.save_selection)
         self.action_save_selection.setEnabled(False)
+
+        tilemap_menu.addSeparator()
+
+        self.action_convert_to_text_mode = tilemap_menu.addAction(self.main_window.translator.tr("convert_to_text_mode"))
+        self.action_convert_to_text_mode.triggered.connect(self.main_window.convert_to_text_mode)
+        self.action_convert_to_text_mode.setEnabled(False)
+
+        self.action_convert_to_rot_mode = tilemap_menu.addAction(self.main_window.translator.tr("convert_to_rot_mode"))
+        self.action_convert_to_rot_mode.triggered.connect(self.main_window.convert_to_rot_mode)
+        self.action_convert_to_rot_mode.setEnabled(False)
 
         # Palette menu
         palette_menu = self.menu_bar.addMenu(self.main_window.translator.tr("palette_menu"))
@@ -254,6 +276,8 @@ class MenuBar:
         # Tileset
         self.action_open_tileset.setText(tr("open_tileset"))
         self.action_save_tileset.setText(tr("save_tileset"))
+        self.action_optimize_tiles.setText(tr("optimize_tiles"))
+        self.action_deoptimize_tiles.setText(tr("deoptimize_tiles"))
         self.action_convert_to_4bpp.setText(tr("convert_to_4bpp"))
         self.action_convert_to_8bpp.setText(tr("convert_to_8bpp"))
         # Tilemap
@@ -261,6 +285,8 @@ class MenuBar:
         self.action_new_tilemap.setText(tr("new_tilemap"))
         self.action_save_tilemap.setText(tr("save_tilemap"))
         self.action_save_selection.setText(tr("save_selection"))
+        self.action_convert_to_text_mode.setText(tr("convert_to_text_mode"))
+        self.action_convert_to_rot_mode.setText(tr("convert_to_rot_mode"))
         # Palette
         self.action_open_palette.setText(tr("open_palette"))
         self.action_save_palette.setText(tr("save_palette"))
