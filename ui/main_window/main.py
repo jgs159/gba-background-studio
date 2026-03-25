@@ -295,6 +295,10 @@ class GBABackgroundStudio(QMainWindow):
                 self.apply_tilemap_resize(state, is_undo)
             elif state['type'] in ('pal_replace', 'pal_swap'):
                 self.apply_pal_tilemap_op(state, is_undo)
+            elif state['type'] == 'tilemap_cut':
+                self.apply_tilemap_cut(state, is_undo)
+            elif state['type'] in ('tilemap_transform', 'tilemap_paste'):
+                self.apply_tilemap_cut(state, is_undo)
             elif state['type'] == 'tilemap_shift':
                 self.apply_tilemap_shift(state, is_undo)
             elif state['type'] == 'tileset_reshape':
@@ -375,6 +379,17 @@ class GBABackgroundStudio(QMainWindow):
 
         if self.edit_tiles_tab.tileset_img:
             self.edit_tiles_tab.tileset_img.save("output/tiles.png")
+
+    def apply_tilemap_cut(self, state, is_undo):
+        data = state['data']
+        new_data = data['old_data'] if is_undo else data['new_data']
+        self.edit_tiles_tab.tilemap_data = new_data
+        self.edit_palettes_tab.tilemap_data = new_data
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(new_data)
+        self._save_map_and_refresh()
 
     def apply_pal_tilemap_op(self, state, is_undo):
         data = state['data']

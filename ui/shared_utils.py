@@ -21,7 +21,12 @@ class CustomGraphicsView(QGraphicsView):
         self.on_selection_complete = None
         self.on_selection_hover = None
         self._sel_origin = None
-        self._sel_drag_item = None  # live yellow rect during drag
+        self._sel_drag_item = None
+        self.paste_mode = False
+        self.on_paste = None
+        self.on_paste_cancel = None
+        self._paste_preview_item = None
+        self._paste_pixmap = None
 
     def _scene_tile(self, pos):
         scene_rect = self.scene().sceneRect()
@@ -34,6 +39,24 @@ class CustomGraphicsView(QGraphicsView):
         scene_p2 = self.mapFromScene((tx + 1) * 8, (ty + 1) * 8)
         return scene_p1, scene_p2
 
+    def _remove_paste_preview(self):
+        try:
+            if self._paste_preview_item is not None and self._paste_preview_item.scene():
+                self.scene().removeItem(self._paste_preview_item)
+        except RuntimeError:
+            pass
+        self._paste_preview_item = None
+
+    def _update_paste_preview(self, tx, ty):
+        self._remove_paste_preview()
+        if self._paste_pixmap and self.scene():
+            from PySide6.QtWidgets import QGraphicsPixmapItem
+            item = self.scene().addPixmap(self._paste_pixmap)
+            item.setPos(tx * 8, ty * 8)
+            item.setOpacity(0.6)
+            item.setZValue(202)
+            self._paste_preview_item = item
+
     def _remove_drag_item(self):
         try:
             if self._sel_drag_item is not None and self._sel_drag_item.scene():
@@ -43,6 +66,19 @@ class CustomGraphicsView(QGraphicsView):
         self._sel_drag_item = None
 
     def mousePressEvent(self, event):
+        if self.paste_mode:
+            scene_pos = self.mapToScene(event.pos())
+            if self.scene() and self.scene().sceneRect().isValid():
+                tx, ty = self._scene_tile(scene_pos)
+                if event.button() == Qt.LeftButton:
+                    if self.on_paste:
+                        self.on_paste(tx, ty)
+                elif event.button() == Qt.RightButton:
+                    self._remove_paste_preview()
+                    if self.on_paste_cancel:
+                        self.on_paste_cancel()
+            event.accept()
+            return
         if self.selection_mode and event.button() == Qt.LeftButton:
             scene_pos = self.mapToScene(event.pos())
             if self.scene() and self.scene().sceneRect().isValid():
@@ -83,6 +119,13 @@ class CustomGraphicsView(QGraphicsView):
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self.paste_mode:
+            scene_pos = self.mapToScene(event.pos())
+            if self.scene() and self.scene().sceneRect().isValid():
+                tx, ty = self._scene_tile(scene_pos)
+                self._update_paste_preview(tx, ty)
+            event.accept()
+            return
         if self.selection_mode and self._sel_origin is not None:
             scene_pos = self.mapToScene(event.pos())
             if self.scene() and self.scene().sceneRect().isValid():

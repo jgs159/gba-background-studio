@@ -9,8 +9,12 @@ from PySide6.QtGui import QPixmap
 def on_tab_changed(main_window, index):
     if hasattr(main_window, 'context_toolbar'):
         if index == main_window.context_toolbar._placeholder_index:
-            main_window.main_tabs.setCurrentIndex(0)
+            prev = getattr(main_window, '_last_tab_index', 0)
+            main_window.main_tabs.blockSignals(True)
+            main_window.main_tabs.setCurrentIndex(prev)
+            main_window.main_tabs.blockSignals(False)
             return
+    main_window._last_tab_index = index
 
     current_tab = main_window.main_tabs.widget(index)
     
