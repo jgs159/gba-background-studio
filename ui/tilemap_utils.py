@@ -220,6 +220,282 @@ class TilemapUtils:
     def _draw_tilemap_selection_rect(self, tile_x, tile_y):
         pass
 
+    def _apply_transform(self, op):
+        if not self._tilemap_sel_area or not self.tilemap_data:
+            return
+        x1, y1, x2, y2 = self._tilemap_sel_area
+        old_data = self.tilemap_data
+        new_data = bytearray(old_data)
+
+        def get_entry(tx, ty):
+            idx = (self._tilemap_index(tx, ty) if hasattr(self, '_tilemap_index')
+                   else ty * self.tilemap_width + tx)
+            if idx * 2 + 2 > len(new_data):
+                return 0
+            return new_data[idx * 2] | (new_data[idx * 2 + 1] << 8)
+
+        def set_entry(tx, ty, entry):
+            idx = (self._tilemap_index(tx, ty) if hasattr(self, '_tilemap_index')
+                   else ty * self.tilemap_width + tx)
+            if idx * 2 + 2 > len(new_data):
+                return
+            new_data[idx * 2]     = entry & 0xFF
+            new_data[idx * 2 + 1] = (entry >> 8) & 0xFF
+
+        w = x2 - x1 + 1
+        h = y2 - y1 + 1
+
+        if op == 'flip_h':
+            for ty in range(y1, y2 + 1):
+                for tx in range(x1, x2 + 1):
+                    e = get_entry(tx, ty)
+                    set_entry(tx, ty, e ^ (1 << 10))
+
+        elif op == 'flip_v':
+            for ty in range(y1, y2 + 1):
+                for tx in range(x1, x2 + 1):
+                    e = get_entry(tx, ty)
+                    set_entry(tx, ty, e ^ (1 << 11))
+
+        elif op == 'swap_h':
+            for ty in range(y1, y2 + 1):
+                for dx in range(w // 2):
+                    lx, rx = x1 + dx, x2 - dx
+                    l, r = get_entry(lx, ty), get_entry(rx, ty)
+                    set_entry(lx, ty, r)
+                    set_entry(rx, ty, l)
+
+        elif op == 'swap_v':
+            for tx in range(x1, x2 + 1):
+                for dy in range(h // 2):
+                    ty_top, ty_bot = y1 + dy, y2 - dy
+                    t, b = get_entry(tx, ty_top), get_entry(tx, ty_bot)
+                    set_entry(tx, ty_top, b)
+                    set_entry(tx, ty_bot, t)
+
+        elif op == 'mirror_h':
+            for ty in range(y1, y2 + 1):
+                for dx in range(w // 2):
+                    lx, rx = x1 + dx, x2 - dx
+                    l, r = get_entry(lx, ty), get_entry(rx, ty)
+                    set_entry(lx, ty, r ^ (1 << 10))
+                    set_entry(rx, ty, l ^ (1 << 10))
+            if w % 2 == 1:
+                cx = x1 + w // 2
+                for ty in range(y1, y2 + 1):
+                    set_entry(cx, ty, get_entry(cx, ty) ^ (1 << 10))
+
+        elif op == 'mirror_v':
+            for tx in range(x1, x2 + 1):
+                for dy in range(h // 2):
+                    ty_top, ty_bot = y1 + dy, y2 - dy
+                    t, b = get_entry(tx, ty_top), get_entry(tx, ty_bot)
+                    set_entry(tx, ty_top, b ^ (1 << 11))
+                    set_entry(tx, ty_bot, t ^ (1 << 11))
+            if h % 2 == 1:
+                cy = y1 + h // 2
+                for tx in range(x1, x2 + 1):
+                    set_entry(tx, cy, get_entry(tx, cy) ^ (1 << 11))
+
+        self.tilemap_data = bytes(new_data)
+        mw = getattr(self, 'main_window', None)
+        if mw:
+            for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+                other = getattr(mw, attr, None)
+                if other and other is not self:
+                    other.tilemap_data = self.tilemap_data
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(self.tilemap_data)
+        if mw and hasattr(mw, 'history_manager'):
+            mw.history_manager.record_state(
+                state_type='tilemap_transform',
+                editor_type='tiles',
+                data={'old_data': old_data, 'new_data': self.tilemap_data,
+                      'op': op, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2},
+                description=f"{op} ({x1},{y1})-({x2},{y2})"
+            )
+        if mw and hasattr(mw, '_save_map_and_refresh'):
+            mw._save_map_and_refresh()
+        self._clear_tilemap_area_selection()
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_area_selected(False)
+
+    def _copy_selection(self, is_cut=False):
+        if not self._tilemap_sel_area or not self.tilemap_data:
+            return
+        x1, y1, x2, y2 = self._tilemap_sel_area
+        buf_w = x2 - x1 + 1
+        buf_h = y2 - y1 + 1
+        buf = []
+        for ty in range(y1, y2 + 1):
+            row = []
+            for tx in range(x1, x2 + 1):
+                idx = (self._tilemap_index(tx, ty) if hasattr(self, '_tilemap_index')
+                       else ty * self.tilemap_width + tx)
+                if idx * 2 + 2 <= len(self.tilemap_data):
+                    row.append(self.tilemap_data[idx * 2] | (self.tilemap_data[idx * 2 + 1] << 8))
+                else:
+                    row.append(0)
+            buf.append(row)
+        self._paste_buffer = buf
+        self._paste_buf_w = buf_w
+        self._paste_buf_h = buf_h
+        if is_cut:
+            self._cut_selection(defer_refresh=True)
+            mw = getattr(self, 'main_window', None)
+            if mw and hasattr(mw, '_save_map_and_refresh'):
+                mw._save_map_and_refresh()
+        else:
+            self._clear_tilemap_area_selection()
+        self._start_paste_mode()
+
+    def _build_paste_pixmap(self):
+        from PySide6.QtGui import QPixmap, QPainter, QImage
+        et = getattr(getattr(self, 'main_window', None), 'edit_tiles_tab', None)
+        if not et or not getattr(et, 'tileset_img', None):
+            px = QPixmap(self._paste_buf_w * 8, self._paste_buf_h * 8)
+            px.fill(QColor(255, 255, 0, 80))
+            return px
+        import numpy as np
+        ts = et.tileset_img
+        tpr = et.tiles_per_row if et.tiles_per_row > 0 else ts.width // 8
+        ep = getattr(self.main_window, 'edit_palettes_tab', None)
+        palette = ep.palette_colors if ep else [(i, i, i) for i in range(256)]
+        w_px = self._paste_buf_w * 8
+        h_px = self._paste_buf_h * 8
+        canvas = np.zeros((h_px, w_px, 4), dtype=np.uint8)
+        ts_arr = np.array(ts)
+        for row_i, row in enumerate(self._paste_buffer):
+            for col_i, entry in enumerate(row):
+                tile_id = entry & 0x3FF
+                h_flip  = bool(entry & (1 << 10))
+                v_flip  = bool(entry & (1 << 11))
+                pal_id  = (entry >> 12) & 0xF
+                src_x = (tile_id % tpr) * 8
+                src_y = (tile_id // tpr) * 8
+                if src_x + 8 > ts.width or src_y + 8 > ts.height:
+                    continue
+                tile = ts_arr[src_y:src_y+8, src_x:src_x+8].copy()
+                if h_flip: tile = np.fliplr(tile)
+                if v_flip: tile = np.flipud(tile)
+                slot = pal_id * 16
+                for py in range(8):
+                    for px_i in range(8):
+                        idx_c = int(tile[py, px_i]) % 16
+                        r, g, b = palette[slot + idx_c]
+                        canvas[row_i*8+py, col_i*8+px_i] = [r, g, b, 180]
+        img = QImage(canvas.tobytes(), w_px, h_px, w_px * 4, QImage.Format_RGBA8888)
+        return QPixmap.fromImage(img)
+
+    def _start_paste_mode(self):
+        pixmap = self._build_paste_pixmap()
+        self.tilemap_view.paste_mode = True
+        self.tilemap_view._paste_pixmap = pixmap
+        self.tilemap_view.on_paste = self._do_paste
+        self.tilemap_view.on_paste_cancel = self._cancel_paste
+        self.tilemap_view.viewport().setCursor(Qt.CrossCursor)
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_paste_mode_active(True)
+
+    def _do_paste(self, tx, ty):
+        if not hasattr(self, '_paste_buffer') or not self.tilemap_data:
+            return
+        old_data = self.tilemap_data
+        new_data = bytearray(old_data)
+        for row_i, row in enumerate(self._paste_buffer):
+            for col_i, entry in enumerate(row):
+                dst_x = tx + col_i
+                dst_y = ty + row_i
+                if dst_x >= self.tilemap_width or dst_y >= self.tilemap_height:
+                    continue
+                if dst_x < 0 or dst_y < 0:
+                    continue
+                idx = (self._tilemap_index(dst_x, dst_y) if hasattr(self, '_tilemap_index')
+                       else dst_y * self.tilemap_width + dst_x)
+                if idx * 2 + 2 > len(new_data):
+                    continue
+                new_data[idx * 2]     = entry & 0xFF
+                new_data[idx * 2 + 1] = (entry >> 8) & 0xFF
+        self.tilemap_data = bytes(new_data)
+        mw = getattr(self, 'main_window', None)
+        if mw:
+            for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+                other = getattr(mw, attr, None)
+                if other and other is not self:
+                    other.tilemap_data = self.tilemap_data
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(self.tilemap_data)
+        if mw and hasattr(mw, 'history_manager'):
+            mw.history_manager.record_state(
+                state_type='tilemap_paste',
+                editor_type='tiles',
+                data={'old_data': old_data, 'new_data': self.tilemap_data,
+                      'tx': tx, 'ty': ty},
+                description=f"Paste at ({tx},{ty})"
+            )
+        if mw and hasattr(mw, '_save_map_and_refresh'):
+            mw._save_map_and_refresh()
+
+    def _cancel_paste(self):
+        self.tilemap_view.paste_mode = False
+        self.tilemap_view._paste_pixmap = None
+        self.tilemap_view.on_paste = None
+        self.tilemap_view.on_paste_cancel = None
+        self.tilemap_view._remove_paste_preview()
+        self.tilemap_view.viewport().setCursor(Qt.ArrowCursor)
+        self._paste_buffer = None
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_paste_mode_active(False)
+
+    def _cut_selection(self, defer_refresh=False):
+        if not self._tilemap_sel_area or not self.tilemap_data:
+            return
+        x1, y1, x2, y2 = self._tilemap_sel_area
+        old_data = self.tilemap_data
+        new_data = bytearray(old_data)
+        affected = []
+        for ty in range(y1, y2 + 1):
+            for tx in range(x1, x2 + 1):
+                idx = (self._tilemap_index(tx, ty) if hasattr(self, '_tilemap_index')
+                       else ty * self.tilemap_width + tx)
+                if idx * 2 + 2 > len(new_data):
+                    continue
+                new_data[idx * 2]     = 0x00
+                new_data[idx * 2 + 1] = 0x00
+                affected.append((tx, ty))
+        self.tilemap_data = bytes(new_data)
+        mw = getattr(self, 'main_window', None)
+        if mw:
+            for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
+                other = getattr(mw, attr, None)
+                if other and other is not self:
+                    other.tilemap_data = self.tilemap_data
+        import os
+        os.makedirs('output', exist_ok=True)
+        with open('output/map.bin', 'wb') as f:
+            f.write(self.tilemap_data)
+        if mw and hasattr(mw, 'history_manager'):
+            mw.history_manager.record_state(
+                state_type='tilemap_cut',
+                editor_type='tiles',
+                data={'old_data': old_data, 'new_data': self.tilemap_data,
+                      'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2},
+                description=f"Cut ({x1},{y1})-({x2},{y2})"
+            )
+        self._clear_tilemap_area_selection()
+        tb = self._toolbar()
+        if tb is not None:
+            tb.on_area_selected(False)
+        if not defer_refresh and mw and hasattr(mw, '_save_map_and_refresh'):
+            mw._save_map_and_refresh()
+
     def on_tilemap_release(self):
         pass
 

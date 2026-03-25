@@ -54,24 +54,40 @@ class ContextToolbar:
         self.main_window = main_window
         self._tab_widget = tab_widget
 
-        self.btn_select_rect  = _btn("select_rect", "toolbar_select_area", checkable=True)
-        self.btn_copy         = _btn("copy",        "toolbar_copy",   shortcut="Ctrl+C")
-        self.btn_cut          = _btn("cut",         "toolbar_cut",    shortcut="Ctrl+X")
-        self.btn_paste        = _btn("paste",       "toolbar_paste",  shortcut="Ctrl+V")
-        self.btn_flip_h       = _btn("flip_h",      "toolbar_flip_h", checkable=True)
-        self.btn_flip_v       = _btn("flip_v",      "toolbar_flip_v", checkable=True)
+        self.btn_select_rect  = _btn("select_rect", "toolbar_select_area",  checkable=True)
+        self.btn_copy         = _btn("copy",        "toolbar_copy",         shortcut="Ctrl+C")
+        self.btn_cut          = _btn("cut",         "toolbar_cut",          shortcut="Ctrl+X")
+        self.btn_paste        = _btn("paste",       "toolbar_paste",        shortcut="Ctrl+V", checkable=True)
+        self.btn_flip_h       = _btn("flip_h",      "toolbar_flip_h")
+        self.btn_flip_v       = _btn("flip_v",      "toolbar_flip_v")
+        self.btn_mirror_h     = _btn("mirror_h",    "toolbar_mirror_h")
+        self.btn_mirror_v     = _btn("mirror_v",    "toolbar_mirror_v")
+        self.btn_swap_h       = _btn("swap_h",      "toolbar_swap_h")
+        self.btn_swap_v       = _btn("swap_v",      "toolbar_swap_v")
         for b in (self.btn_select_rect,
                   self.btn_copy, self.btn_cut, self.btn_paste,
-                  self.btn_flip_h, self.btn_flip_v):
+                  self.btn_flip_h, self.btn_flip_v,
+                  self.btn_mirror_h, self.btn_mirror_v,
+                  self.btn_swap_h, self.btn_swap_v):
             b.setChecked(False)
             b.setEnabled(False)
 
         self.btn_select_rect.toggled.connect(self._on_select_rect_toggled)
+        self.btn_copy.clicked.connect(self._on_copy_clicked)
+        self.btn_cut.clicked.connect(self._on_cut_clicked)
+        self.btn_flip_h.clicked.connect(lambda: self._on_transform_clicked('flip_h'))
+        self.btn_flip_v.clicked.connect(lambda: self._on_transform_clicked('flip_v'))
+        self.btn_mirror_h.clicked.connect(lambda: self._on_transform_clicked('mirror_h'))
+        self.btn_mirror_v.clicked.connect(lambda: self._on_transform_clicked('mirror_v'))
+        self.btn_swap_h.clicked.connect(lambda: self._on_transform_clicked('swap_h'))
+        self.btn_swap_v.clicked.connect(lambda: self._on_transform_clicked('swap_v'))
 
         self._tiles = _make_group([
             self.btn_select_rect, _sep(),
             self.btn_copy, self.btn_cut, self.btn_paste, _sep(),
-            self.btn_flip_h, self.btn_flip_v,
+            self.btn_flip_h, self.btn_flip_v, _sep(),
+            self.btn_mirror_h, self.btn_mirror_v, _sep(),
+            self.btn_swap_h, self.btn_swap_v,
         ])
 
         self.btn_pencil_pal  = _btn("wand",        "toolbar_select_tiles", checkable=True)
@@ -132,7 +148,9 @@ class ContextToolbar:
     def on_tileset_unloaded(self):
         for b in (self.btn_select_rect,
                   self.btn_copy, self.btn_cut, self.btn_paste,
-                  self.btn_flip_h, self.btn_flip_v):
+                  self.btn_flip_h, self.btn_flip_v,
+                  self.btn_mirror_h, self.btn_mirror_v,
+                  self.btn_swap_h, self.btn_swap_v):
             b.setEnabled(False)
             if b.isCheckable():
                 b.setChecked(False)
@@ -155,6 +173,9 @@ class ContextToolbar:
                 b.setChecked(False)
 
     def show_for_tab(self, index):
+        tab = self._active_tab()
+        if tab is not None and getattr(getattr(tab, 'tilemap_view', None), 'paste_mode', False):
+            tab._cancel_paste()
         for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
             tab = getattr(self.main_window, attr, None)
             if tab is not None:
@@ -201,7 +222,9 @@ class ContextToolbar:
         rot = self._rotation_mode()
         for b in (self.btn_copy, self.btn_cut):
             b.setEnabled(has_selection)
-        for b in (self.btn_flip_h, self.btn_flip_v):
+        for b in (self.btn_flip_h, self.btn_flip_v,
+                  self.btn_mirror_h, self.btn_mirror_v,
+                  self.btn_swap_h, self.btn_swap_v):
             b.setEnabled(has_selection and not rot)
         if self._tab_widget.currentIndex() == 2:
             self.btn_pal_replace.setEnabled(has_selection)
@@ -289,6 +312,42 @@ class ContextToolbar:
         if not checked:
             self.on_area_selected(False)
         self._set_tilemap_cursor(Qt.CrossCursor if checked else Qt.ArrowCursor)
+
+    def _on_transform_clicked(self, op):
+        tab = self._active_tab()
+        if tab is not None and hasattr(tab, '_apply_transform'):
+            tab._apply_transform(op)
+
+    def on_paste_mode_active(self, active: bool):
+        if active:
+            self.btn_paste.setEnabled(True)
+            self.btn_paste.setChecked(True)
+            for b in (self.btn_select_rect, self.btn_copy, self.btn_cut,
+                      self.btn_flip_h, self.btn_flip_v,
+                      self.btn_mirror_h, self.btn_mirror_v,
+                      self.btn_swap_h, self.btn_swap_v):
+                b.setEnabled(False)
+        else:
+            self.btn_paste.setChecked(False)
+            self.btn_paste.setEnabled(False)
+            self.on_tileset_loaded()
+            self.btn_select_rect.blockSignals(True)
+            self.btn_select_rect.setChecked(True)
+            self.btn_select_rect.blockSignals(False)
+            tab = self._active_tab()
+            if tab is not None:
+                tab.set_area_selection_mode(True)
+            self._set_tilemap_cursor(Qt.CrossCursor)
+
+    def _on_copy_clicked(self):
+        tab = self._active_tab()
+        if tab is not None and hasattr(tab, '_copy_selection'):
+            tab._copy_selection(is_cut=False)
+
+    def _on_cut_clicked(self):
+        tab = self._active_tab()
+        if tab is not None and hasattr(tab, '_copy_selection'):
+            tab._copy_selection(is_cut=True)
 
     def _on_select_rect_toggled(self, checked):
         tab = self._active_tab()
