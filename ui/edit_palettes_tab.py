@@ -15,8 +15,6 @@ from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 from ui.palette_grid_view import PaletteGridView
 from ui.color_editor import ColorEditor
 from ui.tilemap_utils import TilemapUtils
-from utils.translator import Translator
-translator = Translator()
 
 EMPTY_TILE_ENTRY = b'\x00\x00'
 
@@ -27,6 +25,13 @@ def _invert_lut(lut):
     return inv
 
 class EditPalettesTab(TilemapUtils, QWidget):
+    @property
+    def _tr(self):
+        """Get translator from main_window if available, otherwise use module-level fallback."""
+        if hasattr(self, 'main_window') and hasattr(self.main_window, 'translator'):
+            return self.main_window.translator.tr
+        return lambda key, **kw: key
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent
@@ -65,7 +70,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        header = QLabel(translator.tr("tab_header_edit_palettes"))
+        header = QLabel(self._tr("tab_header_edit_palettes"))
         header.setFont(QFont("Arial", 10, QFont.Bold))
         header.setStyleSheet("QLabel { background: #555; color: white; padding: 4px; border-radius: 4px; }")
         header.setFixedHeight(30)
@@ -95,7 +100,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        palettes_label = QLabel(translator.tr("section_palettes"))
+        palettes_label = QLabel(self._tr("section_palettes"))
         palettes_label.setFont(QFont("Arial", 9, QFont.Bold))
         palettes_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(palettes_label)
@@ -153,12 +158,12 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
         cb_style = "QCheckBox { font-size: 8pt; }"
 
-        self._cb_move_color = QCheckBox(translator.tr("palette_op_move_color"))
+        self._cb_move_color = QCheckBox(self._tr("palette_op_move_color"))
         self._cb_move_color.setStyleSheet(cb_style)
         self._cb_move_color.setFixedHeight(18)
         self._cb_move_color.setEnabled(False)
 
-        self._cb_swap_color = QCheckBox(translator.tr("palette_op_swap_color"))
+        self._cb_swap_color = QCheckBox(self._tr("palette_op_swap_color"))
         self._cb_swap_color.setStyleSheet(cb_style)
         self._cb_swap_color.setFixedHeight(18)
         self._cb_swap_color.setEnabled(False)
@@ -433,7 +438,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        tilemap_label = QLabel(translator.tr("section_tilemap"))
+        tilemap_label = QLabel(self._tr("section_tilemap"))
         tilemap_label.setFont(QFont("Arial", 9, QFont.Bold))
         tilemap_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(tilemap_label)
@@ -1108,7 +1113,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
             if result and hasattr(self.main_window, 'refresh_preview_display'):
                 self.main_window.refresh_preview_display()
         except Exception as e:
-            print(translator.tr("error_regenerating_preview").format(e=e))
+            print(self._tr("error_regenerating_preview").format(e=e))
     
     def _update_all_tiles(self):
         if not self.tilemap_data or not hasattr(self.main_window, 'edit_tiles_tab'):
@@ -1152,7 +1157,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                     tiles_tab.display_tileset(new_tileset_img)
                     
                 except Exception as e:
-                     print(translator.tr("error_reloading_tileset").format(e=e))
+                     print(self._tr("error_reloading_tileset").format(e=e))
 
     def _save_output_palette_4bpp(self, output_dir):
             import os
@@ -1214,7 +1219,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                     for r, g, b in self.palette_colors:
                         f.write(f"{r} {g} {b}\n")
             except Exception as e:
-                 print(translator.tr("error_saving_preview_palette").format(e=e))
+                 print(self._tr("error_saving_preview_palette").format(e=e))
             
             self._save_output_palette()
             if not skip_tiles:
@@ -1273,7 +1278,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                 et.render_tileset_with_padding(w, h, total_tiles)
 
         except Exception as e:
-            print(translator.tr("error_updating_output_tiles").format(e=e))
+            print(self._tr("error_updating_output_tiles").format(e=e))
         
     def finalize_color_editing(self):
         if (self.color_editor.has_changes() and 

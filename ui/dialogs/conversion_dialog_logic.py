@@ -22,8 +22,9 @@ class ConversionDialogLogic:
         self.PRESETS = self.PRESETS_ROT if is_rot else self.PRESETS_TEXT
         self.output_combo.blockSignals(True)
         self.output_combo.clear()
-        for label in self.PRESETS.keys():
-            self.output_combo.addItem(label)
+        for key in self.PRESETS.keys():
+            translated = self._tr(key) if not is_rot else key
+            self.output_combo.addItem(translated, key)
         self.output_combo.blockSignals(False)
         self.output_combo.setCurrentIndex(0)
         self.on_output_size_changed()
@@ -125,36 +126,44 @@ class ConversionDialogLogic:
             print(f"Error loading input image: {e}")
 
     def on_output_size_changed(self):
-        text = self.output_combo.currentText()
-        if text == "Custom":
+        text = self.output_combo.currentData() 
+        
+        if text == "preset_custom":
             self.custom_stack.setCurrentIndex(1)
             self.update_output_info()
-        elif text == "Original":
+        elif text == "preset_original":
             self.custom_stack.setCurrentIndex(0)
             w_px, h_px = self.img_width_tiles * 8, self.img_height_tiles * 8
             self.output_width_tiles = self.img_width_tiles
             self.output_height_tiles = self.img_height_tiles
-            self.output_info.setText(f"Output Size: {w_px}x{h_px} px")
+            self.output_info.setText(f"{self._tr('conv_output_size')} {w_px}x{h_px} px")
         else:
             self.custom_stack.setCurrentIndex(0)
-            w_tiles, h_tiles = self.PRESETS[text]
-            self.output_width_tiles = w_tiles
-            self.output_height_tiles = h_tiles
-            w_px, h_px = w_tiles * 8, h_tiles * 8
-            self.output_info.setText(f"Output Size: {w_px}x{h_px} px")
+            preset_value = self.PRESETS_TEXT.get(text)
+            if preset_value:
+                w_tiles, h_tiles = preset_value
+                self.output_width_tiles = w_tiles
+                self.output_height_tiles = h_tiles
+                w_px, h_px = w_tiles * 8, h_tiles * 8
+                self.output_info.setText(f"{self._tr('conv_output_size')} {w_px}x{h_px} px")
 
     def update_output_info(self):
-        w_tiles = self.custom_width.value()
-        h_tiles = self.custom_height.value()
-        w_px, h_px = w_tiles * 8, h_tiles * 8
-        if w_px > 1024 or h_px > 2048:
-            self.output_info.setText(f"Output Size: {w_px}x{h_px} px ⚠️ Exceeds 1024x2048")
-            self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #cc0000; padding: 4px; }")
-        else:
-            self.output_info.setText(f"Output Size: {w_px}x{h_px} px")
-            self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
-        self.output_width_tiles = w_tiles
-        self.output_height_tiles = h_tiles
+            w_tiles = self.custom_width.value()
+            h_tiles = self.custom_height.value()
+            w_px, h_px = w_tiles * 8, h_tiles * 8
+            
+            base_text = f"{self._tr('conv_output_size')} {w_px}x{h_px} px"
+            
+            if w_px > 1024 or h_px > 2048:
+                warning_text = self._tr("conv_exceeds_limit")
+                self.output_info.setText(f"{base_text} {warning_text}")
+                self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #cc0000; padding: 4px; }")
+            else:
+                self.output_info.setText(base_text)
+                self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
+                
+            self.output_width_tiles = w_tiles
+            self.output_height_tiles = h_tiles
 
     def on_convert(self):
         if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
@@ -170,7 +179,7 @@ class ConversionDialogLogic:
             if len(tc) != 3 or not all(0 <= c <= 255 for c in tc):
                 raise ValueError
         except:
-            QMessageBox.critical(self, "Error", "Invalid transparent color. Use 'R,G,B' with values 0-255.")
+            QMessageBox.critical(self, "Error", self._tr("conv_error_invalid_color"))
             return
 
         origin_text = self.origin.text().strip()
@@ -186,7 +195,7 @@ class ConversionDialogLogic:
                     else:
                         int(p)
             except:
-                QMessageBox.critical(self, "Error", "Invalid origin. Use 'x,y' or 'xt,yt' (e.g. '10,20' or '1t,2t').")
+                QMessageBox.critical(self, "Error", self._tr("conv_error_invalid_origin"))
                 return
 
         tilemap_path = None
@@ -199,28 +208,28 @@ class ConversionDialogLogic:
             if self.use_tilemap_radio.isChecked():
                 tilemap_path = self.tilemap_path_edit.text().strip()
                 if not tilemap_path:
-                    QMessageBox.warning(self, "Warning", "Please select a tilemap file")
+                    QMessageBox.warning(self, "Warning", self._tr("conv_warning_select_tilemap"))
                     return
                 if not os.path.exists(tilemap_path):
-                    QMessageBox.warning(self, "Warning", f"The selected tilemap file does not exist:\n{tilemap_path}")
+                    QMessageBox.warning(self, "Warning", self._tr("conv_warning_tilemap_not_exist") + tilemap_path)
                     return
             else:
                 palettes_to_use = [i for i, cb in enumerate(self.palette_checks) if cb.isChecked()]
 
-        if not is_rot and self.output_combo.currentText() == "Custom":
-            w = self.custom_width.value()
-            h = self.custom_height.value()
-            if w > 32:
-                adjusted_w = ((w + 31) // 32) * 32
-                adjusted_h = ((h + 31) // 32) * 32
-                if adjusted_w != w or adjusted_h != h:
-                    dlg = GBACompatibilityDialog(w, h, adjusted_w, adjusted_h, self)
-                    if dlg.exec():
-                        self.custom_width.setValue(adjusted_w)
-                        self.custom_height.setValue(adjusted_h)
-                        self.update_output_info()
-                    else:
-                        return
+        if not is_rot and self.output_combo.currentData() == "preset_custom":
+                    w = self.custom_width.value()
+                    h = self.custom_height.value()
+                    if w > 32:
+                        adjusted_w = ((w + 31) // 32) * 32
+                        adjusted_h = ((h + 31) // 32) * 32
+                        if adjusted_w != w or adjusted_h != h:
+                            dlg = GBACompatibilityDialog(w, h, adjusted_w, adjusted_h, self)
+                            if dlg.exec():
+                                self.custom_width.setValue(adjusted_w)
+                                self.custom_height.setValue(adjusted_h)
+                                self.update_output_info()
+                            else:
+                                return
 
         self.convert_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -325,5 +334,5 @@ class ConversionDialogLogic:
             self.progress_bar.setFormat("Error")
             QApplication.processEvents()
             msg = str(e) if str(e) else "Process exited unexpectedly."
-            QMessageBox.critical(self, "Error", f"Conversion failed: {msg}")
+            QMessageBox.critical(self, "Error", self._tr("conv_error_conversion_failed", msg=msg))
             self.convert_btn.setEnabled(True)

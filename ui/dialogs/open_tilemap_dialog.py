@@ -3,8 +3,8 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QPushButton
 )
-
 from core.config import ROT_SIZES as _ROT_SIZES
+
 
 def _get_possible_dimensions(total_tiles):
     priority_w = [20, 32, 64]
@@ -32,25 +32,26 @@ def _get_possible_dimensions(total_tiles):
 class OpenTilemapDialog(QDialog):
     def __init__(self, total_tiles, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Open Tilemap")
+        self._tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
+        self.setWindowTitle(self._tr("dlg_open_tilemap_title"))
         self.setModal(True)
         self.setFixedSize(300, 180)
 
         layout = QVBoxLayout(self)
 
         mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("Mode:"))
+        mode_row.addWidget(QLabel(self._tr("dlg_mode_label")))
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
+        self.mode_combo.addItems([self._tr("dlg_text_mode"), self._tr("dlg_rot_mode")])
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self.mode_combo)
         layout.addLayout(mode_row)
 
         current_bpp = getattr(parent, 'current_bpp', 4) if parent else 4
         bpp_row = QHBoxLayout()
-        bpp_row.addWidget(QLabel("Bit Depth:"))
+        bpp_row.addWidget(QLabel(self._tr("dlg_bit_depth_label")))
         self.bpp_combo = QComboBox()
-        self.bpp_combo.addItems(["4bpp", "8bpp"])
+        self.bpp_combo.addItems([self._tr("dlg_4bpp"), self._tr("dlg_8bpp")])
         if current_bpp == 8:
             self.bpp_combo.setCurrentIndex(1)
             self.bpp_combo.setEnabled(False)
@@ -60,18 +61,18 @@ class OpenTilemapDialog(QDialog):
         layout.addLayout(bpp_row)
 
         size_row = QHBoxLayout()
-        size_row.addWidget(QLabel("Size (tiles):"))
+        size_row.addWidget(QLabel(self._tr("dlg_size_tiles")))
         self.size_combo = QComboBox()
-        self._total_bytes = total_tiles  # raw byte count
-        self._total_tiles = total_tiles // 2  # for text mode (2 bytes/entry)
+        self._total_bytes = total_tiles
+        self._total_tiles = total_tiles // 2
         self._text_dims = _get_possible_dimensions(self._total_tiles)
         self._populate_text_sizes()
         size_row.addWidget(self.size_combo)
         layout.addLayout(size_row)
 
         btn_row = QHBoxLayout()
-        self._ok_btn = QPushButton("Open")
-        cancel_btn = QPushButton("Cancel")
+        self._ok_btn = QPushButton(self._tr("dlg_open_btn"))
+        cancel_btn = QPushButton(self._tr("cancel"))
         self._ok_btn.setDefault(True)
         self._ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
@@ -97,7 +98,7 @@ class OpenTilemapDialog(QDialog):
             self.size_combo.setEnabled(True)
             self._ok_btn.setEnabled(True)
         else:
-            self.size_combo.addItem("No valid rotation size matches this file")
+            self.size_combo.addItem(self._tr("dlg_no_valid_rot_size"))
             self.size_combo.setEnabled(False)
             self._ok_btn.setEnabled(False)
 

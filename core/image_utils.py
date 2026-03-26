@@ -4,8 +4,6 @@ import numpy as np
 from PIL import Image
 from shutil import copy2
 from PySide6.QtGui import QImage
-from sklearn.cluster import KMeans
-from scipy.spatial.distance import cdist
 from core.config import MARKER_COLOR
 from core.config_manager import ConfigManager
 from core.palette_utils import rgb_to_gba_rounded

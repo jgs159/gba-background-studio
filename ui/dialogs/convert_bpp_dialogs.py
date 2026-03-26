@@ -3,15 +3,16 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                 QCheckBox, QSpinBox, QPushButton, QGridLayout,
                                 QWidget, QFrame)
 from PySide6.QtCore import Qt
-from utils.translator import Translator
-
-tr = Translator().tr
 
 
 class Convert4BppDialog(QDialog):
     def __init__(self, color_count, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(tr("convert_4bpp_dialog_title"))
+        
+        # Get translator from parent window
+        self._tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
+        
+        self.setWindowTitle(self._tr("convert_4bpp_dialog_title"))
         self.setModal(True)
         self.setFixedWidth(360)
         self._single_mode = color_count <= 16
@@ -20,9 +21,9 @@ class Convert4BppDialog(QDialog):
         layout.setSpacing(8)
 
         if self._single_mode:
-            info = QLabel(tr("convert_4bpp_info_single", count=color_count))
+            info = QLabel(self._tr("convert_4bpp_info_single", count=color_count))
         else:
-            info = QLabel(tr("convert_4bpp_info_multi", count=color_count))
+            info = QLabel(self._tr("convert_4bpp_info_multi", count=color_count))
         info.setWordWrap(True)
         layout.addWidget(info)
 
@@ -55,9 +56,9 @@ class Convert4BppDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self._ok_btn = QPushButton(tr("convert_btn"))
+        self._ok_btn = QPushButton(self._tr("convert_btn"))
         self._ok_btn.setDefault(True)
-        cancel_btn = QPushButton(tr("cancel"))
+        cancel_btn = QPushButton(self._tr("cancel"))
         self._ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(self._ok_btn)
@@ -85,7 +86,11 @@ class Convert4BppDialog(QDialog):
 class Convert8BppDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(tr("convert_8bpp_dialog_title"))
+        
+        # Get translator from parent window
+        self._tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
+        
+        self.setWindowTitle(self._tr("convert_8bpp_dialog_title"))
         self.setModal(True)
         self.setFixedWidth(280)
 
@@ -97,17 +102,17 @@ class Convert8BppDialog(QDialog):
         form_layout.setContentsMargins(0, 0, 0, 0)
         form_layout.setSpacing(6)
 
-        form_layout.addWidget(QLabel(tr("convert_8bpp_start_index")), 0, 0)
+        form_layout.addWidget(QLabel(self._tr("convert_8bpp_start_index")), 0, 0)
         self._start_index = QSpinBox()
         self._start_index.setRange(0, 255)
         self._start_index.setValue(0)
         form_layout.addWidget(self._start_index, 0, 1)
 
-        form_layout.addWidget(QLabel(tr("convert_8bpp_palette_size")), 1, 0)
+        form_layout.addWidget(QLabel(self._tr("convert_8bpp_palette_size")), 1, 0)
         self._palette_size = QSpinBox()
         self._palette_size.setRange(0, 256)
         self._palette_size.setValue(0)
-        self._palette_size.setSpecialValueText(tr("convert_8bpp_auto_size", n=256))
+        self._palette_size.setSpecialValueText(self._tr("convert_8bpp_auto_size", n=256))
         form_layout.addWidget(self._palette_size, 1, 1)
 
         layout.addWidget(form)
@@ -124,9 +129,9 @@ class Convert8BppDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        ok_btn = QPushButton(tr("convert_btn"))
+        ok_btn = QPushButton(self._tr("convert_btn"))
         ok_btn.setDefault(True)
-        cancel_btn = QPushButton(tr("cancel"))
+        cancel_btn = QPushButton(self._tr("cancel"))
         ok_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
@@ -135,7 +140,7 @@ class Convert8BppDialog(QDialog):
 
     def _update_auto_label(self, start_val):
         auto_size = 256 - start_val
-        self._palette_size.setSpecialValueText(tr("convert_8bpp_auto_size", n=auto_size))
+        self._palette_size.setSpecialValueText(self._tr("convert_8bpp_auto_size", n=auto_size))
         if self._palette_size.value() > 0 and start_val + self._palette_size.value() > 256:
             self._palette_size.setValue(0)
 

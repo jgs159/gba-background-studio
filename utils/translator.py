@@ -5,20 +5,25 @@ import os
 
 class Translator:
     LANGUAGE_CODES = {
-        "english": "eng",
-        "spanish": "spa",
-        "br_portuguese": "brp",
-        "french": "fra",
-        "german": "deu",
-        "italian": "ita",
-        "portuguese": "por",
-        "indonesian": "ind",
-        "hindi": "hin",
-        "russian": "rus",
-        "japanese": "jpn",
-        "chinese": "cmn"
-    }
-
+            "english": "eng",
+            "spanish": "spa",
+            "br_portuguese": "brp",
+            "french": "fra",
+            "german": "deu",
+            "italian": "ita",
+            "portuguese": "por",
+            "dutch": "nld",
+            "polish": "pol", 
+            "turkish": "tur",
+            "vietnamese": "vie",
+            "indonesian": "ind",
+            "hindi": "hin",
+            "russian": "rus",
+            "japanese": "jpn",
+            "chinese_simplified": "zhs",
+            "chinese_traditional": "zht",
+            "korean": "kor",
+        }
     def __init__(self, lang_dir="lang", default_lang="english"):
         self.lang_dir = lang_dir
         self.default_lang = default_lang

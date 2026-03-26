@@ -66,7 +66,8 @@ def _rotation_to_text(tilemap_data, w, h):
 class SaveTilemapDialog(QDialog):
     def __init__(self, parent=None, sel_w=None, sel_h=None):
         super().__init__(parent)
-        self.setWindowTitle("Save Tilemap")
+        self._tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
+        self.setWindowTitle(self._tr("dlg_save_tilemap_title"))
         self.setModal(True)
         self.setFixedSize(340, 170)
 
@@ -88,31 +89,28 @@ class SaveTilemapDialog(QDialog):
         
         if self._current_rot:
             if not _is_rot_text_compatible(self._w, self._h):
-                self._switch_blocked_reason = (
-                    f"Cannot convert to Text Mode: {self._w}×{self._h} is not a valid "
-                    f"GBA text BG size. Valid: W≤32 any H, or 64×(multiple of 32)."
+                self._switch_blocked_reason = self._tr(
+                    'save_tilemap_rot_incompatible',
+                    w=self._w, h=self._h
                 )
                 self._can_switch = False
         else:
             if not _is_text_rot_compatible(self._w, self._h):
-                self._switch_blocked_reason = (
-                    f"Cannot convert to Rotation Mode: {self._w}×{self._h} is not compatible. "
-                    f"Valid sizes: 32×32 or 64×64."
+                self._switch_blocked_reason = self._tr(
+                    'save_tilemap_text_incompatible',
+                    w=self._w, h=self._h
                 )
                 self._can_switch = False
             elif self._tilemap_data and _has_flips(self._tilemap_data):
-                self._switch_blocked_reason = (
-                    "Cannot convert to Rotation Mode: tilemap contains flipped tiles. "
-                    "Remove all flips before exporting."
-                )
+                self._switch_blocked_reason = self._tr('save_tilemap_has_flips')
                 self._can_switch = False
 
         layout = QVBoxLayout(self)
 
         mode_row = QHBoxLayout()
-        mode_row.addWidget(QLabel("Mode:"))
+        mode_row.addWidget(QLabel(self._tr("dlg_mode_label")))
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
+        self.mode_combo.addItems([self._tr("dlg_text_mode"), self._tr("dlg_rot_mode")])
         if not self._can_switch:
             self.mode_combo.setCurrentIndex(1 if self._current_rot else 0)
             self.mode_combo.setEnabled(False)
@@ -124,9 +122,9 @@ class SaveTilemapDialog(QDialog):
         layout.addLayout(mode_row)
 
         bpp_row = QHBoxLayout()
-        bpp_row.addWidget(QLabel("Bit Depth:"))
+        bpp_row.addWidget(QLabel(self._tr("dlg_bit_depth_label")))
         self.bpp_combo = QComboBox()
-        self.bpp_combo.addItems(["4bpp", "8bpp"])
+        self.bpp_combo.addItems([self._tr("dlg_4bpp"), self._tr("dlg_8bpp")])
         if self._current_bpp == 8 or self._current_rot:
             self.bpp_combo.setCurrentIndex(1)
             self.bpp_combo.setEnabled(False)
@@ -141,8 +139,8 @@ class SaveTilemapDialog(QDialog):
         layout.addWidget(self._info_label)
 
         btn_row = QHBoxLayout()
-        self._save_btn = QPushButton("Save")
-        cancel_btn = QPushButton("Cancel")
+        self._save_btn = QPushButton(self._tr("dlg_save_btn"))
+        cancel_btn = QPushButton(self._tr("cancel"))
         self._save_btn.setDefault(True)
         self._save_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
@@ -183,15 +181,9 @@ class SaveTilemapDialog(QDialog):
             return
 
         if self._current_rot and not is_rot_selected:
-            self._info_label.setText(
-                "ℹ️ Rotation→Text: 1-byte entries expanded to 2 bytes "
-                "(tile index preserved, palette slot 0, no flips)."
-            )
+            self._info_label.setText(self._tr("dlg_rot_to_text_info"))
         else:
-            self._info_label.setText(
-                "ℹ️ Text→Rotation: 2-byte entries reduced to 1 byte "
-                "(tile index only, palette and flip info discarded)."
-            )
+            self._info_label.setText(self._tr("dlg_text_to_rot_info"))
 
     def get_values(self):
         is_rot = self.mode_combo.currentIndex() == 1

@@ -4,12 +4,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from core.config import ROT_SIZES, ROT_SIZES_SET
-from utils.translator import Translator
-
-translator = Translator()
 
 
 class TilemapUtils:
+    @property
+    def _tr(self):
+        """Get translator function, with fallback for subclasses that don't define it."""
+        if hasattr(self, 'main_window') and hasattr(self.main_window, 'translator'):
+            return self.main_window.translator.tr
+        return lambda key, **kw: key
+
     def setup_tilemap_interaction(self):
         self._tilemap_sel_area = None
         self._tilemap_sel_area_item = None
@@ -591,7 +595,7 @@ class TilemapUtils:
                 state_type='tilemap_shift',
                 editor_type='tiles',
                 data={'old_data': old_data, 'new_data': new_data, 'w': w, 'h': h},
-                description=translator.tr('tilemap_shift_desc', direction=direction)
+                description=translator._tr('tilemap_shift_desc', direction=direction)
             )
 
         import os
@@ -803,7 +807,7 @@ class TilemapUtils:
                     'new_w': final_new_w, 'new_h': final_new_h,
                     'old_data': old_data, 'new_data': final_new_data
                 },
-                description=translator.tr('tilemap_resize_desc', old_w=old_w, old_h=old_h, new_w=final_new_w, new_h=final_new_h)
+                description=self._tr('tilemap_resize_desc', old_w=old_w, old_h=old_h, new_w=final_new_w, new_h=final_new_h)
             )
 
         from core.image_utils import create_gbagfx_preview
@@ -834,7 +838,7 @@ class TilemapUtils:
             lbl.setStyleSheet("QLabel { border: none; }")
             return lbl
 
-        row.addWidget(_label(translator.tr("tilemap_width_label")))
+        row.addWidget(_label(self._tr("tilemap_width_label")))
         self.tilemap_width_spin = QSpinBox()
         self.tilemap_width_spin.setRange(1, 999)
         self.tilemap_width_spin.setValue(32)
@@ -843,7 +847,7 @@ class TilemapUtils:
         self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         row.addWidget(self.tilemap_width_spin)
 
-        row.addWidget(_label(translator.tr("tilemap_height_label")))
+        row.addWidget(_label(self._tr("tilemap_height_label")))
         self.tilemap_height_spin = QSpinBox()
         self.tilemap_height_spin.setRange(1, 999)
         self.tilemap_height_spin.setValue(32)
@@ -852,7 +856,7 @@ class TilemapUtils:
         self.tilemap_height_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         row.addWidget(self.tilemap_height_spin)
 
-        self.resize_button = QPushButton(translator.tr("tilemap_resize_btn"))
+        self.resize_button = QPushButton(self._tr("tilemap_resize_btn"))
         self.resize_button.setFixedWidth(50)
         self.resize_button.setFixedHeight(20)
         self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
@@ -873,7 +877,7 @@ class TilemapUtils:
         self.btn_left.clicked.connect(lambda: self.on_tilemap_shift("left"))
         self.btn_right.clicked.connect(lambda: self.on_tilemap_shift("right"))
 
-        self.move_label = QLabel(translator.tr("tilemap_move_label"))
+        self.move_label = QLabel(self._tr("tilemap_move_label"))
         self.move_label.setStyleSheet("QLabel { border: none; }")
 
         row.addWidget(self.btn_left)
@@ -882,7 +886,7 @@ class TilemapUtils:
         row.addWidget(self.btn_down)
         row.addWidget(self.btn_right)
 
-        self.cyclic_checkbox = QCheckBox(translator.tr("tilemap_cyclic_shift"))
+        self.cyclic_checkbox = QCheckBox(self._tr("tilemap_cyclic_shift"))
         self.cyclic_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.cyclic_checkbox.setFixedHeight(18)
         row.addWidget(self.cyclic_checkbox)
@@ -907,11 +911,11 @@ class TilemapUtils:
     def _ask_rotation_size(self, attempted_w, attempted_h):
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogButtonBox
         dlg = QDialog(self.main_window if self.main_window else None)
-        dlg.setWindowTitle(translator.tr("invalid_rot_size_title_dialog"))
+        dlg.setWindowTitle(translator._tr("invalid_rot_size_title_dialog"))
         dlg.setFixedWidth(320)
         layout = QVBoxLayout(dlg)
         layout.addWidget(QLabel(
-            translator.tr("invalid_rot_size_message", w=attempted_w, h=attempted_h)
+            translator._tr("invalid_rot_size_message", w=attempted_w, h=attempted_h)
         ))
         lst = QListWidget()
         labels = ["16×16 (128×128 px)", "32×32 (256×256 px)",
@@ -968,7 +972,7 @@ class TilemapUtils:
                 data={'old_w': old_w, 'old_h': old_h,
                       'new_w': new_w, 'new_h': new_h,
                       'old_data': old_data, 'new_data': new_data},
-                description=translator.tr('tilemap_resize_desc', old_w=old_w, old_h=old_h, new_w=new_w, new_h=new_h)
+                description=translator._tr('tilemap_resize_desc', old_w=old_w, old_h=old_h, new_w=new_w, new_h=new_h)
             )
 
         save_preview = keep_transparent = False

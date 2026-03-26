@@ -26,7 +26,8 @@ class LibraryLoader:
             try:
                 if progress_callback:
                     progress = int((i / total) * 100)
-                    progress_callback(progress, f"Precargando {module_name}...")
+                    msg = translator.tr("preloading_library").format(module_name=module_name)
+                    progress_callback(progress, msg)
                 
                 module = importlib.import_module(module_name)
                 
@@ -41,11 +42,15 @@ class LibraryLoader:
                     dummy_img = Image.new('P', (8, 8))
                     _ = dummy_img.getpalette()
 
-                time.sleep(0.05)
+                elif module_name == "PySide6.QtWidgets":
+                    from PySide6.QtWidgets import QFileDialog
+                    _ = QFileDialog
+
+                time.sleep(0.02)
                 
             except ImportError as e:
-                 print(translator.tr("warning_loading_library").format(module_name=module_name, e=e))
+                print(translator.tr("warning_loading_library").format(module_name=module_name, e=e))
                 continue
         
         if progress_callback:
-            progress_callback(100, "¡Precarga completada!")
+            progress_callback(100, translator.tr("preload_complete"))

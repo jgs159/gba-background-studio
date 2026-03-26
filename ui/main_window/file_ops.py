@@ -2,11 +2,11 @@
 import os
 import shutil
 from PIL import Image as PilImage
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, 
-                               QLabel, QSpinBox, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                               QLabel, QSpinBox, QPushButton,
                                QFileDialog, QMessageBox)
 from PySide6.QtGui import QPixmap, QBrush, QColor
-from core.image_utils import pil_to_qimage
+from core.image_utils import pil_to_qimage, create_gbagfx_preview
 from core.palette_utils import generate_grayscale_palette
 from core.config import ROT_SIZES_SET as _ROT_SIZES
 
@@ -1050,7 +1050,6 @@ def open_tilemap(main_window):
     et.tilemap_height_spin.setValue(h)
     et.enable_tilemap_controls()
 
-    from core.image_utils import create_gbagfx_preview
     from core.image_utils import pil_to_qimage as _pil_to_qimage
     from PySide6.QtGui import QPixmap as _QPixmap
 
@@ -1092,7 +1091,6 @@ def new_tilemap(main_window):
     from ui.dialogs.new_tilemap_dialog import NewTilemapDialog
     from ui.dialogs.gba_compatibility_dialog import GBACompatibilityDialog
     from core.final_assets import reorganize_tilemap_for_gba_bg
-    from core.image_utils import create_gbagfx_preview
 
     dlg = NewTilemapDialog(main_window)
     if dlg.exec() != QDialog.Accepted:

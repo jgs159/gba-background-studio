@@ -80,15 +80,14 @@ class GBASplashScreen(QSplashScreen):
         self.setCursor(Qt.BusyCursor)
 
     def _tr_splash(self, key, default_text):
-        if self.translator and hasattr(self.translator, 'translations'):
-            return self.translator.translations.get(key, default_text)
+        if self.translator and hasattr(self.translator, 'tr'):
+            return self.translator.tr(key, **{})
         return default_text
 
     def set_progress(self, value, message=""):
         self.progress_bar.setValue(value)
         if message:
-            translated_message = self._tr_splash(f"splash_{message.lower().replace(' ', '_')}", message)
-            self.showMessage(translated_message, Qt.AlignBottom | Qt.AlignCenter, Qt.white)
+            self.showMessage(message, Qt.AlignBottom | Qt.AlignCenter, Qt.white)
         
         QTimer.singleShot(10, self._process_events)
     

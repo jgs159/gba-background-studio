@@ -13,13 +13,17 @@ from core.final_assets import revert_gba_tilemap_reorganization
 from core.image_utils import pil_to_qimage, create_gbagfx_preview
 from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 from ui.tilemap_utils import TilemapUtils
-from utils.translator import Translator
-
-_translator = Translator()
 
 EMPTY_TILE_ENTRY = b'\x00\x00'
 
 class EditTilesTab(TilemapUtils, QWidget):
+    @property
+    def _tr(self):
+        """Get translator from main_window if available, otherwise use module-level fallback."""
+        if hasattr(self, 'main_window') and hasattr(self.main_window, 'translator'):
+            return self.main_window.translator.tr
+        return lambda key, **kw: key
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.main_window = parent
@@ -37,14 +41,14 @@ class EditTilesTab(TilemapUtils, QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        header = self.create_header(_translator.tr("tab_header_edit_tiles"))
+        header = self.create_header(self._tr("tab_header_edit_tiles"))
         self.layout.addWidget(header)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(6)
 
-        tileset_container = self.create_section(_translator.tr("section_tileset"))
+        tileset_container = self.create_section(self._tr("section_tileset"))
         self.setup_tileset_controls(tileset_container)
         self.edit_tileset_view = QGraphicsView()
         self.edit_tileset_scene = QGraphicsScene()
@@ -57,7 +61,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         
         splitter.addWidget(tileset_container)
 
-        tilemap_container = self.create_section(_translator.tr("section_tilemap"))
+        tilemap_container = self.create_section(self._tr("section_tilemap"))
         self.setup_tilemap_controls(tilemap_container)
         self.edit_tilemap_view = CustomGraphicsView()
         self.edit_tilemap_scene = QGraphicsScene()
@@ -94,7 +98,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         controls_main_layout.setSpacing(3)
         controls_main_layout.setContentsMargins(0, 0, 0, 0)
         controls_main_layout.setAlignment(Qt.AlignLeft)
-        width_label = QLabel(_translator.tr("tileset_width_label"))
+        width_label = QLabel(self._tr("tileset_width_label"))
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
         self.tile_width_spin = QSpinBox()
@@ -104,7 +108,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         self.tile_width_spin.setFixedHeight(18)
         self.tile_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         controls_main_layout.addWidget(self.tile_width_spin)
-        height_label = QLabel(_translator.tr("tileset_height_label"))
+        height_label = QLabel(self._tr("tileset_height_label"))
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
         self.tileset_height_label = QLabel("0")
@@ -113,10 +117,10 @@ class EditTilesTab(TilemapUtils, QWidget):
         self.tileset_height_label.setAlignment(Qt.AlignCenter)
         self.tileset_height_label.setStyleSheet("QLabel { font-size: 8pt; border: 1px solid #ccc; background: #eee; padding: 1px; }")
         controls_main_layout.addWidget(self.tileset_height_label)
-        self.flip_h_checkbox = QCheckBox(_translator.tr("flip_h_label"))
+        self.flip_h_checkbox = QCheckBox(self._tr("flip_h_label"))
         self.flip_h_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.flip_h_checkbox.setFixedHeight(18)
-        self.flip_v_checkbox = QCheckBox(_translator.tr("flip_v_label"))
+        self.flip_v_checkbox = QCheckBox(self._tr("flip_v_label"))
         self.flip_v_checkbox.setStyleSheet("QCheckBox { font-size: 8pt; }")
         self.flip_v_checkbox.setFixedHeight(18)
         controls_main_layout.addWidget(self.flip_h_checkbox)
@@ -182,7 +186,7 @@ class EditTilesTab(TilemapUtils, QWidget):
                     'old_width': old_width, 'old_height': old_height,
                     'new_width': new_width, 'new_height': new_height,
                 },
-                description=_translator.tr('tileset_reshape_desc', old_w=old_width, old_h=old_height, new_w=new_width, new_h=new_height)
+                description=self._tr('tileset_reshape_desc', old_w=old_width, old_h=old_height, new_w=new_width, new_h=new_height)
             )
 
         self._tileset_width_before_edit = new_width
@@ -467,7 +471,7 @@ class EditTilesTab(TilemapUtils, QWidget):
             self.main_window.history_manager.record_state(
                 state_type='tile_change', editor_type='tiles',
                 data=old_state,
-                description=_translator.tr('tile_change_desc', x=tile_x, y=tile_y)
+                description=self._tr('tile_change_desc', x=tile_x, y=tile_y)
             )
 
         self.update_single_tile_visual(tile_x, tile_y, sync_palettes=False)
