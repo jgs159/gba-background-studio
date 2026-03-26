@@ -3,9 +3,6 @@ import os
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QToolButton, QWidget, QTabBar
 from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QCursor
 from PySide6.QtCore import Qt, QSize
-from utils.translator import Translator
-
-_translator = Translator()
 
 
 def _icon(name):
@@ -19,12 +16,13 @@ def _cursor_from_svg(name, size=24, hotspot=(0, 0)):
     px = QPixmap(path).scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
     return QCursor(px, hotspot[0], hotspot[1])
 
-def _btn(icon_name, tooltip_key, checkable=False, shortcut=None):
+def _btn(icon_name, tooltip_key, checkable=False, shortcut=None, translator=None):
     b = QToolButton()
     b.setIcon(_icon(icon_name))
     b.setIconSize(QSize(16, 16))
     b.setFixedSize(24, 24)
-    b.setToolTip(_translator.tr(tooltip_key))
+    _tr = translator.tr if translator else lambda k, **kw: k
+    b.setToolTip(_tr(tooltip_key))
     b.setCheckable(checkable)
     b.setAutoRaise(True)
     if shortcut:
@@ -53,17 +51,18 @@ class ContextToolbar:
     def __init__(self, main_window, tab_widget):
         self.main_window = main_window
         self._tab_widget = tab_widget
+        self._tr = main_window.translator.tr if hasattr(main_window, 'translator') else lambda k, **kw: k
 
-        self.btn_select_rect  = _btn("select_rect", "toolbar_select_area",  checkable=True)
-        self.btn_copy         = _btn("copy",        "toolbar_copy",         shortcut="Ctrl+C")
-        self.btn_cut          = _btn("cut",         "toolbar_cut",          shortcut="Ctrl+X")
-        self.btn_paste        = _btn("paste",       "toolbar_paste",        shortcut="Ctrl+V", checkable=True)
-        self.btn_flip_h       = _btn("flip_h",      "toolbar_flip_h")
-        self.btn_flip_v       = _btn("flip_v",      "toolbar_flip_v")
-        self.btn_mirror_h     = _btn("mirror_h",    "toolbar_mirror_h")
-        self.btn_mirror_v     = _btn("mirror_v",    "toolbar_mirror_v")
-        self.btn_swap_h       = _btn("swap_h",      "toolbar_swap_h")
-        self.btn_swap_v       = _btn("swap_v",      "toolbar_swap_v")
+        self.btn_select_rect  = _btn("select_rect", "toolbar_select_area",  checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_copy         = _btn("copy",        "toolbar_copy",         shortcut="Ctrl+C", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_cut          = _btn("cut",         "toolbar_cut",          shortcut="Ctrl+X", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_paste        = _btn("paste",       "toolbar_paste",        shortcut="Ctrl+V", checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_flip_h       = _btn("flip_h",      "toolbar_flip_h", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_flip_v       = _btn("flip_v",      "toolbar_flip_v", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_mirror_h     = _btn("mirror_h",    "toolbar_mirror_h", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_mirror_v     = _btn("mirror_v",    "toolbar_mirror_v", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_swap_h       = _btn("swap_h",      "toolbar_swap_h", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_swap_v       = _btn("swap_v",      "toolbar_swap_v", translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
         for b in (self.btn_select_rect,
                   self.btn_copy, self.btn_cut, self.btn_paste,
                   self.btn_flip_h, self.btn_flip_v,
@@ -90,11 +89,11 @@ class ContextToolbar:
             self.btn_swap_h, self.btn_swap_v,
         ])
 
-        self.btn_pencil_pal  = _btn("wand",        "toolbar_select_tiles", checkable=True)
-        self.btn_fill        = _btn("fill",        "toolbar_fill",        checkable=True)
-        self.btn_pal_replace = _btn("pal_replace", "toolbar_pal_replace", checkable=True)
-        self.btn_pal_swap    = _btn("swap",        "toolbar_pal_swap",    checkable=True)
-        self.btn_pal_select_rect = _btn("select_rect", "toolbar_select_area", checkable=True)
+        self.btn_pencil_pal  = _btn("wand",        "toolbar_select_tiles", checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_fill        = _btn("fill",        "toolbar_fill",        checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_pal_replace = _btn("pal_replace", "toolbar_pal_replace", checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_pal_swap    = _btn("swap",        "toolbar_pal_swap",    checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
+        self.btn_pal_select_rect = _btn("select_rect", "toolbar_select_area", checkable=True, translator=self.main_window.translator if hasattr(main_window, 'translator') else None)
         self.btn_pencil_pal.setChecked(True)
         for b in (self.btn_pal_select_rect, self.btn_pencil_pal, self.btn_fill,
                   self.btn_pal_replace, self.btn_pal_swap):

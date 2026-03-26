@@ -37,10 +37,8 @@ class CustomStatusBar(QWidget):
     def update_status(self, selection_type="Tile", selection_id="-", tilemap_pos=(-1, -1),
                      tile_id="-", palette_id="-", flip_state="None", zoom_level=100):
         self.selection_label.setText(self.tr("status_selected", type=selection_type, id=selection_id))
-
         tilemap_display = f"({tilemap_pos[0]}, {tilemap_pos[1]})" if tilemap_pos != (-1, -1) else "(-, -)"
         self.tilemap_label.setText(self.tr("status_tilemap", pos=tilemap_display))
-
         self.tile_label.setText(self.tr("status_tile", id=tile_id))
         self.palette_label.setText(self.tr("status_palette", id=palette_id))
         self.flip_label.setText(self.tr("status_flip", state=flip_state))
@@ -49,11 +47,11 @@ class CustomStatusBar(QWidget):
     def update_selection_status(self, x1, y1, x2, y2, zoom_level=None):
         w = x2 - x1 + 1
         h = y2 - y1 + 1
-        self.selection_label.setText(f"Origin: ({x1}, {y1})")
-        self.tilemap_label.setText(f"End: ({x2}, {y2})")
-        self.tile_label.setText(f"Width: {w} tiles")
-        self.palette_label.setText(f"Height: {h} tiles")
-        self.flip_label.setText(f"Size: {w*8}\u00d7{h*8} px")
+        self.selection_label.setText(self.tr("status_origin", x=x1, y=y1))
+        self.tilemap_label.setText(self.tr("status_end", x=x2, y=y2))
+        self.tile_label.setText(self.tr("status_width_tiles", n=w))
+        self.palette_label.setText(self.tr("status_height_tiles", n=h))
+        self.flip_label.setText(self.tr("status_size_px", w=w*8, h=h*8))
         if zoom_level is not None:
             self.zoom_label.setText(self.tr("zoom_level", level=zoom_level))
 

@@ -7,14 +7,20 @@ from .conversion_dialog_config import ConversionDialogConfig
 from .auto_spinbox import AutoSpinBox
 
 class ConversionDialog(QDialog, ConversionDialogUI, ConversionDialogLogic, ConversionDialogConfig):
+    @property
+    def _tr(self):
+        if self.parent() and hasattr(self.parent(), 'translator'):
+            return self.parent().translator.tr
+        return lambda key, **kw: key
+    
     PRESETS_TEXT = {
-        "Original": None,
-        "Screen Size (256x160)": (32, 20),
-        "Screen Size 0 (256x256)": (32, 32),
-        "Screen Size 1 (512x256)": (64, 32),
-        "Screen Size 2 (256x512)": (32, 64),
-        "Screen Size 3 (512x512)": (64, 64),
-        "Custom": None
+        "preset_original": None,
+        "preset_screen_256x160": (32, 20),
+        "preset_screen_256x256": (32, 32),
+        "preset_screen_512x256": (64, 32),
+        "preset_screen_256x512": (32, 64),
+        "preset_screen_512x512": (64, 64),
+        "preset_custom": None
     }
     PRESETS_ROT = {
         "16×16 (128×128)": (16, 16),
@@ -22,7 +28,7 @@ class ConversionDialog(QDialog, ConversionDialogUI, ConversionDialogLogic, Conve
         "64×64 (512×512)": (64, 64),
         "128×128 (1024×1024)": (128, 128),
     }
-    PRESETS = PRESETS_TEXT  # default, overridden dynamically
+    PRESETS = PRESETS_TEXT
 
     def __init__(self, image_path, parent=None):
         super().__init__(parent)
@@ -41,7 +47,14 @@ class ConversionDialog(QDialog, ConversionDialogUI, ConversionDialogLogic, Conve
         except:
             pass
 
-        self.setWindowTitle("Convert Image to Tilemap")
+        self.setWindowTitle(self._tr("conv_dialog_title"))
         self.setFixedSize(844, 558)
         self.setup_ui()
+        self.retranslate_presets()
         self.load_conversion_settings()
+        
+    def retranslate_presets(self):
+        self.output_combo.clear()
+        for key in self.PRESETS_TEXT.keys():
+            translated_name = self._tr(key) 
+            self.output_combo.addItem(translated_name, key)

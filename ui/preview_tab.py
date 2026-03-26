@@ -1,6 +1,6 @@
 # ui/preview_tab.py
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QSplitter, 
-                               QGraphicsView, QGraphicsScene, QHBoxLayout, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QSplitter,
+                               QGraphicsView, QGraphicsScene, QHBoxLayout,
                                QPushButton, QSizePolicy)
 from PySide6.QtGui import QFont, QPainter
 from PySide6.QtCore import Qt
@@ -13,12 +13,13 @@ class PreviewTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
+        self._tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
         self.layout = QVBoxLayout(self)
         self.palette_colors = [(0, 0, 0)] * 256
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         
-        preview_header = self.create_header("Preview")
+        preview_header = self.create_header(self._tr("preview_tab_header"))
         self.layout.addWidget(preview_header)
         
         main_container = QWidget()
@@ -31,7 +32,7 @@ class PreviewTab(QWidget):
         image_container_layout.setContentsMargins(4, 4, 4, 4)
         image_container_layout.setSpacing(4)
         
-        image_label = QLabel("Image")
+        image_label = QLabel(self._tr("preview_image_label"))
         image_label.setFont(QFont("Arial", 9, QFont.Bold))
         image_label.setAlignment(Qt.AlignCenter)
         image_container_layout.addWidget(image_label)
@@ -50,7 +51,7 @@ class PreviewTab(QWidget):
         palette_container_layout.setContentsMargins(4, 4, 4, 4)
         palette_container_layout.setSpacing(4)
         
-        palette_label = QLabel("Palette")
+        palette_label = QLabel(self._tr("preview_palette_label"))
         palette_label.setFont(QFont("Arial", 9, QFont.Bold))
         palette_label.setAlignment(Qt.AlignCenter)
         palette_container_layout.addWidget(palette_label)
@@ -64,7 +65,7 @@ class PreviewTab(QWidget):
         self.preview_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         palette_container_layout.addWidget(self.preview_palette_view)
         
-        open_output_btn = QPushButton("📁 Open Output Folder")
+        open_output_btn = QPushButton(self._tr("preview_open_output"))
         open_output_btn.setStyleSheet("""
             QPushButton {
                 background: #4CAF50;

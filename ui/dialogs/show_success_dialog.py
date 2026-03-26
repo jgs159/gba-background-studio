@@ -5,19 +5,22 @@ import subprocess
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout
 from PySide6.QtCore import Qt
 
+
 def show_success_dialog(parent):
+    _tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
+    
     dialog = QDialog(parent)
-    dialog.setWindowTitle("✅ Conversion Completed")
+    dialog.setWindowTitle(_tr("success_dialog_title"))
     dialog.resize(400, 300)
 
     layout = QVBoxLayout()
 
-    title = QLabel("The conversion was completed successfully!")
+    title = QLabel(_tr("success_dialog_message"))
     title.setStyleSheet("font-weight: bold; font-size: 14px; color: #006600;")
     title.setAlignment(Qt.AlignCenter)
     layout.addWidget(title)
 
-    layout.addWidget(QLabel("Generated files:"))
+    layout.addWidget(QLabel(_tr("success_dialog_files")))
 
     list_widget = QListWidget()
     output_dir = "output"
@@ -25,27 +28,27 @@ def show_success_dialog(parent):
         for file in sorted(os.listdir(output_dir)):
             list_widget.addItem(file)
     else:
-        list_widget.addItem("(No output folder)")
+        list_widget.addItem(_tr("success_dialog_no_output"))
     layout.addWidget(list_widget)
 
     btn_layout = QHBoxLayout()
     btn_layout.addStretch()
-    
-    open_btn = QPushButton("📁 Open Output Folder")
+
+    open_btn = QPushButton(_tr("success_dialog_open_folder"))
 
     def open_folder():
         path = os.path.abspath(output_dir)
         if sys.platform == "win32":
             os.startfile(path)
-        elif sys.platform == "darwin":  # macOS
+        elif sys.platform == "darwin":
             subprocess.run(["open", path])
-        else:  # Linux
+        else:
             subprocess.run(["xdg-open", path])
 
     open_btn.clicked.connect(open_folder)
     btn_layout.addWidget(open_btn)
-    
-    close_btn = QPushButton("Close")
+
+    close_btn = QPushButton(_tr("success_dialog_close"))
     close_btn.setDefault(True)
     close_btn.clicked.connect(dialog.accept)
     btn_layout.addWidget(close_btn)

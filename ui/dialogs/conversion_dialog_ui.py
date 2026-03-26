@@ -41,7 +41,7 @@ class ConversionDialogUI:
         left_panel.setLayout(left_layout)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
-        input_header = QLabel("Input Image")
+        input_header = QLabel(self._tr("conv_input_image"))
         input_header.setFont(QFont("Arial", 10, QFont.Bold))
         input_header.setStyleSheet("QLabel { background: #555; color: white; padding: 4px; border-radius: 4px; }")
         input_header.setFixedSize(512, 30)
@@ -64,7 +64,7 @@ class ConversionDialogUI:
         right_panel.setLayout(right_layout)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
-        params_group = QGroupBox("Conversion Parameters")
+        params_group = QGroupBox(self._tr("conv_conversion_params"))
         form_layout = QFormLayout()
 
         self.create_mode_selector(form_layout)
@@ -82,7 +82,7 @@ class ConversionDialogUI:
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
-        self.progress_bar.setFormat("Ready")
+        self.progress_bar.setFormat(self._tr("conv_ready"))
         self.progress_bar.setVisible(False)
         right_layout.addWidget(self.progress_bar)
 
@@ -94,16 +94,16 @@ class ConversionDialogUI:
 
     def create_mode_selector(self, form_layout):
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["Text Mode", "Rotation/Scaling"])
+        self.mode_combo.addItems([self._tr("conv_text_mode"), self._tr("conv_rot_mode")])
         self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
-        form_layout.addRow("BG Mode:", self.mode_combo)
+        form_layout.addRow(self._tr("conv_bg_mode"), self.mode_combo)
 
     def create_bpp_selector(self, form_layout):
         self.bpp_combo = QComboBox()
-        self.bpp_combo.addItems(["4bpp (16 colors per palette)", "8bpp (256 colors)"])
+        self.bpp_combo.addItems([self._tr("bpp_4bpp"), self._tr("bpp_8bpp")])
         self.bpp_combo.setCurrentIndex(0)
         self.bpp_combo.currentIndexChanged.connect(self.on_bpp_changed)
-        form_layout.addRow("Bits per pixel:", self.bpp_combo)
+        form_layout.addRow(self._tr("conv_bpp"), self.bpp_combo)
 
     def create_palette_selector(self, form_layout):
         self.palettes_container = QWidget()
@@ -116,8 +116,8 @@ class ConversionDialogUI:
         radio_layout = QHBoxLayout()
         radio_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.use_palettes_radio = QRadioButton("Use Palettes")
-        self.use_tilemap_radio = QRadioButton("Use Tilemap")
+        self.use_palettes_radio = QRadioButton(self._tr("conv_use_palettes"))
+        self.use_tilemap_radio = QRadioButton(self._tr("conv_use_tilemap"))
         self.use_palettes_radio.setChecked(True)
         self.use_palettes_radio.toggled.connect(self.on_palette_tilemap_toggled)
 
@@ -165,10 +165,10 @@ class ConversionDialogUI:
         file_layout.setContentsMargins(0, 0, 0, 0)
 
         self.tilemap_path_edit = QLineEdit()
-        self.tilemap_path_edit.setPlaceholderText("Select .bin tilemap file")
+        self.tilemap_path_edit.setPlaceholderText(self._tr("conv_select_bin"))
         self.tilemap_path_edit.setReadOnly(True)
 
-        self.tilemap_browse_btn = QPushButton("Browse...")
+        self.tilemap_browse_btn = QPushButton(self._tr("conv_browse"))
         self.tilemap_browse_btn.clicked.connect(self.browse_tilemap_file)
 
         file_layout.addWidget(self.tilemap_path_edit)
@@ -176,7 +176,7 @@ class ConversionDialogUI:
 
         file_widget = QWidget()
         file_widget.setLayout(file_layout)
-        tilemap_layout.addRow("Tilemap file:", file_widget)
+        tilemap_layout.addRow(self._tr("conv_tilemap_file"), file_widget)
 
         self.tilemap_file_container.setLayout(tilemap_layout)
         self.tilemap_file_container.setVisible(False)
@@ -193,8 +193,8 @@ class ConversionDialogUI:
         self.palette_size = AutoSpinBox()
         self.palette_size.setVisible(False)
 
-        form_layout.addRow("Palette Start Index:", self.start_index)
-        form_layout.addRow("Palette Size:", self.palette_size)
+        form_layout.addRow(self._tr("conv_palette_start"), self.start_index)
+        form_layout.addRow(self._tr("conv_palette_size"), self.palette_size)
 
         self.bpp8_widgets = [self.start_index, self.palette_size]
         self.bpp8_labels = []
@@ -218,7 +218,7 @@ class ConversionDialogUI:
         self.eyedropper_btn = QPushButton("🔍")
         self.eyedropper_btn.setFixedSize(24, 24)
         self.eyedropper_btn.setCheckable(True)
-        self.eyedropper_btn.setToolTip("Pick transparent color from image")
+        self.eyedropper_btn.setToolTip(self._tr("conv_pick_color"))
         self.eyedropper_btn.setStyleSheet(
             "QPushButton { font-size: 12px; padding: 0; }"
             "QPushButton:checked { background: #aad4f5; border: 1px solid #3399cc; }"
@@ -228,32 +228,31 @@ class ConversionDialogUI:
         tc_layout.addWidget(self.eyedropper_btn)
         tc_widget = QWidget()
         tc_widget.setLayout(tc_layout)
-        form_layout.addRow("Transparent Color:", tc_widget)
+        form_layout.addRow(self._tr("conv_transparent_color"), tc_widget)
 
         self.extra_transparent = QSpinBox()
         self.extra_transparent.setRange(0, 10)
         self.extra_transparent.setValue(0)
-        form_layout.addRow("Extra Transparent Tiles:", self.extra_transparent)
+        form_layout.addRow(self._tr("conv_extra_transparent"), self.extra_transparent)
 
         self.tileset_width = QSpinBox()
         self.tileset_width.setRange(0, 64)
         self.tileset_width.setValue(0)
         self.tileset_width.setSpecialValueText("Auto")
-        form_layout.addRow("Tileset Width (tiles):", self.tileset_width)
+        form_layout.addRow(self._tr("conv_tileset_width"), self.tileset_width)
 
         self.origin = QLineEdit("0,0")
-        self.origin.setPlaceholderText("x,y or xt,yt")
-        form_layout.addRow("Origin:", self.origin)
+        self.origin.setPlaceholderText(self._tr("conv_placeholder_origin"))
+        form_layout.addRow(self._tr("conv_origin"), self.origin)
 
     def create_output_size(self, form_layout):
         output_hlayout = QHBoxLayout()
         self.output_combo = QComboBox()
-        for label in self.PRESETS.keys():
-            self.output_combo.addItem(label)
-        self.output_combo.setCurrentText("Original")
+        for key in self.PRESETS.keys():
+            self.output_combo.addItem(self._tr(key), key)
         self.output_combo.currentTextChanged.connect(self.on_output_size_changed)
         output_hlayout.addWidget(self.output_combo)
-        form_layout.addRow("Output Size:", output_hlayout)
+        form_layout.addRow(self._tr("conv_output_size"), output_hlayout)
 
         self.custom_stack = QStackedWidget()
         self.custom_none = QWidget()
@@ -270,12 +269,12 @@ class ConversionDialogUI:
         self.custom_height.setRange(1, 64)
         self.custom_height.setValue(20)
         self.custom_height.valueChanged.connect(self.update_output_info)
-        custom_layout.addRow("Width (tiles):", self.custom_width)
-        custom_layout.addRow("Height (tiles):", self.custom_height)
+        custom_layout.addRow(self._tr("conv_width_tiles"), self.custom_width)
+        custom_layout.addRow(self._tr("conv_height_tiles"), self.custom_height)
         self.custom_widget.setLayout(custom_layout)
         form_layout.addRow(self.custom_stack)
 
-        self.output_info = QLabel("Output Size: 256x160 px")
+        self.output_info = QLabel(self._tr("conv_output_info", w=256, h=160))
         self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
         form_layout.addRow(self.output_info)
 
@@ -283,8 +282,8 @@ class ConversionDialogUI:
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        cancel_btn = QPushButton("Cancel")
-        self.convert_btn = QPushButton("Convert")
+        cancel_btn = QPushButton(self._tr("conv_cancel"))
+        self.convert_btn = QPushButton(self._tr("conv_convert"))
         self.convert_btn.setDefault(True)
 
         cancel_btn.clicked.connect(self.reject)

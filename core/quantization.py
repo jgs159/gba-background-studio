@@ -6,8 +6,6 @@ import subprocess
 import shutil
 import numpy as np
 from PIL import Image
-from sklearn.cluster import KMeans
-from scipy.spatial.distance import cdist
 from core.palette_utils import rgb_to_gba_rounded, calculate_relative_luminance
 from core.config import MARKER_COLOR
 from utils.translator import Translator
@@ -15,6 +13,8 @@ translator = Translator()
 
 
 def quantize_to_n_colors_4bpp(groups_dir, selected_palettes=None, transparent_color=(0,0,0), keep_transparent=False):
+    from sklearn.cluster import KMeans
+    
     indexed_dir = os.path.join(groups_dir, "01_indexed")
     reindexed_dir = os.path.join(groups_dir, "02_reindexed")
     os.makedirs(indexed_dir, exist_ok=True)
@@ -211,6 +211,8 @@ def quantize_to_n_colors_4bpp(groups_dir, selected_palettes=None, transparent_co
     return reindexed_dir
 
 def quantize_to_n_colors_8bpp(img, n_colors, start_index=0, transparent_color=(0, 0, 0), keep_transparent=False):
+    from sklearn.cluster import KMeans
+    
     if img.mode != 'RGBA':
         img = img.convert('RGBA')
     arr = np.array(img)

@@ -94,10 +94,12 @@ class MenuBar:
         tilemap_menu.addSeparator()
 
         self.action_convert_to_text_mode = tilemap_menu.addAction(self.main_window.translator.tr("convert_to_text_mode"))
+        self.action_convert_to_text_mode.setShortcut("Ctrl+Shift+0")
         self.action_convert_to_text_mode.triggered.connect(self.main_window.convert_to_text_mode)
         self.action_convert_to_text_mode.setEnabled(False)
 
         self.action_convert_to_rot_mode = tilemap_menu.addAction(self.main_window.translator.tr("convert_to_rot_mode"))
+        self.action_convert_to_rot_mode.setShortcut("Ctrl+Shift+1")
         self.action_convert_to_rot_mode.triggered.connect(self.main_window.convert_to_rot_mode)
         self.action_convert_to_rot_mode.setEnabled(False)
 
@@ -177,19 +179,25 @@ class MenuBar:
         language_menu = self.language_menu
         self.language_actions = {}
         languages = {
-            "english": "English",
-            "spanish": "Español",
-            "br_portuguese": "Português (BR)",
-            "french": "Français",
-            "german": "Deutsch",
-            "italian": "Italiano",
-            "portuguese": "Português",
-            "indonesian": "Bahasa Indonesia",
-            "hindi": "हिन्दी",
-            "russian": "Русский",
-            "japanese": "日本語",
-            "chinese": "中文"
-        }
+                "english": "English",
+                "spanish": "Español",
+                "br_portuguese": "Português (BR)",
+                "french": "Français",
+                "german": "Deutsch",
+                "italian": "Italiano",
+                "portuguese": "Português",
+                "dutch": "Nederlands",
+                "polish": "Polski",
+                "turkish": "Türkçe",
+                "vietnamese": "Tiếng Việt",
+                "indonesian": "Bahasa Indonesia",
+                "hindi": "हिन्दी",
+                "russian": "Русский",
+                "japanese": "日本語",
+                "chinese_simplified": "简体中文",
+                "chinese_traditional": "繁體中文",
+                "korean": "한국어",
+            }
         
         for lang_code, lang_name in languages.items():
             action = language_menu.addAction(lang_name)
