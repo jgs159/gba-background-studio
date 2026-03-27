@@ -15,7 +15,6 @@ class ConfigManager:
         else:
             self.config['SETTINGS'] = {
                 'language': 'english',
-                'theme': 'light',
                 'save_preview_files': 'False',
                 'keep_transparent_color': 'False',
                 'keep_temp_files': 'False',

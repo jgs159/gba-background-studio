@@ -99,6 +99,10 @@ def optimize_tiles(tileset_img, tilemap_data, tilemap_w, tilemap_h, tilemap_inde
     seen = {}
     new_tiles = []
 
+    if tiles:
+        seen[tiles[0].tobytes()] = 0
+        new_tiles.append(tiles[0])
+
     new_entries = []
     for tile_id, hf, vf, pal in entries:
         if tile_id >= len(tiles):
@@ -153,6 +157,10 @@ def deoptimize_tiles(tileset_img, tilemap_data, tilemap_w, tilemap_h, tilemap_in
     new_tiles = []
     new_entries = []
 
+    if tiles:
+        seen[tiles[0].tobytes()] = 0
+        new_tiles.append(tiles[0])
+
     for tile_id, hf, vf, pal in entries:
         if tile_id >= len(tiles):
             new_entries.append((0, 0, 0, pal))
@@ -201,6 +209,10 @@ def convert_text_to_rotation(tileset_img, tilemap_data, tilemap_w, tilemap_h, ti
     seen = {}
     unique_tiles = []
     rot_map = []
+
+    if tiles:
+        seen[tiles[0].tobytes()] = 0
+        unique_tiles.append(tiles[0])
 
     for i in range(n):
         entry = new_tm[i * 2] | (new_tm[i * 2 + 1] << 8)
