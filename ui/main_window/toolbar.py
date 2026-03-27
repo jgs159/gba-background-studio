@@ -126,6 +126,24 @@ class ContextToolbar:
         self._tab_bar = tab_bar
         self._tab_bar.setTabVisible(self._placeholder_index, False)
 
+    def retranslate_ui(self):
+        tr = self.main_window.translator.tr
+        self.btn_select_rect.setToolTip(tr("toolbar_select_area"))
+        self.btn_copy.setToolTip(tr("toolbar_copy"))
+        self.btn_cut.setToolTip(tr("toolbar_cut"))
+        self.btn_paste.setToolTip(tr("toolbar_paste"))
+        self.btn_flip_h.setToolTip(tr("toolbar_flip_h"))
+        self.btn_flip_v.setToolTip(tr("toolbar_flip_v"))
+        self.btn_mirror_h.setToolTip(tr("toolbar_mirror_h"))
+        self.btn_mirror_v.setToolTip(tr("toolbar_mirror_v"))
+        self.btn_swap_h.setToolTip(tr("toolbar_swap_h"))
+        self.btn_swap_v.setToolTip(tr("toolbar_swap_v"))
+        self.btn_pencil_pal.setToolTip(tr("toolbar_select_tiles"))
+        self.btn_fill.setToolTip(tr("toolbar_fill"))
+        self.btn_pal_replace.setToolTip(tr("toolbar_pal_replace"))
+        self.btn_pal_swap.setToolTip(tr("toolbar_pal_swap"))
+        self.btn_pal_select_rect.setToolTip(tr("toolbar_select_area"))
+
     def _rotation_mode(self):
         return getattr(self.main_window, 'current_rotation_mode', False)
 

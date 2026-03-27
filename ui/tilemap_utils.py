@@ -838,7 +838,8 @@ class TilemapUtils:
             lbl.setStyleSheet("QLabel { border: none; }")
             return lbl
 
-        row.addWidget(_label(self._tr("tilemap_width_label")))
+        self._toolbar_width_label = _label(self._tr("tilemap_width_label"))
+        row.addWidget(self._toolbar_width_label)
         self.tilemap_width_spin = QSpinBox()
         self.tilemap_width_spin.setRange(1, 999)
         self.tilemap_width_spin.setValue(32)
@@ -847,7 +848,8 @@ class TilemapUtils:
         self.tilemap_width_spin.setStyleSheet("QSpinBox { font-size: 8pt; }")
         row.addWidget(self.tilemap_width_spin)
 
-        row.addWidget(_label(self._tr("tilemap_height_label")))
+        self._toolbar_height_label = _label(self._tr("tilemap_height_label"))
+        row.addWidget(self._toolbar_height_label)
         self.tilemap_height_spin = QSpinBox()
         self.tilemap_height_spin.setRange(1, 999)
         self.tilemap_height_spin.setValue(32)
@@ -857,7 +859,7 @@ class TilemapUtils:
         row.addWidget(self.tilemap_height_spin)
 
         self.resize_button = QPushButton(self._tr("tilemap_resize_btn"))
-        self.resize_button.setFixedWidth(50)
+        self.resize_button.setFixedWidth(100)
         self.resize_button.setFixedHeight(20)
         self.resize_button.setStyleSheet("QPushButton { font-size: 8pt; padding: 0px; }")
         self.resize_button.clicked.connect(self.on_tilemap_resize)
@@ -895,6 +897,13 @@ class TilemapUtils:
 
         self._set_tilemap_controls_enabled(False)
         return controls_frame
+
+    def retranslate_tilemap_toolbar(self):
+        self._toolbar_width_label.setText(self._tr("tilemap_width_label"))
+        self._toolbar_height_label.setText(self._tr("tilemap_height_label"))
+        self.resize_button.setText(self._tr("tilemap_resize_btn"))
+        self.move_label.setText(self._tr("tilemap_move_label"))
+        self.cyclic_checkbox.setText(self._tr("tilemap_cyclic_shift"))
 
     def _set_tilemap_controls_enabled(self, enabled: bool):
         for widget in (

@@ -48,7 +48,7 @@ class ConversionDialog(QDialog, ConversionDialogUI, ConversionDialogLogic, Conve
             pass
 
         self.setWindowTitle(self._tr("conv_dialog_title"))
-        self.setFixedSize(844, 558)
+        self.setFixedSize(894, 558) #(844, 558)
         self.setup_ui()
         self.retranslate_presets()
         self.load_conversion_settings()

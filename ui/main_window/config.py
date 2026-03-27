@@ -34,7 +34,6 @@ def apply_configuration_to_menu(main_window):
 def setup_grids(main_window):
     main_window.grid_manager.register_view(main_window.edit_tiles_tab.edit_tileset_view, "tileset")
     main_window.grid_manager.register_view(main_window.edit_tiles_tab.edit_tilemap_view, "tilemap_edit")
-    main_window.grid_manager.register_view(main_window.edit_palettes_tab.edit_palettes_view, "palettes")
     main_window.grid_manager.register_view(main_window.edit_palettes_tab.edit_tilemap2_view, "tilemap_palettes")
 
     _apply_display_settings(main_window)

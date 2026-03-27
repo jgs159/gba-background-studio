@@ -10,17 +10,22 @@ import subprocess
 
 
 class PreviewTab(QWidget):
+    @property
+    def _tr(self):
+        if self.parent and hasattr(self.parent, 'translator'):
+            return self.parent.translator.tr
+        return lambda k, **kw: k
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
-        self._tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
         self.layout = QVBoxLayout(self)
         self.palette_colors = [(0, 0, 0)] * 256
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
         
-        preview_header = self.create_header(self._tr("preview_tab_header"))
-        self.layout.addWidget(preview_header)
+        self._preview_header = self.create_header(self._tr("preview_tab_header"))
+        self.layout.addWidget(self._preview_header)
         
         main_container = QWidget()
         self.main_layout = QHBoxLayout(main_container)
@@ -32,10 +37,10 @@ class PreviewTab(QWidget):
         image_container_layout.setContentsMargins(4, 4, 4, 4)
         image_container_layout.setSpacing(4)
         
-        image_label = QLabel(self._tr("preview_image_label"))
-        image_label.setFont(QFont("Arial", 9, QFont.Bold))
-        image_label.setAlignment(Qt.AlignCenter)
-        image_container_layout.addWidget(image_label)
+        self._image_label = QLabel(self._tr("preview_image_label"))
+        self._image_label.setFont(QFont("Arial", 9, QFont.Bold))
+        self._image_label.setAlignment(Qt.AlignCenter)
+        image_container_layout.addWidget(self._image_label)
         
         self.preview_image_view = QGraphicsView()
         self.preview_image_scene = QGraphicsScene()
@@ -51,10 +56,10 @@ class PreviewTab(QWidget):
         palette_container_layout.setContentsMargins(4, 4, 4, 4)
         palette_container_layout.setSpacing(4)
         
-        palette_label = QLabel(self._tr("preview_palette_label"))
-        palette_label.setFont(QFont("Arial", 9, QFont.Bold))
-        palette_label.setAlignment(Qt.AlignCenter)
-        palette_container_layout.addWidget(palette_label)
+        self._palette_label = QLabel(self._tr("preview_palette_label"))
+        self._palette_label.setFont(QFont("Arial", 9, QFont.Bold))
+        self._palette_label.setAlignment(Qt.AlignCenter)
+        palette_container_layout.addWidget(self._palette_label)
         
         self.preview_palette_view = QGraphicsView()
         self.preview_palette_scene = QGraphicsScene()
@@ -65,8 +70,8 @@ class PreviewTab(QWidget):
         self.preview_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         palette_container_layout.addWidget(self.preview_palette_view)
         
-        open_output_btn = QPushButton(self._tr("preview_open_output"))
-        open_output_btn.setStyleSheet("""
+        self._open_output_btn = QPushButton(self._tr("preview_open_output"))
+        self._open_output_btn.setStyleSheet("""
             QPushButton {
                 background: #4CAF50;
                 color: white;
@@ -82,9 +87,9 @@ class PreviewTab(QWidget):
                 background: #3d8b40;
             }
         """)
-        open_output_btn.clicked.connect(self.open_output_folder)
-        open_output_btn.setFixedHeight(30)
-        palette_container_layout.addWidget(open_output_btn)
+        self._open_output_btn.clicked.connect(self.open_output_folder)
+        self._open_output_btn.setFixedHeight(30)
+        palette_container_layout.addWidget(self._open_output_btn)
         
         self.main_layout.addWidget(image_container, 1)
         self.main_layout.addWidget(palette_container, 0)
@@ -100,6 +105,12 @@ class PreviewTab(QWidget):
         header.setFixedHeight(30)
         header.setAlignment(Qt.AlignCenter)
         return header
+
+    def retranslate_ui(self):
+        self._preview_header.setText(self._tr("preview_tab_header"))
+        self._image_label.setText(self._tr("preview_image_label"))
+        self._palette_label.setText(self._tr("preview_palette_label"))
+        self._open_output_btn.setText(self._tr("preview_open_output"))
 
     def open_output_folder(self):
         output_dir = "output"

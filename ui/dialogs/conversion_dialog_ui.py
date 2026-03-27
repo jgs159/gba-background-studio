@@ -28,6 +28,7 @@ class ConversionDialogUI:
         main_splitter.setSizes([516, 318])
         main_splitter.setCollapsible(0, False)
         main_splitter.setCollapsible(1, False)
+        main_splitter.handle(1).setEnabled(False)
 
         layout.addWidget(main_splitter)
 
@@ -75,7 +76,7 @@ class ConversionDialogUI:
         self.create_output_size(form_layout)
 
         params_group.setLayout(form_layout)
-        params_group.setFixedWidth(316)
+        params_group.setFixedWidth(366)
         right_layout.addWidget(params_group)
 
         self.progress_bar = QProgressBar()
@@ -133,7 +134,7 @@ class ConversionDialogUI:
         self.palettes_widget = QWidget()
         grid_layout = QGridLayout()
         grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.setSpacing(1)
+        grid_layout.setSpacing(6)
         self.palettes_widget.setLayout(grid_layout)
 
         self.palette_checks = []

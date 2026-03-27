@@ -79,7 +79,7 @@ def split_into_groups(input_path, num_palettes=1, pal_indices=None):
         if modified:
             path = os.path.join(output_dir, f"group_{group_idx}.png")
             group_img.save(path)
-            print(f"✓ Grupo {group_idx} (paleta {pal_idx}): {sum(1 for x in pal_indices if x == pal_idx)} tiles")
+            print(f"✓ Group {group_idx} (palette {pal_idx}): {sum(1 for x in pal_indices if x == pal_idx)} tiles")
     
     unassigned_count = sum(1 for assigned in tile_assigned if not assigned)
     if unassigned_count > 0:

@@ -6,7 +6,6 @@ def setup_wheel_events(main_window):
     main_window.preview_tab.preview_image_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.preview_tab.preview_image_view, event)
     main_window.edit_tiles_tab.edit_tileset_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_tiles_tab.edit_tileset_view, event)
     main_window.edit_tiles_tab.edit_tilemap_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_tiles_tab.edit_tilemap_view, event)
-    main_window.edit_palettes_tab.edit_palettes_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_palettes_tab.edit_palettes_view, event)
     main_window.edit_palettes_tab.edit_tilemap2_view.wheelEvent = lambda event: zoom_wheel_event(main_window, main_window.edit_palettes_tab.edit_tilemap2_view, event)
 
 def zoom_wheel_event(main_window, view, event):
