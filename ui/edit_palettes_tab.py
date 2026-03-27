@@ -76,6 +76,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         header.setFixedHeight(30)
         header.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(header)
+        self._header_label = header
 
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setChildrenCollapsible(False)
@@ -95,7 +96,6 @@ class EditPalettesTab(TilemapUtils, QWidget):
 
     def create_palettes_container(self):
         container = QWidget()
-        container.setStyleSheet("QWidget { background-color: #f0f0f0; }")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
@@ -104,19 +104,14 @@ class EditPalettesTab(TilemapUtils, QWidget):
         palettes_label.setFont(QFont("Arial", 9, QFont.Bold))
         palettes_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(palettes_label)
+        self._palettes_section_label = palettes_label
 
         layout.addWidget(self._create_palette_ops_toolbar())
 
         bordered_frame = QFrame()
         bordered_frame.setFrameShape(QFrame.StyledPanel)
-        bordered_frame.setFrameShadow(QFrame.Raised)
-        bordered_frame.setStyleSheet("""
-            QFrame {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-            }
-        """)
-        bordered_frame.setFixedHeight(271)
+        bordered_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border: 1px solid #ccc; }")
+        bordered_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         inner_layout = QHBoxLayout(bordered_frame)
         inner_layout.setContentsMargins(4, 4, 4, 4)
@@ -129,15 +124,6 @@ class EditPalettesTab(TilemapUtils, QWidget):
         inner_layout.addWidget(right_container)
 
         layout.addWidget(bordered_frame)
-
-        self.edit_palettes_view = QGraphicsView()
-        self.edit_palettes_scene = QGraphicsScene()
-        self.edit_palettes_view.setScene(self.edit_palettes_scene)
-        self.edit_palettes_view.setRenderHint(QPainter.Antialiasing, False)
-        self.edit_palettes_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.edit_palettes_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
-        self.edit_palettes_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        layout.addWidget(self.edit_palettes_view)
 
         return container
 
@@ -442,6 +428,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         tilemap_label.setFont(QFont("Arial", 9, QFont.Bold))
         tilemap_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(tilemap_label)
+        self._tilemap_section_label = tilemap_label
 
         tilemap_toolbar = self.create_tilemap_toolbar()
         layout.addWidget(tilemap_toolbar)
@@ -483,6 +470,14 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.display_palette_colors(generate_grayscale_palette(), enable_editor=False)
         for btn in self._palette_op_btns:
             btn.setEnabled(False)
+
+    def retranslate_ui(self):
+        self._header_label.setText(self._tr("tab_header_edit_palettes"))
+        self._palettes_section_label.setText(self._tr("section_palettes"))
+        self._tilemap_section_label.setText(self._tr("section_tilemap"))
+        self._cb_move_color.setText(self._tr("palette_op_move_color"))
+        self._cb_swap_color.setText(self._tr("palette_op_swap_color"))
+        self.retranslate_tilemap_toolbar()
 
     def setup_tilemap_interaction(self):
         super().setup_tilemap_interaction()
@@ -1113,7 +1108,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
             if result and hasattr(self.main_window, 'refresh_preview_display'):
                 self.main_window.refresh_preview_display()
         except Exception as e:
-            print(self._tr("error_regenerating_preview").format(e=e))
+            print(self._tr("error_regenerating_preview", e=e))
     
     def _update_all_tiles(self):
         if not self.tilemap_data or not hasattr(self.main_window, 'edit_tiles_tab'):
@@ -1157,7 +1152,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                     tiles_tab.display_tileset(new_tileset_img)
                     
                 except Exception as e:
-                     print(self._tr("error_reloading_tileset").format(e=e))
+                     print(self._tr("error_reloading_tileset", e=e))
 
     def _save_output_palette_4bpp(self, output_dir):
             import os
@@ -1219,7 +1214,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                     for r, g, b in self.palette_colors:
                         f.write(f"{r} {g} {b}\n")
             except Exception as e:
-                 print(self._tr("error_saving_preview_palette").format(e=e))
+                 print(self._tr("error_saving_preview_palette", e=e))
             
             self._save_output_palette()
             if not skip_tiles:
@@ -1278,7 +1273,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
                 et.render_tileset_with_padding(w, h, total_tiles)
 
         except Exception as e:
-            print(self._tr("error_updating_output_tiles").format(e=e))
+            print(self._tr("error_updating_output_tiles", e=e))
         
     def finalize_color_editing(self):
         if (self.color_editor.has_changes() and 

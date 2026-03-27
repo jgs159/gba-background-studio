@@ -41,14 +41,15 @@ class EditTilesTab(TilemapUtils, QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        header = self.create_header(self._tr("tab_header_edit_tiles"))
-        self.layout.addWidget(header)
+        self._header_label = self.create_header(self._tr("tab_header_edit_tiles"))
+        self.layout.addWidget(self._header_label)
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.setChildrenCollapsible(False)
         splitter.setHandleWidth(6)
 
         tileset_container = self.create_section(self._tr("section_tileset"))
+        self._tileset_section_label = tileset_container.layout().itemAt(0).widget()
         self.setup_tileset_controls(tileset_container)
         self.edit_tileset_view = QGraphicsView()
         self.edit_tileset_scene = QGraphicsScene()
@@ -56,12 +57,10 @@ class EditTilesTab(TilemapUtils, QWidget):
         self.setup_view(self.edit_tileset_view)
         tileset_container.layout().addWidget(self.edit_tileset_view)
         
-        reserved_container = self.create_tileset_reserved_container()
-        tileset_container.layout().addWidget(reserved_container)
-        
         splitter.addWidget(tileset_container)
 
         tilemap_container = self.create_section(self._tr("section_tilemap"))
+        self._tilemap_section_label = tilemap_container.layout().itemAt(0).widget()
         self.setup_tilemap_controls(tilemap_container)
         self.edit_tilemap_view = CustomGraphicsView()
         self.edit_tilemap_scene = QGraphicsScene()
@@ -101,6 +100,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         width_label = QLabel(self._tr("tileset_width_label"))
         width_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(width_label)
+        self._tileset_width_label = width_label
         self.tile_width_spin = QSpinBox()
         self.tile_width_spin.setRange(0, 64)
         self.tile_width_spin.setValue(0)
@@ -111,6 +111,7 @@ class EditTilesTab(TilemapUtils, QWidget):
         height_label = QLabel(self._tr("tileset_height_label"))
         height_label.setStyleSheet("QLabel { border: none; }")
         controls_main_layout.addWidget(height_label)
+        self._tileset_height_static_label = height_label
         self.tileset_height_label = QLabel("0")
         self.tileset_height_label.setFixedWidth(45)
         self.tileset_height_label.setFixedHeight(18)
@@ -260,23 +261,16 @@ class EditTilesTab(TilemapUtils, QWidget):
     def setup_tilemap_controls(self, container):
         container.layout().addWidget(self.build_tilemap_toolbar())
 
-    def create_tileset_reserved_container(self):
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
-        
-        reserved_view = QGraphicsView()
-        reserved_scene = QGraphicsScene()
-        reserved_view.setScene(reserved_scene)
-        reserved_view.setRenderHint(QPainter.Antialiasing, False)
-        reserved_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        reserved_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: 1px solid #ccc; }")
-        reserved_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        reserved_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
-        layout.addWidget(reserved_view)
-        return container
+
+    def retranslate_ui(self):
+        self._header_label.setText(self._tr("tab_header_edit_tiles"))
+        self._tileset_section_label.setText(self._tr("section_tileset"))
+        self._tilemap_section_label.setText(self._tr("section_tilemap"))
+        self._tileset_width_label.setText(self._tr("tileset_width_label"))
+        self._tileset_height_static_label.setText(self._tr("tileset_height_label"))
+        self.flip_h_checkbox.setText(self._tr("flip_h_label"))
+        self.flip_v_checkbox.setText(self._tr("flip_v_label"))
+        self.retranslate_tilemap_toolbar()
 
     def create_header(self, text):
         label = QLabel(text)

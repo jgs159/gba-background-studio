@@ -49,6 +49,8 @@ def main():
     
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QIcon
+    from PySide6.QtCore import QLoggingCategory
+    QLoggingCategory.setFilterRules("qt.text.font.db=false")
     app = QApplication(sys.argv)
     
     icon_path = os.path.join("assets", "icon.png")
