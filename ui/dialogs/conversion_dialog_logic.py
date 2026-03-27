@@ -41,10 +41,10 @@ class ConversionDialogLogic:
 
     def browse_tilemap_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Select Tilemap File", 
-            "", 
-            "Binary Files (*.bin);;All Files (*)"
+            self,
+            self._tr("conv_browse_tilemap_title"),
+            "",
+            self._tr("filter_bin")
         )
         
         if file_path:
@@ -233,7 +233,7 @@ class ConversionDialogLogic:
 
         self.convert_btn.setEnabled(False)
         self.progress_bar.setVisible(True)
-        self.progress_bar.setFormat("Starting...")
+        self.progress_bar.setFormat(self._tr("conv_progress_starting"))
         self.progress_bar.setValue(0)
         QApplication.processEvents()
 
@@ -241,25 +241,25 @@ class ConversionDialogLogic:
             def update_progress(text):
                 if "Splitting" in text:
                     self.progress_bar.setValue(10)
-                    self.progress_bar.setFormat("Splitting...")
+                    self.progress_bar.setFormat(self._tr("conv_progress_splitting"))
                 elif "Quantizing" in text:
                     self.progress_bar.setValue(25)
-                    self.progress_bar.setFormat("Quantizing...")
+                    self.progress_bar.setFormat(self._tr("conv_progress_quantizing"))
                 elif "Applying" in text:
                     self.progress_bar.setValue(50)
-                    self.progress_bar.setFormat("Applying GBA palette...")
+                    self.progress_bar.setFormat(self._tr("conv_progress_applying"))
                 elif "Extracting" in text:
                     self.progress_bar.setValue(65)
-                    self.progress_bar.setFormat("Extracting palettes...")
+                    self.progress_bar.setFormat(self._tr("conv_progress_extracting"))
                 elif "Rebuilding" in text:
                     self.progress_bar.setValue(70)
-                    self.progress_bar.setFormat("Rebuilding image...")
+                    self.progress_bar.setFormat(self._tr("conv_progress_rebuilding"))
                 elif "Generating" in text:
                     self.progress_bar.setValue(85)
-                    self.progress_bar.setFormat("Generating assets...")
+                    self.progress_bar.setFormat(self._tr("conv_progress_generating"))
                 elif "completed" in text and "Process" in text:
                     self.progress_bar.setValue(100)
-                    self.progress_bar.setFormat("Conversion completed.")
+                    self.progress_bar.setFormat(self._tr("conv_progress_completed"))
                 QApplication.processEvents()
 
             class ProgressWriter:
@@ -311,7 +311,7 @@ class ConversionDialogLogic:
                 sys.stdout = old_stdout
 
             self.progress_bar.setValue(100)
-            self.progress_bar.setFormat("Conversion completed.")
+            self.progress_bar.setFormat(self._tr("conv_progress_completed"))
             QApplication.processEvents()
 
             self.save_conversion_settings(params)
@@ -331,7 +331,7 @@ class ConversionDialogLogic:
                 self.grid_was_visible):
                 self.parent().grid_manager.set_grid_visible(True)
                 
-            self.progress_bar.setFormat("Error")
+            self.progress_bar.setFormat(self._tr("conv_progress_error"))
             QApplication.processEvents()
             msg = str(e) if str(e) else "Process exited unexpectedly."
             QMessageBox.critical(self, "Error", self._tr("conv_error_conversion_failed", msg=msg))

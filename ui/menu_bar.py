@@ -206,23 +206,6 @@ class MenuBar:
             self.language_actions[lang_code] = action
         
         settings_menu.addMenu(language_menu)
-        
-        # Theme submenu
-        self.theme_menu = QMenu(self.main_window.translator.tr("theme_menu"), self.main_window)
-        theme_menu = self.theme_menu
-        self.theme_actions = {}
-        themes = {
-            "light": "theme_light",
-            "dark": "theme_dark"
-        }
-        
-        for theme_code, theme_name in themes.items():
-            action = theme_menu.addAction(self.main_window.translator.tr(theme_name))
-            action.setCheckable(True)
-            action.triggered.connect(lambda checked, t=theme_code: self.main_window.change_theme(t))
-            self.theme_actions[theme_code] = action
-        
-        settings_menu.addMenu(theme_menu)
 
         settings_menu.addSeparator()
 
@@ -313,9 +296,6 @@ class MenuBar:
         self.action_status_bar.setText(tr("status_bar_toggle"))
         # Settings submenus
         self.language_menu.setTitle(tr("language_menu"))
-        self.theme_menu.setTitle(tr("theme_menu"))
-        self.theme_actions["light"].setText(tr("theme_light"))
-        self.theme_actions["dark"].setText(tr("theme_dark"))
         self.action_save_preview.setText(tr("save_preview"))
         self.action_keep_transparent.setText(tr("keep_transparent"))
         self.action_keep_temp.setText(tr("keep_temp"))

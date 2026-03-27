@@ -23,10 +23,6 @@ def apply_configuration_to_menu(main_window):
         main_window.menu_bar.action_show_success_dialog.setChecked(main_window.show_success_dialog)
         main_window.menu_bar.action_save_conversion_params.setChecked(main_window.save_conversion_params)
         
-        theme = main_window.config_manager.get('SETTINGS', 'theme', 'light')
-        for theme_code, action in main_window.menu_bar.theme_actions.items():
-            action.setChecked(theme_code == theme)
-        
         language = main_window.config_manager.get('SETTINGS', 'language', 'english')
         for lang_code, action in main_window.menu_bar.language_actions.items():
             action.setChecked(lang_code == language)

@@ -7,15 +7,6 @@ def change_language(main_window, language_code):
     
     retranslate_ui(main_window)
 
-def change_theme(main_window, theme_code):
-    for theme_c, action in main_window.menu_bar.theme_actions.items():
-        action.setChecked(theme_c == theme_code)
-    
-    main_window.config_manager.set('SETTINGS', 'theme', theme_code)
-    
-    from utils.theme_manager import apply_theme
-    apply_theme(theme_code)
-
 def retranslate_ui(main_window):
     main_window.main_tabs.setTabText(0, main_window.translator.tr("preview_tab"))
     main_window.main_tabs.setTabText(1, main_window.translator.tr("edit_tiles_tab"))

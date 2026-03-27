@@ -777,10 +777,6 @@ class GBABackgroundStudio(QMainWindow):
         from .utils import change_language
         change_language(self, language_code)
     
-    def change_theme(self, theme_code):
-        from .utils import change_theme
-        change_theme(self, theme_code)
-    
     def retranslate_ui(self):
         from .utils import retranslate_ui
         retranslate_ui(self)
