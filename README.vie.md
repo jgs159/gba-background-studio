@@ -1,4 +1,5 @@
 <p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
+<div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
 
@@ -272,9 +273,8 @@ Xem tệp [LICENSE](LICENSE) để biết thêm chi tiết.
 ## 📩 Liên hệ và Hỗ trợ
 
 <p align="left">
-  <img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" />
-  <a href="https://discordapp.com/users/213803341988364289">
-    <img src="https://img.shields.io/badge/CompuMax-gray?style=for-the-badge" alt="Người dùng" />
+  <a href="https://discord.gg/wsFFExCWFu">
+    <img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord Server" /><img src="https://img.shields.io/badge/CompuMax_Dev's-gray?style=for-the-badge" alt="Join our Discord" />
   </a>
 </p>
 
