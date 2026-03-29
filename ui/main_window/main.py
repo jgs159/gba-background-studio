@@ -55,6 +55,7 @@ class GBABackgroundStudio(QMainWindow):
         self.is_drawing = False
         self.current_status_message = self.translator.tr("ready_status")
         self.last_tile_pos = (-1, -1)
+        self._last_image_directory = None
 
         self.hover_manager = HoverManager()
         self.grid_manager = GridManager()
@@ -227,7 +228,7 @@ class GBABackgroundStudio(QMainWindow):
         
         try:
             from PIL import Image
-            from core.image_utils import pil_to_qimage
+            from ui.shared_utils import pil_to_qimage
             from PySide6.QtGui import QPixmap
             
             with Image.open(preview_path) as f:
@@ -428,7 +429,6 @@ class GBABackgroundStudio(QMainWindow):
         os.makedirs('output', exist_ok=True)
         with open('output/map.bin', 'wb') as f:
             f.write(new_data)
-        # Rebuild overlay from scratch
         ep = self.edit_palettes_tab
         for ty in range(ep.tilemap_height):
             for tx in range(ep.tilemap_width):
@@ -772,6 +772,10 @@ class GBABackgroundStudio(QMainWindow):
     def toggle_status_bar(self, checked):
         from .config import toggle_status_bar
         toggle_status_bar(self, checked)
+    
+    def toggle_remember_file_paths(self, checked):
+        from .config import toggle_remember_file_paths
+        toggle_remember_file_paths(self, checked)
     
     def change_language(self, language_code):
         from .utils import change_language

@@ -10,7 +10,7 @@ from PySide6.QtGui import QFont, QBrush, QPen, QColor, QPainter, QPixmap, QIntVa
 from PySide6.QtCore import Qt, Signal, QTimer, QSize
 
 from PIL import Image as PilImage
-from core.image_utils import pil_to_qimage
+from ui.shared_utils import CustomGraphicsView, update_status_bar_shared, pil_to_qimage
 from ui.shared_utils import CustomGraphicsView, update_status_bar_shared
 from ui.palette_grid_view import PaletteGridView
 from ui.color_editor import ColorEditor
@@ -53,6 +53,9 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.current_editing_index = -1
         self._move_color_src = None
         self._swap_color_src = None
+        self._move_palette_src = None
+        self._move_palette_drag_item = None
+        self._syncing_splitter = False
 
         self.setup_ui()
         self.setup_tilemap_interaction()
@@ -64,6 +67,85 @@ class EditPalettesTab(TilemapUtils, QWidget):
         QTimer.singleShot(0, self._init_grayscale_palette)
 
         self.update_status_bar(-1, -1)
+
+    def _on_splitter_moved(self, pos, index):
+        """Handle splitter movement and sync with tiles tab"""
+        if self._syncing_splitter or not self.main_window or not hasattr(self.main_window, 'edit_tiles_tab'):
+            return
+        
+        sizes = self.splitter.sizes()
+        if len(sizes) != 2:
+            return
+            
+        total_width = sum(sizes)
+        min_left_width = self._get_min_left_container_width()
+        max_tilemap_width = total_width - min_left_width
+        
+        tilemap_width = min(sizes[1], max_tilemap_width)
+        left_width = total_width - tilemap_width
+        
+        if sizes[0] != left_width or sizes[1] != tilemap_width:
+            self._syncing_splitter = True
+            self.splitter.setSizes([left_width, tilemap_width])
+            self._syncing_splitter = False
+        
+        self._sync_tilemap_width_to_tiles_tab(tilemap_width)
+    
+    def _get_min_left_container_width(self):
+        """Get actual minimum width for the palettes container based on content"""
+        if hasattr(self, 'splitter') and self.splitter.sizes():
+            return self.splitter.sizes()[0]
+        return 250
+    
+    def _sync_tilemap_width_to_tiles_tab(self, tilemap_width):
+        """Sync tilemap width to tiles tab"""
+        if not self.main_window or not hasattr(self.main_window, 'edit_tiles_tab'):
+            return
+            
+        tiles_tab = self.main_window.edit_tiles_tab
+        if not hasattr(tiles_tab, 'splitter') or getattr(tiles_tab, '_syncing_splitter', False):
+            return
+            
+        tiles_sizes = tiles_tab.splitter.sizes()
+        if len(tiles_sizes) != 2:
+            return
+            
+        tiles_total_width = sum(tiles_sizes)
+        tiles_min_left_width = tiles_tab._get_min_left_container_width()
+        tiles_max_tilemap_width = tiles_total_width - tiles_min_left_width
+        
+        new_tiles_tilemap_width = min(tilemap_width, tiles_max_tilemap_width)
+        new_tiles_left_width = tiles_total_width - new_tiles_tilemap_width
+        
+        tiles_tab._syncing_splitter = True
+        tiles_tab.splitter.setSizes([new_tiles_left_width, new_tiles_tilemap_width])
+        tiles_tab._syncing_splitter = False
+    
+    def sync_splitter_on_tab_change(self):
+        """Sync splitter sizes when this tab becomes active"""
+        if not self.main_window or not hasattr(self.main_window, 'edit_tiles_tab'):
+            return
+            
+        tiles_tab = self.main_window.edit_tiles_tab
+        if not hasattr(tiles_tab, 'splitter'):
+            return
+            
+        pal_sizes = self.splitter.sizes()
+        tiles_sizes = tiles_tab.splitter.sizes()
+        
+        if len(pal_sizes) != 2 or len(tiles_sizes) != 2:
+            return
+            
+        pal_left_width = pal_sizes[0]
+        pal_tilemap_width = pal_sizes[1]
+        
+        tiles_total_width = sum(tiles_sizes)
+        new_tiles_tilemap_width = min(pal_tilemap_width, tiles_total_width - pal_left_width)
+        new_tiles_left_width = tiles_total_width - new_tiles_tilemap_width
+        
+        tiles_tab._syncing_splitter = True
+        tiles_tab.splitter.setSizes([new_tiles_left_width, new_tiles_tilemap_width])
+        tiles_tab._syncing_splitter = False
 
     def setup_ui(self):
         self.layout = QVBoxLayout(self)
@@ -81,6 +163,8 @@ class EditPalettesTab(TilemapUtils, QWidget):
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setChildrenCollapsible(False)
         main_splitter.setHandleWidth(6)
+        self.splitter = main_splitter
+
 
         palettes_container = self.create_palettes_container()
         main_splitter.addWidget(palettes_container)
@@ -89,6 +173,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         main_splitter.addWidget(tilemap_container)
         
         main_splitter.setSizes([500, 500])
+        main_splitter.splitterMoved.connect(self._on_splitter_moved)
         self.layout.addWidget(main_splitter)
 
         self.colors = self.grid_view.colors
@@ -154,23 +239,38 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self._cb_swap_color.setFixedHeight(18)
         self._cb_swap_color.setEnabled(False)
 
+        self._cb_move_palette = QCheckBox(self._tr("palette_op_move_palette"))
+        self._cb_move_palette.setStyleSheet(cb_style)
+        self._cb_move_palette.setFixedHeight(18)
+        self._cb_move_palette.setEnabled(False)
+
         def _on_move_toggled(checked):
             if checked:
                 self._cb_swap_color.setChecked(False)
+                self._cb_move_palette.setChecked(False)
             self._on_palette_op_mode_changed()
 
         def _on_swap_toggled(checked):
             if checked:
                 self._cb_move_color.setChecked(False)
+                self._cb_move_palette.setChecked(False)
+            self._on_palette_op_mode_changed()
+
+        def _on_move_palette_toggled(checked):
+            if checked:
+                self._cb_move_color.setChecked(False)
+                self._cb_swap_color.setChecked(False)
             self._on_palette_op_mode_changed()
 
         self._cb_move_color.toggled.connect(_on_move_toggled)
         self._cb_swap_color.toggled.connect(_on_swap_toggled)
+        self._cb_move_palette.toggled.connect(_on_move_palette_toggled)
 
-        self._palette_op_btns = [self._cb_move_color, self._cb_swap_color]
+        self._palette_op_btns = [self._cb_move_color, self._cb_swap_color, self._cb_move_palette]
 
         row.addWidget(self._cb_move_color)
         row.addWidget(self._cb_swap_color)
+        row.addWidget(self._cb_move_palette)
         row.addStretch()
         outer.addLayout(row)
         return toolbar
@@ -188,6 +288,12 @@ class EditPalettesTab(TilemapUtils, QWidget):
             self.full_palette_view.mouseMoveEvent    = self._swap_color_move
             self.full_palette_view.mouseReleaseEvent = self._swap_color_release
             self._swap_color_src = None
+        elif self._cb_move_palette.isChecked():
+            self.full_palette_view.setCursor(Qt.PointingHandCursor)
+            self.full_palette_view.mousePressEvent   = self._move_palette_press
+            self.full_palette_view.mouseMoveEvent    = self._move_palette_move
+            self.full_palette_view.mouseReleaseEvent = self._move_palette_release
+            self._move_palette_src = None
         else:
             self.full_palette_view.setCursor(Qt.ArrowCursor)
             self.full_palette_view.mousePressEvent   = lambda e: type(self.full_palette_view).mousePressEvent(self.full_palette_view, e)
@@ -253,7 +359,8 @@ class EditPalettesTab(TilemapUtils, QWidget):
         lut = list(range(256))
         lut[src] = dst
         lut[dst] = src
-        self._apply_palette_op(new_colors, lut, f"Swap colors {src} <> {dst}", cursor_index=src)
+        self._apply_palette_op(new_colors, lut, f"Swap colors {src} <> {dst}",
+                               cursor_index=src, remap_images=False)
 
     def _apply_move_color(self, src, dst):
         bpp = getattr(self.main_window, 'current_bpp', 4) if self.main_window else 4
@@ -282,9 +389,123 @@ class EditPalettesTab(TilemapUtils, QWidget):
             for i in range(local_dst, local_src):
                 lut[s0 + i] = s0 + i + 1
 
-        self._apply_palette_op(new_colors, lut, f"Move color {src} -> {dst}", cursor_index=lut[src])
+        self._apply_palette_op(new_colors, lut, f"Move color {src} -> {dst}", cursor_index=lut[src], remap_images=True)
 
-    def _apply_palette_op(self, new_colors, lut, description, cursor_index):
+    def _move_palette_press(self, event):
+        from PySide6.QtWidgets import QGraphicsView
+        if event.button() == Qt.LeftButton:
+            idx = self._palette_index_at(event.pos())
+            if idx >= 0:
+                self._move_palette_src = idx // 16  # slot 0-15
+                self._move_palette_drag_item = self._build_palette_drag_pixmap(self._move_palette_src)
+                self._show_palette_drag(event.pos())
+        QGraphicsView.mousePressEvent(self.full_palette_view, event)
+
+    def _move_palette_move(self, event):
+        from PySide6.QtWidgets import QGraphicsView
+        if self._move_palette_src is not None and self._move_palette_drag_item is not None:
+            self._show_palette_drag(event.pos())
+        QGraphicsView.mouseMoveEvent(self.full_palette_view, event)
+
+    def _move_palette_release(self, event):
+        from PySide6.QtWidgets import QGraphicsView
+        self._hide_palette_drag()
+        if event.button() == Qt.LeftButton and self._move_palette_src is not None:
+            idx = self._palette_index_at(event.pos())
+            dst_slot = idx // 16 if idx >= 0 else -1
+            src_slot = self._move_palette_src
+            self._move_palette_src = None
+            bpp = getattr(self.main_window, 'current_bpp', 4) if self.main_window else 4
+            if bpp == 4 and dst_slot >= 0 and src_slot != dst_slot:
+                src_colors = self.palette_colors[src_slot * 16 : src_slot * 16 + 16]
+                if any(c != (0, 0, 0) for c in src_colors):
+                    self._apply_move_palette(src_slot, dst_slot)
+        QGraphicsView.mouseReleaseEvent(self.full_palette_view, event)
+
+    def _build_palette_drag_pixmap(self, slot):
+        """Build a QGraphicsPixmapItem (16x1 grid, 12px cells) for the 16 colors of a slot."""
+        from PySide6.QtGui import QPixmap, QPainter, QColor
+        CELL = 12
+        px = QPixmap(16 * CELL, CELL)
+        px.fill(Qt.transparent)
+        painter = QPainter(px)
+        start = slot * 16
+        for i in range(16):
+            r, g, b = self.palette_colors[start + i]
+            painter.fillRect(i * CELL, 0, CELL, CELL, QColor(r, g, b))
+        painter.end()
+        item = QGraphicsPixmapItem(px)
+        return item
+
+    def _show_palette_drag(self, view_pos):
+        """Place/move the drag pixmap item in the scene under the cursor."""
+        scene_pos = self.full_palette_view.mapToScene(view_pos)
+        if self._move_palette_drag_item is None:
+            return
+        if self._move_palette_drag_item.scene() is None:
+            self.full_palette_scene.addItem(self._move_palette_drag_item)
+            self._move_palette_drag_item.setOpacity(0.75)
+            self._move_palette_drag_item.setZValue(100)
+        self._move_palette_drag_item.setPos(scene_pos.x() - 96, scene_pos.y() - 6)
+
+    def _hide_palette_drag(self):
+        """Remove the drag pixmap from the scene."""
+        if self._move_palette_drag_item is not None:
+            try:
+                if self._move_palette_drag_item.scene():
+                    self.full_palette_scene.removeItem(self._move_palette_drag_item)
+            except RuntimeError:
+                pass
+            self._move_palette_drag_item = None
+
+    def _apply_move_palette(self, src_slot, dst_slot):
+        old_colors = list(self.palette_colors)
+        new_colors = list(self.palette_colors)
+
+        src_start = src_slot * 16
+        dst_start = dst_slot * 16
+
+        new_colors[dst_start:dst_start + 16] = old_colors[src_start:src_start + 16]
+        new_colors[src_start:src_start + 16] = [(0, 0, 0)] * 16
+
+        identity_lut = list(range(256))
+        if self.main_window and hasattr(self.main_window, 'history_manager'):
+            self.main_window.history_manager.record_state(
+                state_type='move_color',
+                editor_type='palettes',
+                data={
+                    'old_colors':       old_colors,
+                    'new_colors':       new_colors,
+                    'lut':              identity_lut,
+                    'inv_lut':          identity_lut,
+                    'old_tiles_data':   None,
+                    'new_tiles_data':   None,
+                    'tiles_shape':      None,
+                    'old_preview_data': None,
+                    'new_preview_data': None,
+                    'preview_shape':    None,
+                },
+                description=f"Move palette {src_slot} -> {dst_slot}"
+            )
+
+        self.palette_colors = new_colors
+        for i, (r, g, b) in enumerate(new_colors):
+            if i < len(self.palette_rects):
+                self.palette_rects[i].setBrush(QBrush(QColor(r, g, b)))
+
+        self.current_editing_index = dst_start
+        r, g, b = new_colors[dst_start]
+        self.color_editor.set_color(dst_start, r, g, b)
+        self.draw_selection_rectangle(dst_start)
+
+        self._save_output_palette()
+        if self.main_window and hasattr(self.main_window, 'preview_tab'):
+            self.main_window.preview_tab.palette_colors = self.palette_colors.copy()
+            self.main_window.preview_tab.display_palette_colors(self.palette_colors)
+        if self.main_window and hasattr(self.main_window, '_save_map_and_refresh'):
+            self.main_window._save_map_and_refresh()
+
+    def _apply_palette_op(self, new_colors, lut, description, cursor_index, remap_images=True):
         import numpy as np
         from PIL import Image as _Img
 
@@ -292,39 +513,72 @@ class EditPalettesTab(TilemapUtils, QWidget):
         flat_new = [c for rgb in new_colors for c in rgb]
         while len(flat_new) < 768:
             flat_new.append(0)
-        lut_arr = np.array(lut, dtype=np.uint8)
-
-        def _remap_image(path):
-            if not os.path.exists(path):
-                return None, None, None
-            with _Img.open(path) as f:
-                a = np.array(f).copy()
-            remapped = lut_arr[a]
-            out = _Img.fromarray(remapped, mode='P')
-            out.putpalette(flat_new)
-            out.save(path)
-            return a.tobytes(), remapped.tobytes(), a.shape
 
         old_tiles_data = new_tiles_data = tiles_shape = None
         old_preview_data = new_preview_data = preview_shape = None
 
-        try:
-            old_tiles_data, new_tiles_data, tiles_shape = _remap_image('output/tiles.png')
-            if old_tiles_data and self.main_window and hasattr(self.main_window, 'edit_tiles_tab'):
-                et = self.main_window.edit_tiles_tab
-                with _Img.open('output/tiles.png') as f:
-                    et.tileset_img = f.copy()
-                    et.tileset_img_original = et.tileset_img
-                total = (et.tileset_img.width // 8) * (et.tileset_img.height // 8)
-                w = et.tiles_per_row if et.tiles_per_row > 0 else et.tileset_img.width // 8
-                et.render_tileset_with_padding(w, (total + w - 1) // w, total)
-        except Exception as e:
-            print(f"palette_op remap tiles error: {e}")
+        if remap_images:
+            lut_arr = np.array(lut, dtype=np.uint8)
 
-        try:
-            old_preview_data, new_preview_data, preview_shape = _remap_image('temp/preview/preview.png')
-        except Exception as e:
-            print(f"palette_op remap preview error: {e}")
+            def _remap_image(path):
+                if not os.path.exists(path):
+                    return None, None, None
+                with _Img.open(path) as f:
+                    a = np.array(f).copy()
+                remapped = lut_arr[a]
+                out = _Img.fromarray(remapped, mode='P')
+                out.putpalette(flat_new)
+                out.save(path)
+                return a.tobytes(), remapped.tobytes(), a.shape
+
+            try:
+                old_tiles_data, new_tiles_data, tiles_shape = _remap_image('output/tiles.png')
+                if old_tiles_data and self.main_window and hasattr(self.main_window, 'edit_tiles_tab'):
+                    et = self.main_window.edit_tiles_tab
+                    with _Img.open('output/tiles.png') as f:
+                        et.tileset_img = f.copy()
+                        et.tileset_img_original = et.tileset_img
+                    total = (et.tileset_img.width // 8) * (et.tileset_img.height // 8)
+                    w = et.tiles_per_row if et.tiles_per_row > 0 else et.tileset_img.width // 8
+                    et.render_tileset_with_padding(w, (total + w - 1) // w, total)
+            except Exception as e:
+                print(f"palette_op remap tiles error: {e}")
+
+            try:
+                old_preview_data, new_preview_data, preview_shape = _remap_image('temp/preview/preview.png')
+            except Exception as e:
+                print(f"palette_op remap preview error: {e}")
+        else:
+            def _update_palette_only(path):
+                if not os.path.exists(path):
+                    return None, None, None
+                with _Img.open(path) as f:
+                    img = f.copy()
+                if img.mode != 'P':
+                    return None, None, None
+                old_data = np.array(img).tobytes()
+                shape = np.array(img).shape
+                img.putpalette(flat_new)
+                img.save(path)
+                return old_data, old_data, shape
+
+            try:
+                old_tiles_data, new_tiles_data, tiles_shape = _update_palette_only('output/tiles.png')
+                if old_tiles_data and self.main_window and hasattr(self.main_window, 'edit_tiles_tab'):
+                    et = self.main_window.edit_tiles_tab
+                    with _Img.open('output/tiles.png') as f:
+                        et.tileset_img = f.copy()
+                        et.tileset_img_original = et.tileset_img
+                    total = (et.tileset_img.width // 8) * (et.tileset_img.height // 8)
+                    w = et.tiles_per_row if et.tiles_per_row > 0 else et.tileset_img.width // 8
+                    et.render_tileset_with_padding(w, (total + w - 1) // w, total)
+            except Exception as e:
+                print(f"palette_op swap tiles error: {e}")
+
+            try:
+                old_preview_data, new_preview_data, preview_shape = _update_palette_only('temp/preview/preview.png')
+            except Exception as e:
+                print(f"palette_op swap preview error: {e}")
 
         if self.main_window and hasattr(self.main_window, 'history_manager'):
             self.main_window.history_manager.record_state(
@@ -356,6 +610,8 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.draw_selection_rectangle(cursor_index)
 
         self._save_and_update_all(skip_tiles=True)
+        if self.main_window and hasattr(self.main_window, 'refresh_preview_display'):
+            self.main_window.refresh_preview_display()
 
     def create_left_palette_container(self):
         container = QWidget()
@@ -401,7 +657,9 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self.full_palette_view.setRenderHint(QPainter.SmoothPixmapTransform, False)
         self.full_palette_view.setStyleSheet("QGraphicsView { background: #f0f0f0; border: none; }")
         self.full_palette_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.full_palette_view.setFixedSize(195, 195)
+        self.full_palette_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.full_palette_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.full_palette_view.setFixedSize(192, 192)
         layout.addWidget(self.full_palette_view)
         
         editor_container = QWidget()
@@ -477,6 +735,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
         self._tilemap_section_label.setText(self._tr("section_tilemap"))
         self._cb_move_color.setText(self._tr("palette_op_move_color"))
         self._cb_swap_color.setText(self._tr("palette_op_swap_color"))
+        self._cb_move_palette.setText(self._tr("palette_op_move_palette"))
         self.retranslate_tilemap_toolbar()
 
     def setup_tilemap_interaction(self):
@@ -1013,6 +1272,10 @@ class EditPalettesTab(TilemapUtils, QWidget):
         if hasattr(self, '_palette_op_btns'):
             for btn in self._palette_op_btns:
                 btn.setEnabled(True)
+            bpp = getattr(self.main_window, 'current_bpp', 4) if self.main_window else 4
+            if bpp != 4:
+                self._cb_move_palette.setEnabled(False)
+                self._cb_move_palette.setChecked(False)
             if not enable_editor:
                 for btn in self._palette_op_btns:
                     btn.setChecked(False)
@@ -1030,6 +1293,9 @@ class EditPalettesTab(TilemapUtils, QWidget):
         tile_size = 12
         self.palette_rects = []
         self.selection_rect = None
+
+        self.full_palette_scene.setSceneRect(0, 0, 16 * tile_size, 16 * tile_size)
+        self.full_palette_view.resetTransform()
         
         for i, (r, g, b) in enumerate(colors):
             if i >= 256:
@@ -1354,7 +1620,7 @@ class EditPalettesTab(TilemapUtils, QWidget):
     def update_status_bar(self, tile_x, tile_y, tile_id=None, palette_id=None, flip_state=None):
         update_status_bar_shared(
             main_window=self.main_window,
-            selection_type="Palette",
+            selection_type=self._tr("type_palette"),
             selection_id=self.selected_palette_id,
             tile_x=tile_x,
             tile_y=tile_y,

@@ -1,13 +1,18 @@
 # main.py
 import os
-os.environ['JOBLIB_WORKER_COUNT'] = '4'
-os.environ['JOBLIB_MULTIPROCESSING'] = '0'
-os.environ['LOKY_MAX_CPU_COUNT'] = '4'
-
 import sys
 import importlib
 import time
 import threading
+
+os.environ['JOBLIB_WORKER_COUNT'] = '4'
+os.environ['JOBLIB_MULTIPROCESSING'] = '0'
+os.environ['LOKY_MAX_CPU_COUNT'] = '4'
+
+if os.name == 'nt':
+    os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
+    os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+    os.environ["QT_SCALE_FACTOR_ROUNDING_POLICY"] = "PassThrough"
 
 def _install_exception_hook(translator=None):
     import traceback
@@ -52,6 +57,10 @@ def main():
     from PySide6.QtCore import QLoggingCategory
     QLoggingCategory.setFilterRules("qt.text.font.db=false")
     app = QApplication(sys.argv)
+
+    if os.name == 'nt':
+        app.setStyle("windowsvista")
+        app.setProperty("darkMode", False)
     
     icon_path = os.path.join("assets", "icon.png")
     if os.path.exists(icon_path):

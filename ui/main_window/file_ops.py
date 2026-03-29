@@ -1,14 +1,35 @@
 # ui/main_window/file_ops.py
 import os
 import shutil
+from pathlib import Path
 from PIL import Image as PilImage
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                QLabel, QSpinBox, QPushButton,
                                QFileDialog, QMessageBox)
 from PySide6.QtGui import QPixmap, QBrush, QColor
-from core.image_utils import pil_to_qimage, create_gbagfx_preview
+from core.image_utils import create_gbagfx_preview
+from ui.shared_utils import pil_to_qimage, CustomGraphicsView, update_status_bar_shared
 from core.palette_utils import generate_grayscale_palette
 from core.config import ROT_SIZES_SET as _ROT_SIZES
+
+
+def get_documents_folder():
+    """Get the Documents folder path for the current OS"""
+    try:
+        if os.name == 'nt':  # Windows
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
+                               r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") as key:
+                documents_path = winreg.QueryValueEx(key, "Personal")[0]
+                return documents_path
+        else:  # macOS and Linux
+            home = Path.home()
+            documents = home / "Documents"
+            if documents.exists():
+                return str(documents)
+            return str(home)
+    except Exception:
+        return str(Path.home())
 
 
 class PaletteApplyDialog(QDialog):
@@ -348,14 +369,29 @@ def _replace_tileset_palette(tiles_path, new_palette):
 def open_image_for_conversion(main_window):
     from ui.dialogs.conversion_dialog import ConversionDialog
     
+    if hasattr(main_window, '_last_image_directory') and main_window._last_image_directory:
+        start_dir = main_window._last_image_directory
+    else:
+        remember_paths = main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', True)
+        if remember_paths:
+            start_dir = main_window.config_manager.get('PATHS', 'last_image_directory', get_documents_folder())
+        else:
+            start_dir = get_documents_folder()
+    
     input_path, _ = QFileDialog.getOpenFileName(
         main_window,
         main_window.translator.tr("open_image"),
-        "",
+        start_dir,
         main_window.translator.tr("filter_images")
     )
     if not input_path:
         return
+
+    main_window._last_image_directory = os.path.dirname(input_path)
+    
+    remember_paths = main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', True)
+    if remember_paths:
+        main_window.config_manager.set('PATHS', 'last_image_directory', main_window._last_image_directory)
 
     dialog = ConversionDialog(image_path=input_path, parent=main_window)
     dialog.exec()
@@ -427,7 +463,6 @@ def _apply_mode_conversion(main_window, mode):
     if reply != QMessageBox.Yes:
         return
 
-    # Text Mode supports max 64x64 tiles
     if mode == 'to_text' and (et.tilemap_width > 64 or et.tilemap_height > 64):
         QMessageBox.critical(
             main_window, title,
@@ -436,7 +471,6 @@ def _apply_mode_conversion(main_window, mode):
         )
         return
 
-    # Rotation/Scaling requires exact predefined dimensions
     from core.config import ROT_SIZES_SET
     if mode == 'to_rot' and (et.tilemap_width, et.tilemap_height) not in ROT_SIZES_SET:
         valid = ', '.join(f'{w}x{h}' for w, h in sorted(ROT_SIZES_SET))
@@ -471,7 +505,6 @@ def _apply_mode_conversion(main_window, mode):
                                  tr('convert_to_rot_mode_too_many', n=new_count))
             return
 
-    # Update mode flags
     new_is_rot = (mode == 'to_rot')
     main_window.current_rotation_mode = new_is_rot
     if new_is_rot:
@@ -481,26 +514,22 @@ def _apply_mode_conversion(main_window, mode):
         if new_is_rot:
             main_window.config_manager.set('CONVERSION', 'bpp', '1')
 
-    # Update both tabs
     for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
         tab = getattr(main_window, attr, None)
         if tab:
             tab.tilemap_data = new_tm
 
-    # Reload tileset
     et.tileset_img = new_ts
     et.tileset_img_original = new_ts
     total = (new_ts.width // 8) * (new_ts.height // 8)
     w = et.tiles_per_row if et.tiles_per_row > 0 else new_ts.width // 8
     et.render_tileset_with_padding(w, (total + w - 1) // w, total)
 
-    # Save files
     os.makedirs('output', exist_ok=True)
     new_ts.save('output/tiles.png')
     with open('output/map.bin', 'wb') as f:
         f.write(new_tm)
 
-    # Record history
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.record_state(
             state_type='tile_optimizer',
@@ -544,7 +573,6 @@ def _apply_tile_optimizer(main_window, mode):
     tr = main_window.translator.tr
     title = tr(mode + '_tiles')
 
-    # Confirmation dialog
     reply = QMessageBox.question(
         main_window, title,
         tr(mode + '_tiles_confirm'),
@@ -573,7 +601,6 @@ def _apply_tile_optimizer(main_window, mode):
         et.tilemap_width, et.tilemap_height, tilemap_index
     )
 
-    # Count only tiles actually referenced in the tilemap (not padding)
     if et.tilemap_data:
         old_count = len(set(
             (et.tilemap_data[i*2] | (et.tilemap_data[i*2+1] << 8)) & 0x3FF
@@ -584,7 +611,6 @@ def _apply_tile_optimizer(main_window, mode):
             for i in range(et.tilemap_width * et.tilemap_height)
         )) if new_tilemap else new_count
 
-    # Tile count limit check (only relevant for deoptimize)
     if mode == 'deoptimize' and new_count > 1024:
         QMessageBox.critical(main_window, title, tr(too_many_key, n=new_count))
         return
@@ -593,27 +619,23 @@ def _apply_tile_optimizer(main_window, mode):
         QMessageBox.information(main_window, title, tr(no_change_key))
         return
 
-    # Reload tileset display
     et.tileset_img = new_tileset
     et.tileset_img_original = new_tileset
     total = (new_tileset.width // 8) * (new_tileset.height // 8)
     w = et.tiles_per_row if et.tiles_per_row > 0 else new_tileset.width // 8
     et.render_tileset_with_padding(w, (total + w - 1) // w, total)
 
-    # Update tilemap in both tabs
     for attr in ('edit_tiles_tab', 'edit_palettes_tab'):
         tab = getattr(main_window, attr, None)
         if tab and new_tilemap:
             tab.tilemap_data = new_tilemap
 
-    # Save files after render
     os.makedirs('output', exist_ok=True)
     new_tileset.save('output/tiles.png')
     if new_tilemap:
         with open('output/map.bin', 'wb') as f:
             f.write(new_tilemap)
 
-    # Record history
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.record_state(
             state_type='tile_optimizer',
@@ -1050,7 +1072,7 @@ def open_tilemap(main_window):
     et.tilemap_height_spin.setValue(h)
     et.enable_tilemap_controls()
 
-    from core.image_utils import pil_to_qimage as _pil_to_qimage
+    from ui.shared_utils import pil_to_qimage as _pil_to_qimage
     from PySide6.QtGui import QPixmap as _QPixmap
 
     save_preview     = main_window.config_manager.getboolean('SETTINGS', 'save_preview_files',     False) if hasattr(main_window, 'config_manager') else False

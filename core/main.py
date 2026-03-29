@@ -206,6 +206,15 @@ def main(input_path, tilemap_path=None, selected_palettes=None, transparent_colo
             n_tiles = (cropped_img.size[0] // 8) * (cropped_img.size[1] // 8)
             if len(data) // 2 != n_tiles:
                 raise ValueError("Tilemap length does not match number of tiles.")
+
+            width_tiles  = cropped_img.size[0] // 8
+            height_tiles = cropped_img.size[1] // 8
+            if width_tiles > 32:
+                from core.final_assets import revert_gba_tilemap_reorganization
+                data = revert_gba_tilemap_reorganization(
+                    data, width_tiles, height_tiles, width_tiles, height_tiles
+                )
+
             pal_indices = [(data[i] | (data[i+1] << 8)) >> 12 & 0xF for i in range(0, len(data), 2)]
             unique_pal_indices = set(pal_indices) if pal_indices else set()
             selected_palettes = sorted(unique_pal_indices)
@@ -414,7 +423,8 @@ def cli_main():
     parser.add_argument("--keep-temp", action="store_true", help="Keep temporary files in temp/ folder")
     parser.add_argument("--keep-transparent", action="store_true", help="Keep the transparent color in palette (instead of black)")
     parser.add_argument("--save-preview", action="store_true", help="Keep preview files in the output folder")
-    parser.add_argument("--bpp", type=int, choices=[4, 8], default=4, help="Bits per pixel: 4 (16 colors) or 8 (256 colors)")
+    parser.add_argument("--bpp", type=int, choices=[4, 8], default=4, help="Bits per pixel: 4 (16 colors) or 8 (256 colors). Ignored when --rotation-mode is used.")
+    parser.add_argument("--rotation-mode", action="store_true", help="Generate assets for Rotation/Scaling BG mode (8bpp, max 256 unique tiles)")
     parser.add_argument("--start-index", type=int, default=0, help="Starting color index in palette (0-255, only for 8bpp)")
     parser.add_argument("--palette-size", type=int, default=None, help="Number of colors in palette (1-256). Default: 256 - start-index (only for 8bpp)")
 
@@ -436,7 +446,12 @@ def cli_main():
     start_index = args.start_index
     palette_size = args.palette_size
 
-    if args.bpp == 8:
+    if args.rotation_mode:
+        bpp = 8
+        start_index = 0
+        palette_size = 256
+    elif args.bpp == 8:
+        bpp = 8
         if start_index < 0 or start_index > 255:
             print(translator.tr("error_start_index_8bpp"))
             sys.exit(1)
@@ -450,6 +465,7 @@ def cli_main():
             print(translator.tr("error_palette_overflow"))
             sys.exit(1)
     else:
+        bpp = 4
         start_index = 0
         palette_size = 256
 
@@ -466,9 +482,10 @@ def cli_main():
         save_preview=args.save_preview,
         keep_temp=args.keep_temp,
         keep_transparent=args.keep_transparent,
-        bpp=args.bpp,
+        bpp=bpp,
         start_index=start_index,
-        palette_size=palette_size
+        palette_size=palette_size,
+        rotation_mode=args.rotation_mode
     )
 
 if __name__ == "__main__":

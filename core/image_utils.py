@@ -3,7 +3,6 @@ import os
 import numpy as np
 from PIL import Image
 from shutil import copy2
-from PySide6.QtGui import QImage
 from core.config import MARKER_COLOR
 from core.config_manager import ConfigManager
 from core.palette_utils import rgb_to_gba_rounded
@@ -41,15 +40,6 @@ def extract_tiles_rgba(img):
                 tile = pad
             tiles.append(tile)
     return tiles
-
-def pil_to_qimage(pil_img):
-    if pil_img.mode == "RGBA":
-        data = pil_img.tobytes("raw", "RGBA")
-        return QImage(data, pil_img.size[0], pil_img.size[1], QImage.Format_RGBA8888)
-    else:
-        rgb_img = pil_img.convert("RGB")
-        data = rgb_img.tobytes("raw", "RGB")
-        return QImage(data, rgb_img.size[0], rgb_img.size[1], QImage.Format_RGB888)
 
 def create_gbagfx_preview(save_preview=False, keep_transparent=False):
     try:

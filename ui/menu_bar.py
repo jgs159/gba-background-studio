@@ -243,6 +243,11 @@ class MenuBar:
         self.action_show_success_dialog.setCheckable(True)
         self.action_show_success_dialog.triggered.connect(self.main_window.toggle_show_success_dialog)
 
+        self.action_remember_file_paths = settings_menu.addAction(self.main_window.translator.tr("remember_file_paths"))
+        self.action_remember_file_paths.setCheckable(True)
+        self.action_remember_file_paths.setChecked(self.main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', True))
+        self.action_remember_file_paths.triggered.connect(self.main_window.toggle_remember_file_paths)
+
         # Help menu
         help_menu = self.menu_bar.addMenu(self.main_window.translator.tr("help_menu"))
         
@@ -302,6 +307,7 @@ class MenuBar:
         self.action_load_last_output.setText(tr("load_last_output"))
         self.action_save_conversion_params.setText(tr("save_conversion_params"))
         self.action_show_success_dialog.setText(tr("show_success_dialog"))
+        self.action_remember_file_paths.setText(tr("remember_file_paths"))
         # Help
         self.action_about.setText(tr("about"))
         self.action_contribute.setText(tr("contribute"))

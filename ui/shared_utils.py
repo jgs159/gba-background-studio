@@ -1,10 +1,20 @@
 # ui/shared_utils.py
 from PySide6.QtWidgets import QGraphicsView
-from PySide6.QtGui import QPen, QColor
+from PySide6.QtGui import QPen, QColor, QImage
 from PySide6.QtCore import Qt, QRect, QPoint, QSize
 
 _SEL_PEN = QPen(QColor(255, 255, 0), 2.0)
 _SEL_PEN.setCosmetic(True)
+
+
+def pil_to_qimage(pil_img):
+    if pil_img.mode == "RGBA":
+        data = pil_img.tobytes("raw", "RGBA")
+        return QImage(data, pil_img.size[0], pil_img.size[1], QImage.Format_RGBA8888)
+    else:
+        rgb_img = pil_img.convert("RGB")
+        data = rgb_img.tobytes("raw", "RGB")
+        return QImage(data, rgb_img.size[0], rgb_img.size[1], QImage.Format_RGB888)
 
 class CustomGraphicsView(QGraphicsView):
     def __init__(self, parent=None):

@@ -1,6 +1,6 @@
----
+<p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
 
-# GBA Background Studio
+## GBA Background Studio
 
 **GBA Background Studio** is a desktop application for creating and editing **Game Boy Advance (GBA) backgrounds**. It allows you to convert images into GBA-compatible tilesets and tilemaps, edit tiles and palettes visually, and export ready-to-use assets for your GBA projects.
 
@@ -10,25 +10,12 @@
 
 ## 🌐 Translations
 
-This README is currently written in English. Translations are available at the following links:
+This README is available in the following languages:
 
-- 🇪🇸 Spanish (es): `README.es.md`
-- 🇧🇷 Brazilian Portuguese (pt-BR): `README.brp.md`
-- 🇫🇷 French (fr): `README.fr.md`
-- 🇩🇪 German (de): `README.deu.md`
-- 🇮🇹 Italian (it): `README.ita.md`
-- 🇵🇹 European Portuguese (pt-PT): `README.por.md`
-- 🇮🇩 Indonesian (id): `README.ind.md`
-- 🇮🇳 Hindi (hi): `README.hin.md`
-- 🇷🇺 Russian (ru): `README.rus.md`
-- 🇯🇵 Japanese (ja): `README.jpn.md`
-- 🇨🇳 Simplified Chinese (zh-Hans): `README.zhs.md`
-- 🇹🇼 Traditional Chinese (zh-Hant): `README.zht.md`
-- 🇰🇷 Korean (ko): `README.kor.md`
-- 🇵🇱 Polish (pl): `README.pol.md`
-- 🇳🇱 Dutch (nl): `README.nld.md`
-- 🇹🇷 Turkish (tr): `README.tur.md`
-- 🇻🇳 Vietnamese (vi): `README.vie.md`
+<p align="center">
+  <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
+  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jap.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+</p>
 
 ---
 
@@ -69,17 +56,13 @@ This README is currently written in English. Translations are available at the f
 
 ## 🖼️ Screenshots
 
-> <!-- TODO: Insert main window screenshot here (overall app layout, showing tabs and preview).  
-> Example:  
-> ![Main window of GBA Background Studio showing the preview, tile editor, and palette editor tabs.](path/to/main_window_screenshot.png) -->
+<p align="center"><img width="896" height="590" alt="Image" src="https://github.com/user-attachments/assets/1a0ee864-2736-4f7f-9ddc-8f4b030f5cbd" /></p>
 
-> <!-- TODO: Insert conversion dialog screenshot here (input image and GBA output preview).  
-> Example:  
-> ![Conversion dialog displaying the source image on the left and the GBA-formatted preview on the right, with configuration options.](path/to/conversion_dialog_screenshot.png) -->
+<p align="center"><img width="812" height="676" alt="Image" src="https://github.com/user-attachments/assets/8af02c90-e531-44f3-ba9f-252058db0449" /></p>
 
-> <!-- TODO: Insert palette editor screenshot here (palette grid and color editor).  
-> Example:  
-> ![Palette editor tab showing the color grid, selection overlays, and color sliders for fine-tuning.](path/to/palette_editor_screenshot.png) -->
+<p align="center"><img width="812" height="676" alt="Image" src="https://github.com/user-attachments/assets/6cee32fa-e4df-41cb-8ae1-b5fe31595683" /></p>
+
+<p align="center"><img width="812" height="676" alt="Image" src="https://github.com/user-attachments/assets/3b68d4ca-1057-42de-964d-39b718a1e501" /></p>
 
 ---
 
@@ -105,30 +88,44 @@ GBA Background Studio is built with **Python** and **PySide6**, and follows a mo
   - `HoverManager`, `GridManager` – Visual helpers for hover effects and grid overlays.
   - `Translator`, `ConfigManager` – Localization and persistent configuration.
 
-This separation makes it easier to maintain and extend the application.
-
 ---
 
 ## 📦 Installation
 
 ### Requirements
-
-- **Python** \(3.12+ recommended\)
+- **Python** (3.12+ recommended)
 - **Pip** (Python package manager)
-- A supported desktop environment (Windows, macOS, or Linux)
+- **Operating System Support for PySide6:**
+  - **Windows:** Windows 10 (Version 1809) or later.
+  - **macOS:** macOS 11 (Big Sur) or later.
+  - **Linux:** Modern distributions with glibc 2.28 or later (e.g., Ubuntu 20.04+, Debian 11+).
 
 ### Dependencies
-
 Core dependencies include:
-
-- `PySide6` (Qt for Python)
+- `PySide6` (Qt for Python) - *Note: Requires the OS versions mentioned above.*
 - `Pillow` (PIL) for image processing
 
 You can install dependencies using:
-
 ```bash
 pip install -r requirements.txt
 ```
+
+---
+
+### 🏛️ Legacy OS Support (Windows 7 / 8 / 8.1)
+If you are using an older version of Windows that does not support **PySide6** (the GUI framework), you can still use the core conversion engine through our **Multi-language Command Line Wizard**.
+
+You can install legacy dependencies using:
+```bash
+pip install -r requirements-legacy.txt
+```
+
+This allows you to convert images to GBA assets without the graphical interface, using a step-by-step guided assistant in your native language.
+
+1. Navigate to the project root.
+2. Run the **`GBA_Studio_Wizard.bat`** file.
+3. Select your language (18 languages supported).
+4. Follow the instructions to drag and drop your image and configure the GBA output.
 
 ---
 
@@ -137,7 +134,7 @@ pip install -r requirements.txt
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/jgs159/gba-background-studio.git
+   git clone https://github.com/CompuMaxx/gba-background-studio.git
    cd gba-background-studio
    ```
 
@@ -164,31 +161,40 @@ pip install -r requirements.txt
 
 ## 🧭 Basic Usage
 
-1. **Open an image**
-   - Use **File → Open Image** or press **Ctrl+O**.
-   - Select the image you want to convert to a GBA background.
+1. **Open an Image**
+   - Go to **File → Open Image** or press `Ctrl+O`.
+   - Select the image you want to convert into a GBA background.
 
-2. **Configure conversion**
-   - Adjust output size and color depth (\(4\text{bpp}\) or \(8\text{bpp}\)).
-   - Use the conversion dialog to see a preview of the GBA-formatted result.
+2. **Configure Conversion**
+   - Select the **BG Mode** (**Text Mode** or **Rotation/Scaling Mode**).
+   - Choose the palette(s) or Tilemap to use (only for **4bpp Text Mode**).
+   - Set the color to be used as transparent.
+   - Adjust the output size and other necessary parameters.
+   - Click **Convert**, and the app will handle the rest for you.
 
-3. **Edit tiles**
+3. **Edit Tiles**
    - Switch to the **Edit Tiles** tab.
-   - Use the tilemap view to draw and modify tiles.
-   - Zoom in/out to work at the desired scale.
+   - Use the tilemap view to draw and modify individual tiles.
+   - Select entire areas to copy, cut, paste, or rotate groups of tiles.
+   - Synchronize changes in real-time to see instant results.
+   - Adjust the **Zoom** level for perfect precision.
+   - Optimize or Deoptimize tilesets to save space or ensure hardware compatibility.
+   - Convert assets between **4bpp** and **8bpp** formats.
+   - Switch between **Text Mode** and **Rotation/Scaling Mode** seamlessly.
 
-4. **Edit palettes**
+4. **Edit Palettes**
    - Go to the **Edit Palettes** tab.
-   - Edit colors in the palette grid and tweak them via the color editor.
-   - Sync palettes with the preview and tiles as needed.
+   - Modify colors in the palette grid and fine-tune them using the color editor.
+   - Select specific areas or all tiles belonging to a palette to replace or swap them with another.
 
-5. **Preview the background**
-   - Switch to the **Preview** tab to see a GBA-like preview.
-   - Verify that tiles and palettes look correct together.
+5. **Preview the Background**
+   - Switch to the **Preview** tab for a high-fidelity representation of how it will look on an actual GBA.
+   - Verify that your tile and palette configurations work perfectly together.
 
-6. **Export files**
-   - Use **File → Export Files** or press **Ctrl+E**.
-   - Export tilesets, tilemaps, and palettes in formats ready to be integrated into your GBA toolchain.
+6. **Export Assets**
+   - Go to **File → Export Files** or press `Ctrl+E`.
+   - Export tilesets, tilemaps, and palettes in formats ready to be integrated into your GBA development toolchain.
+   - Export individual assets separately from their respective menus if needed.
 
 ---
 
@@ -226,27 +232,9 @@ A `Translator` component handles the UI text:
 
 ---
 
-## 🧪 Testing
-
-> Describe how to run tests if you have any. For example:
-
-```bash
-pytest
-```
-
-or
-
-```bash
-python -m unittest
-```
-
-If you don’t have tests yet, you can either omit this section or add a short note stating that tests are planned.
-
----
-
 ## 🤝 Contributing
 
-Contributions are welcome! If you’d like to help:
+Contributions are welcome! If you'd like to help:
 
 1. Fork this repository.
 2. Create a feature branch:
@@ -269,8 +257,8 @@ Please keep your code consistent with the existing style and include tests when 
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.  
-See the `LICENSE` file for more details.
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.  
+See the [LICENSE](LICENSE) file for more details.
 
 ---
 
@@ -278,5 +266,20 @@ See the `LICENSE` file for more details.
 
 - Thanks to the GBA homebrew and ROM hacking communities for their documentation and tools.
 - Inspired by classic pixel art editors and GBA development utilities.
+
+---
+
+## 📩 Contact & Support
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" />
+  <a href="https://discordapp.com/users/213803341988364289">
+    <img src="https://img.shields.io/badge/CompuMax-gray?style=for-the-badge" alt="User" />
+  </a>
+</p>
+
+If you find this tool useful and would like to support its development, consider buying me a coffee!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/compumax)
 
 ---

@@ -56,9 +56,12 @@ class CustomStatusBar(QWidget):
             self.zoom_label.setText(self.tr("zoom_level", level=zoom_level))
 
     def restore_default_status(self, zoom_level=100):
-        self.selection_label.setText(self.tr("status_selected", type="Tile", id="-"))
+        self.selection_label.setText(self.tr("status_selected", type=self.tr("type_tile"), id="-"))
         self.tilemap_label.setText(self.tr("status_tilemap", pos="(-, -)"))
         self.tile_label.setText(self.tr("status_tile", id="-"))
         self.palette_label.setText(self.tr("status_palette", id="-"))
         self.flip_label.setText(self.tr("status_flip", state="None"))
         self.zoom_label.setText(self.tr("zoom_level", level=zoom_level))
+
+    def retranslate_ui(self, zoom_level=100):
+        self.restore_default_status(zoom_level)

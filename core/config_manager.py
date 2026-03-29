@@ -20,13 +20,18 @@ class ConfigManager:
                 'keep_temp_files': 'False',
                 'load_last_output': 'False',
                 'save_conversion_params': 'False',
-                'show_success_dialog': 'True'
+                'show_success_dialog': 'True',
+                'show_grid': 'True',
+                'remember_file_paths': 'False'
             }
             self.config['DISPLAY'] = {
                 'grid_color': '255,255,255',
-                'grid_alpha': '180',
+                'grid_alpha': '128',
                 'overlay_text_color': '0,0,0',
-                'overlay_alpha': '76'
+                'overlay_alpha': '128'
+            }
+            self.config['PATHS'] = {
+                'last_image_directory': ''
             }
             self.config['CONVERSION'] = {
                 'bpp': '0',

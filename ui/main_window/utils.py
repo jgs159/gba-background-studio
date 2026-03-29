@@ -20,3 +20,6 @@ def retranslate_ui(main_window):
         main_window.edit_palettes_tab.retranslate_ui()
     if hasattr(main_window, 'context_toolbar'):
         main_window.context_toolbar.retranslate_ui()
+    if hasattr(main_window, 'custom_status_bar'):
+        zoom = getattr(main_window, 'current_zoom_level', 100)
+        main_window.custom_status_bar.retranslate_ui(zoom)

@@ -7,7 +7,8 @@ from PySide6.QtCore import Qt
 
 
 def show_success_dialog(parent):
-    _tr = parent.translator.tr if (parent and hasattr(parent, 'translator')) else lambda k, **kw: k
+    main_window = parent.parent() if parent else None
+    _tr = main_window.translator.tr if (main_window and hasattr(main_window, 'translator')) else lambda k, **kw: k
     
     dialog = QDialog(parent)
     dialog.setWindowTitle(_tr("success_dialog_title"))

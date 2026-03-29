@@ -6,7 +6,7 @@ import os
 import sys
 import time
 from contextlib import redirect_stdout
-from core.image_utils import pil_to_qimage
+from ui.shared_utils import pil_to_qimage
 from core.main import main as converter_main
 from .conversion_params import get_conversion_parameters
 from .show_success_dialog import show_success_dialog

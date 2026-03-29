@@ -103,7 +103,7 @@ def _is_editor_view(main_window, view):
     editor_views = [
         main_window.edit_tiles_tab.edit_tileset_view,
         main_window.edit_tiles_tab.edit_tilemap_view,
-        main_window.edit_palettes_tab.edit_palettes_view,
+        main_window.edit_palettes_tab.full_palette_view,
         main_window.edit_palettes_tab.edit_tilemap2_view
     ]
     return view in editor_views
@@ -113,7 +113,7 @@ def _get_view_name(main_window, view):
         return "tileset"
     elif view == main_window.edit_tiles_tab.edit_tilemap_view:
         return "tilemap_edit"
-    elif view == main_window.edit_palettes_tab.edit_palettes_view:
+    elif view == main_window.edit_palettes_tab.full_palette_view:
         return "palettes"
     elif view == main_window.edit_palettes_tab.edit_tilemap2_view:
         return "tilemap_palettes"

@@ -90,3 +90,6 @@ def toggle_grid(main_window, checked):
 
 def toggle_status_bar(main_window, checked):
     main_window.custom_status_bar.setVisible(checked)
+
+def toggle_remember_file_paths(main_window, checked):
+    main_window.config_manager.set('SETTINGS', 'remember_file_paths', checked)

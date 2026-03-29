@@ -1,7 +1,7 @@
 # ui/main_window/tab_ops.py
 import os
 from PIL import Image as PilImage
-from core.image_utils import pil_to_qimage
+from ui.shared_utils import pil_to_qimage
 from core.palette_utils import generate_grayscale_palette
 from PySide6.QtGui import QPixmap
 
@@ -27,9 +27,13 @@ def on_tab_changed(main_window, index):
         main_window.context_toolbar.show_for_tab(index)
 
     if current_tab == main_window.edit_tiles_tab:
+        if hasattr(main_window.edit_tiles_tab, 'sync_splitter_on_tab_change'):
+            main_window.edit_tiles_tab.sync_splitter_on_tab_change()
         update_hover_from_current_cursor(main_window)
         main_window.edit_tiles_tab.update_status_bar(-1, -1)
     elif current_tab == main_window.edit_palettes_tab:
+        if hasattr(main_window.edit_palettes_tab, 'sync_splitter_on_tab_change'):
+            main_window.edit_palettes_tab.sync_splitter_on_tab_change()
         update_hover_from_current_cursor(main_window)
         main_window.edit_palettes_tab.update_status_bar(-1, -1)
     elif current_tab == main_window.preview_tab:
