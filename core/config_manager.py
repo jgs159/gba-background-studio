@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 
 class ConfigManager:
+    APP_VERSION = "1.1.0"
+    
     def __init__(self, config_file="config.ini"):
         self.config_file = config_file
         self.config = configparser.ConfigParser()
@@ -12,8 +14,14 @@ class ConfigManager:
     def load_config(self):
         if os.path.exists(self.config_file):
             self.config.read(self.config_file, encoding='utf-8')
+
+            if not self.config.has_option('SETTINGS', 'version') or \
+               self.config.get('SETTINGS', 'version') != self.APP_VERSION:
+                self.config.set('SETTINGS', 'version', self.APP_VERSION)
+                self.save_config()
         else:
             self.config['SETTINGS'] = {
+                'version': self.APP_VERSION,
                 'language': 'english',
                 'save_preview_files': 'False',
                 'keep_transparent_color': 'False',

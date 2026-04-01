@@ -1,4 +1,4 @@
-<p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
+<p align="center"><img width="1868" height="560" src="assets/readme/banner.png" alt="Image" /></p>
 <div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
@@ -15,7 +15,7 @@ README này có sẵn bằng các ngôn ngữ sau:
 
 <p align="center">
   <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
-  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jap.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jpn.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
 </p>
 
 ---
@@ -57,13 +57,13 @@ README này có sẵn bằng các ngôn ngữ sau:
 
 ## 🖼️ Ảnh chụp màn hình
 
-<p align="center"><img width="896" height="590" alt="Image" src="https://github.com/user-attachments/assets/968f383b-52c5-4b88-b1c7-0c382a50996a" /></p>
+<p align="center"><img width="896" height="590" src="assets/readme/vie_conversion_interfaz.png" alt="Image" /></p>
 
-<p align="center"><img width="1009" height="676" alt="Image" src="https://github.com/user-attachments/assets/ef011fe6-1fe7-4331-8c07-81960e5f6fc0" /></p>
+<p align="center"><img width="1009" height="676" src="assets/readme/vie_preview.png" alt="Image" /></p>
 
-<p align="center"><img width="1009" height="676" alt="Image" src="https://github.com/user-attachments/assets/e41c52b2-c38d-4c80-8b28-f48c6b95773f" /></p>
+<p align="center"><img width="1009" height="676" src="assets/readme/vie_edit_tiles.png" alt="Image" /></p>
 
-<p align="center"><img width="1009" height="676" alt="Image" src="https://github.com/user-attachments/assets/33244820-255e-4def-9abd-13ac28319894" /></p>
+<p align="center"><img width="1009" height="676" src="assets/readme/vie_edit_palettes.png" alt="Image" /></p>
 
 ---
 
@@ -116,10 +116,8 @@ pip install -r requirements.txt
 ### 🏛️ Hỗ trợ hệ điều hành cũ (Windows 7 / 8 / 8.1)
 Nếu bạn đang sử dụng phiên bản Windows cũ hơn không hỗ trợ **PySide6** (khung giao diện đồ họa), bạn vẫn có thể sử dụng công cụ chuyển đổi cốt lõi thông qua **Trình hướng dẫn dòng lệnh đa ngôn ngữ** của chúng tôi.
 
-Bạn có thể cài đặt các thư viện cho hệ điều hành cũ bằng lệnh:
-```bash
-pip install -r requirements-legacy.txt
-```
+#### Yêu cầu
+- **Python** (Khuyến nghị 3.8+)
 
 Điều này cho phép bạn chuyển đổi hình ảnh thành tài nguyên GBA mà không cần giao diện đồ họa, sử dụng hướng dẫn từng bước bằng ngôn ngữ mẹ đẻ của bạn.
 

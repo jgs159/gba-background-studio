@@ -1,0 +1,29 @@
+Version: 1.1.0
+Date: April 1st, 2026
+
+Official Discord Server: https://discord.gg/wsFFExCWFu
+
+Please report any issues on GitHub: [https://github.com/CompuMaxx/gba-background-studio/issues](https://github.com/CompuMaxx/gba-background-studio/issues)
+
+---
+
+## [1.1.0] - 2026-04-01
+
+### Added
+- New "Check for Updates" feature in the "About" dialog to notify users of new releases.
+- Automated dependency verification in `GBA_Studio_Wizard.bat` (checks for Python 3.8+, Pillow, NumPy, Scikit-Learn, and OpenCV).
+- Embedded README assets directly in the repository to ensure documentation images are always available.
+- Support for `Updater.exe` to allow delta-updates without redownloading the full package.
+
+### Changed
+- Standardized Japanese localization identifiers from `.jap` to `.jpn` across all documentation and assets.
+- Optimized installer parameters to preserve source code during updates, enabling faster patch cycles.
+- Improved `GBA_Studio_Wizard.bat` logic to perform silent integrity checks on the Python environment.
+
+### Fixed
+- Fix UI bug in the Conversion Dialog where 8bpp-related strings were displayed while in 4bpp mode.
+- Fix broken image links in localized README files by migrating to internal repository hosting.
+- Corrected Python version detection in the batch wizard to prevent false positives in legacy environments.
+
+## [1.0.0] - 2026-03-29
+- Initial stable release.

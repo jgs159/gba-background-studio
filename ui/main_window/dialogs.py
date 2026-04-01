@@ -14,13 +14,6 @@ def show_contribute(main_window):
     msg_box.exec()
 
 def show_about(main_window):
-    about_text = main_window.translator.tr("about_text")
-    
-    msg_box = QMessageBox(main_window)
-    msg_box.setWindowTitle(main_window.translator.tr("about_title"))
-    msg_box.setTextFormat(Qt.RichText)
-    msg_box.setText(about_text)
-    msg_box.setIcon(QMessageBox.Information)
-    msg_box.setTextInteractionFlags(Qt.TextBrowserInteraction)
-    msg_box.setStandardButtons(QMessageBox.Ok)
-    msg_box.exec()
+    from ui.dialogs.about_dialog import AboutDialog
+    dlg = AboutDialog(main_window)
+    dlg.exec()

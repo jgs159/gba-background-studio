@@ -105,6 +105,7 @@ config.ini
 *.log  
 *.tmp  
 *.txt  
+!changelog.txt  
 
 # === Graphics and Assets ===
 # Ignore common image files EXCEPT assets/

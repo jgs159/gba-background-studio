@@ -200,9 +200,9 @@ class ConversionDialogUI:
         self.bpp8_widgets = [self.start_index, self.palette_size]
         self.bpp8_labels = []
 
-        for i in range(form_layout.rowCount()):
-            item = form_layout.itemAt(i, QFormLayout.LabelRole)
-            if item and item.widget() and item.widget().text() in ["Palette Start Index:", "Palette Size:"]:
+        for row_index in [form_layout.rowCount() - 2, form_layout.rowCount() - 1]:
+            item = form_layout.itemAt(row_index, QFormLayout.LabelRole)
+            if item and item.widget():
                 self.bpp8_labels.append(item.widget())
                 item.widget().setVisible(False)
 

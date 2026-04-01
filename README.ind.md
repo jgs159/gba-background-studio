@@ -1,4 +1,4 @@
-<p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
+<p align="center"><img width="1868" height="560" src="assets/readme/banner.png" alt="Image" /></p>
 <div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
@@ -15,7 +15,7 @@ README ini tersedia dalam bahasa-bahasa berikut:
 
 <p align="center">
   <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
-  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jap.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jpn.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
 </p>
 
 ---
@@ -57,13 +57,13 @@ README ini tersedia dalam bahasa-bahasa berikut:
 
 ## 🖼️ Tangkapan Layar
 
-<p align="center"><img width="896" height="590" alt="Image" src="https://github.com/user-attachments/assets/e4c7b9f7-59dd-4640-8ce7-b5ec8331cdbd" /></p>
+<p align="center"><img width="896" height="590" src="assets/readme/ind_conversion_interfaz.png" alt="Image" /></p>
 
-<p align="center"><img width="849" height="676" alt="Image" src="https://github.com/user-attachments/assets/83460fa2-048d-4a87-8349-b6cb2b4bc708" /></p>
+<p align="center"><img width="887" height="676" src="assets/readme/ind_preview.png" alt="Image" /></p>
 
-<p align="center"><img width="849" height="676" alt="Image" src="https://github.com/user-attachments/assets/ae55d367-37fd-4417-9c22-e44c8404c578" /></p>
+<p align="center"><img width="887" height="676" src="assets/readme/ind_edit_tiles.png" alt="Image" /></p>
 
-<p align="center"><img width="849" height="676" alt="Image" src="https://github.com/user-attachments/assets/033fb7c5-ccac-4384-8530-9bba4b0fd71f" /></p>
+<p align="center"><img width="887" height="676" src="assets/readme/ind_edit_palettes.png" alt="Image" /></p>
 
 ---
 
@@ -116,10 +116,8 @@ pip install -r requirements.txt
 ### 🏛️ Dukungan OS Legacy (Windows 7 / 8 / 8.1)
 Jika Anda menggunakan versi Windows lama yang tidak mendukung **PySide6** (framework GUI), Anda tetap bisa menggunakan mesin konversi melalui **Wizard Baris Perintah Multibahasa** kami.
 
-Anda dapat menginstal dependensi legacy menggunakan:
-```bash
-pip install -r requirements-legacy.txt
-```
+#### Persyaratan
+- **Python** (Direkomendasikan 3.8+)
 
 Ini memungkinkan Anda untuk mengonversi gambar ke aset GBA tanpa antarmuka grafis, menggunakan asisten langkah-demi-langkah dalam bahasa lokal Anda.
 

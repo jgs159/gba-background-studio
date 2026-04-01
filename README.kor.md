@@ -1,4 +1,4 @@
-<p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
+<p align="center"><img width="1868" height="560" src="assets/readme/banner.png" alt="Image" /></p>
 <div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
-  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jap.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jpn.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
 </p>
 
 ---
@@ -57,13 +57,13 @@
 
 ## 🖼️ 스크린샷
 
-<p align="center"><img width="896" height="590" alt="Image" src="https://github.com/user-attachments/assets/a5df166e-8da9-42da-a3f5-9d521f11043a" /></p>
+<p align="center"><img width="896" height="590" src="assets/readme/kor_conversion_interfaz.png" alt="Image" /></p>
 
-<p align="center"><img width="842" height="676" alt="Image" src="https://github.com/user-attachments/assets/e378e8dc-8079-4cba-a172-44e4bf732267" /></p>
+<p align="center"><img width="793" height="676" src="assets/readme/kor_preview.png" alt="Image" /></p>
 
-<p align="center"><img width="842" height="676" alt="Image" src="https://github.com/user-attachments/assets/57425035-dd74-4190-8a14-12f192f0733a" /></p>
+<p align="center"><img width="793" height="676" src="assets/readme/kor_edit_tiles.png" alt="Image" /></p>
 
-<p align="center"><img width="842" height="676" alt="Image" src="https://github.com/user-attachments/assets/690aafe9-ab4c-4fc2-8b2a-90df29005999" /></p>
+<p align="center"><img width="793" height="676" src="assets/readme/kor_edit_palettes.png" alt="Image" /></p>
 
 ---
 
@@ -116,10 +116,8 @@ pip install -r requirements.txt
 ### 🏛️ 레거시 OS 지원 (Windows 7 / 8 / 8.1)
 **PySide6**(GUI 프레임워크)를 지원하지 않는 이전 버전의 Windows를 사용하는 경우에도 **다국어 명령줄 마법사**를 통해 핵심 변환 엔진을 사용할 수 있습니다.
 
-레거시 종속성은 다음 명령으로 설치할 수 있습니다:
-```bash
-pip install -r requirements-legacy.txt
-```
+#### 요구 사항
+- **Python** (3.8 이상 권장)
 
 이를 통해 그래픽 인터페이스 없이 모국어별 단계별 안내에 따라 이미지를 GBA 리소스로 변환할 수 있습니다.
 

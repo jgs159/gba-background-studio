@@ -1,4 +1,4 @@
-<p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
+<p align="center"><img width="1868" height="560" src="assets/readme/banner.png" alt="Image" /></p>
 <div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
@@ -15,7 +15,7 @@ Deze README is beschikbaar in de volgende talen:
 
 <p align="center">
   <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
-  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jap.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jpn.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
 </p>
 
 ---
@@ -57,13 +57,13 @@ Deze README is beschikbaar in de volgende talen:
 
 ## 🖼️ Schermafbeeldingen
 
-<p align="center"><img width="896" height="590" alt="Image" src="https://github.com/user-attachments/assets/bcd698df-b3a5-477a-af42-eda13f9c93f6" /></p>
+<p align="center"><img width="896" height="590" src="assets/readme/nld_conversion_interfaz.png" alt="Image" /></p>
 
-<p align="center"><img width="925" height="676" alt="Image" src="https://github.com/user-attachments/assets/8873256c-3b12-4f15-bf04-401b20ab09dc" /></p>
+<p align="center"><img width="966" height="676" src="assets/readme/nld_preview.png" alt="Image" /></p>
 
-<p align="center"><img width="925" height="676" alt="Image" src="https://github.com/user-attachments/assets/ae7f129b-2d9f-4fda-be3c-ef5e7da5a0fd" /></p>
+<p align="center"><img width="966" height="676" src="assets/readme/nld_edit_tiles.png" alt="Image" /></p>
 
-<p align="center"><img width="925" height="676" alt="Image" src="https://github.com/user-attachments/assets/f918d167-b7cc-4864-a754-5278fb7e264d" /></p>
+<p align="center"><img width="966" height="676" src="assets/readme/nld_edit_palettes.png" alt="Image" /></p>
 
 ---
 
@@ -116,10 +116,8 @@ pip install -r requirements.txt
 ### 🏛️ Ondersteuning voor Legacy OS (Windows 7 / 8 / 8.1)
 Als u een oudere versie van Windows gebruikt die **PySide6** (het GUI-framework) niet ondersteunt, kunt u nog steeds de conversie-engine gebruiken via onze **Meertalige Command Line Wizard**.
 
-U kunt de legacy-afhankelijkheden installeren met:
-```bash
-pip install -r requirements-legacy.txt
-```
+#### Vereisten
+- **Python** (3.8+ aanbevolen)
 
 Hiermee kunt u afbeeldingen converteren naar GBA-assets zonder de grafische interface, met behulp van een stapsgewijze assistent in uw eigen taal.
 

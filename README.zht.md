@@ -1,4 +1,4 @@
-<p align="center"><img width="1868" height="560" alt="Image" src="https://github.com/user-attachments/assets/a6bc6480-d0bd-4cab-bd0b-72e03e2b4580" /></p>
+<p align="center"><img width="1868" height="560" src="assets/readme/banner.png" alt="Image" /></p>
 <div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
-  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jap.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jpn.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
 </p>
 
 ---
@@ -57,13 +57,13 @@
 
 ## 🖼️ 截圖
 
-<p align="center"><img width="896" height="590" alt="Image" src="https://github.com/user-attachments/assets/ef22c454-7f0b-4dc0-a48e-76dd4e95aae5" /></p>
+<p align="center"><img width="896" height="590" src="assets/readme/zht_conversion_interfaz.png" alt="Image" /></p>
 
-<p align="center"><img width="842" height="676" alt="Image" src="https://github.com/user-attachments/assets/a66d42bf-70a2-4d29-9306-dfc4385ce509" /></p>
+<p align="center"><img width="796" height="676" src="assets/readme/zht_preview.png" alt="Image" /></p>
 
-<p align="center"><img width="842" height="676" alt="Image" src="https://github.com/user-attachments/assets/9bd8bb74-6e99-4e6b-a7c5-27c4d57fa72d" /></p>
+<p align="center"><img width="796" height="676" src="assets/readme/zht_edit_tiles.png" alt="Image" /></p>
 
-<p align="center"><img width="842" height="676" alt="Image" src="https://github.com/user-attachments/assets/bdb5f593-fbb5-4496-a1dc-49ed5a947553" /></p>
+<p align="center"><img width="796" height="676" src="assets/readme/zht_edit_palettes.png" alt="Image" /></p>
 
 ---
 
@@ -116,10 +116,8 @@ pip install -r requirements.txt
 ### 🏛️ 舊版作業系統支援 (Windows 7 / 8 / 8.1)
 如果您使用的舊版本 Windows 不支援 **PySide6**（圖形介面框架），您仍然可以透過我們的**多語言命令行精靈**使用核心轉換引擎。
 
-您可以使用以下命令安裝舊版依賴項：
-```bash
-pip install -r requirements-legacy.txt
-```
+#### 要求
+- **Python** (推薦 3.8+)
 
 這允許您在沒有圖形界面的情況下，使用母語的分步精靈將圖像轉換為 GBA 資源。
 
