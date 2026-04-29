@@ -56,6 +56,7 @@ class GBABackgroundStudio(QMainWindow):
         self.current_status_message = self.translator.tr("ready_status")
         self.last_tile_pos = (-1, -1)
         self._last_image_directory = None
+        self._last_save_directory = None
 
         self.hover_manager = HoverManager()
         self.grid_manager = GridManager()

@@ -270,6 +270,9 @@ class ContextToolbar:
                         )
                         swap_ok = area_count == total
             self.btn_pal_swap.setEnabled(swap_ok)
+        
+        if hasattr(self, 'main_window') and self.main_window:
+            self.main_window.menu_bar.action_save_selection.setEnabled(has_selection)
 
     def on_pal_selection_changed(self, has_selection: bool):
         mode_active = self.btn_pencil_pal.isChecked() or self.btn_fill.isChecked()

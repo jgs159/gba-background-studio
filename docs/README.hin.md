@@ -14,8 +14,8 @@
 यह README निम्नलिखित भाषाओं में उपलब्ध है:
 
 <p align="center">
-  <a href="README.md">English</a> | <a href="README.spa.md">Español</a> | <a href="README.brp.md">Português (BR)</a> | <a href="README.fra.md">Français</a> | <a href="README.deu.md">Deutsch</a> | <a href="README.ita.md">Italiano</a> | <a href="README.por.md">Português</a> | <a href="README.nld.md">Nederlands</a> | <a href="README.pol.md">Polski</a><br>
-  <a href="README.tur.md">Türkçe</a> | <a href="README.vie.md">Tiếng Việt</a> | <a href="README.ind.md">Bahasa Indonesia</a> | <a href="README.hin.md">हिन्दी</a> | <a href="README.rus.md">Русский</a> | <a href="README.jpn.md">日本語</a> | <a href="README.zhs.md">简体中文</a> | <a href="README.zht.md">繁體中文</a> | <a href="README.kor.md">한국어</a>
+  <a href="README.md">English</a> | <a href="docs/README.spa.md">Español</a> | <a href="docs/README.brp.md">Português (BR)</a> | <a href="docs/README.fra.md">Français</a> | <a href="docs/README.deu.md">Deutsch</a> | <a href="docs/README.ita.md">Italiano</a> | <a href="docs/README.por.md">Português</a> | <a href="docs/README.nld.md">Nederlands</a> | <a href="docs/README.pol.md">Polski</a><br>
+  <a href="docs/README.tur.md">Türkçe</a> | <a href="docs/README.vie.md">Tiếng Việt</a> | <a href="docs/README.ind.md">Bahasa Indonesia</a> | <a href="docs/README.hin.md">हिन्दी</a> | <a href="docs/README.rus.md">Русский</a> | <a href="docs/README.jpn.md">日本語</a> | <a href="docs/README.zhs.md">简体中文</a> | <a href="docs/README.zht.md">繁體中文</a> | <a href="docs/README.kor.md">한국어</a>
 </p>
 
 ---

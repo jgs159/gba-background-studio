@@ -1,5 +1,5 @@
 # ui/dialogs/conversion_dialog_logic.py
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import QApplication, QMessageBox, QFileDialog
 from PySide6.QtGui import QPixmap
 import os
@@ -26,6 +26,13 @@ class ConversionDialogLogic:
             translated = self._tr(key) if not is_rot else key
             self.output_combo.addItem(translated, key)
         self.output_combo.blockSignals(False)
+        # Adjust custom spinbox ranges per mode
+        if is_rot:
+            self.custom_width.setRange(1, 128)
+            self.custom_height.setRange(1, 128)
+        else:
+            self.custom_width.setRange(1, 64)
+            self.custom_height.setRange(1, 256)
         self.output_combo.setCurrentIndex(0)
         self.on_output_size_changed()
         self.on_bpp_changed()
@@ -126,44 +133,79 @@ class ConversionDialogLogic:
             print(f"Error loading input image: {e}")
 
     def on_output_size_changed(self):
-        text = self.output_combo.currentData() 
-        
+        text = self.output_combo.currentData()
+        is_rot = self.mode_combo.currentIndex() == 1
+
         if text == "preset_custom":
             self.custom_stack.setCurrentIndex(1)
             self.update_output_info()
         elif text == "preset_original":
             self.custom_stack.setCurrentIndex(0)
-            w_px, h_px = self.img_width_tiles * 8, self.img_height_tiles * 8
             self.output_width_tiles = self.img_width_tiles
             self.output_height_tiles = self.img_height_tiles
+            w_px, h_px = self.output_width_tiles * 8, self.output_height_tiles * 8
             self.output_info.setText(f"{self._tr('conv_output_size')} {w_px}x{h_px} px")
         else:
             self.custom_stack.setCurrentIndex(0)
-            preset_value = self.PRESETS_TEXT.get(text)
+            # For rot mode, currentData() is the key itself (e.g. "16×16 (128×128)")
+            preset_value = self.PRESETS.get(text)
             if preset_value:
                 w_tiles, h_tiles = preset_value
                 self.output_width_tiles = w_tiles
                 self.output_height_tiles = h_tiles
                 w_px, h_px = w_tiles * 8, h_tiles * 8
                 self.output_info.setText(f"{self._tr('conv_output_size')} {w_px}x{h_px} px")
+        self._update_preview_crop()
 
     def update_output_info(self):
-            w_tiles = self.custom_width.value()
-            h_tiles = self.custom_height.value()
-            w_px, h_px = w_tiles * 8, h_tiles * 8
-            
-            base_text = f"{self._tr('conv_output_size')} {w_px}x{h_px} px"
-            
-            if w_px > 1024 or h_px > 2048:
-                warning_text = self._tr("conv_exceeds_limit")
-                self.output_info.setText(f"{base_text} {warning_text}")
-                self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #cc0000; padding: 4px; }")
-            else:
-                self.output_info.setText(base_text)
-                self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
-                
-            self.output_width_tiles = w_tiles
-            self.output_height_tiles = h_tiles
+        w_tiles = self.custom_width.value()
+        h_tiles = self.custom_height.value()
+        w_px, h_px = w_tiles * 8, h_tiles * 8
+        is_rot = self.mode_combo.currentIndex() == 1
+        max_w = 1024 if is_rot else 512
+        max_h = 1024 if is_rot else 2048
+
+        base_text = f"{self._tr('conv_output_size')} {w_px}x{h_px} px"
+
+        if w_px > max_w or h_px > max_h:
+            warning_text = self._tr("conv_exceeds_limit")
+            self.output_info.setText(f"{base_text} {warning_text}")
+            self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #cc0000; padding: 4px; }")
+        else:
+            self.output_info.setText(base_text)
+            self.output_info.setStyleSheet("QLabel { font-weight: bold; color: #0066cc; padding: 4px; }")
+
+        self.output_width_tiles = w_tiles
+        self.output_height_tiles = h_tiles
+        self._update_preview_crop()
+
+    def _update_preview_crop(self):
+        try:
+            out_w = getattr(self, 'output_width_tiles', self.img_width_tiles) * 8
+            out_h = getattr(self, 'output_height_tiles', self.img_height_tiles) * 8
+            # Parse transparent color for padding
+            try:
+                tc = tuple(map(int, self.transparent_color.text().strip().split(',')))
+                if len(tc) != 3 or not all(0 <= c <= 255 for c in tc):
+                    raise ValueError
+                pad_color = (tc[0], tc[1], tc[2], 255)
+            except Exception:
+                pad_color = (0, 0, 0, 255)
+            pil_img = PilImage.open(self.image_path).convert("RGBA")
+            src_w, src_h = pil_img.size
+            result = PilImage.new("RGBA", (out_w, out_h), pad_color)
+            paste_w = min(src_w, out_w)
+            paste_h = min(src_h, out_h)
+            result.paste(pil_img.crop((0, 0, paste_w, paste_h)), (0, 0))
+            qimg = pil_to_qimage(result)
+            pix = QPixmap.fromImage(qimg)
+            self.input_scene.clear()
+            item = self.input_scene.addPixmap(pix)
+            self.input_scene.setSceneRect(pix.rect())
+            self.input_view.resetTransform()
+            self.input_view.centerOn(0, 0)
+        except Exception:
+            pass
 
     def on_convert(self):
         if (self.parent() and hasattr(self.parent(), 'grid_manager') and 
@@ -219,6 +261,9 @@ class ConversionDialogLogic:
         if not is_rot and self.output_combo.currentData() == "preset_custom":
                     w = self.custom_width.value()
                     h = self.custom_height.value()
+                    if w * 8 > 512 or h * 8 > 2048:
+                        QMessageBox.critical(self, self._tr("error"), self._tr("conv_exceeds_limit"))
+                        return
                     if w > 32:
                         adjusted_w = ((w + 31) // 32) * 32
                         adjusted_h = ((h + 31) // 32) * 32

@@ -14,7 +14,6 @@ from core.config import ROT_SIZES_SET as _ROT_SIZES
 
 
 def get_documents_folder():
-    """Get the Documents folder path for the current OS"""
     try:
         if os.name == 'nt':  # Windows
             import winreg
@@ -30,6 +29,44 @@ def get_documents_folder():
             return str(home)
     except Exception:
         return str(Path.home())
+
+
+def _get_save_directory(main_window):
+    if hasattr(main_window, '_last_save_directory') and main_window._last_save_directory:
+        return main_window._last_save_directory
+    
+    remember_paths = main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', False)
+    if remember_paths:
+        saved = main_window.config_manager.get('PATHS', 'last_save_directory', '')
+        if saved and os.path.isdir(saved):
+            return saved
+    
+    return get_documents_folder()
+
+
+def _update_save_directory(main_window, file_path):
+    directory = os.path.dirname(os.path.abspath(file_path))
+    main_window._last_save_directory = directory
+    main_window.config_manager.set('PATHS', 'last_save_directory', directory)
+
+
+def _get_image_directory(main_window):
+    if hasattr(main_window, '_last_image_directory') and main_window._last_image_directory:
+        return main_window._last_image_directory
+    
+    remember_paths = main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', False)
+    if remember_paths:
+        saved = main_window.config_manager.get('PATHS', 'last_image_directory', '')
+        if saved and os.path.isdir(saved):
+            return saved
+    
+    return get_documents_folder()
+
+
+def _update_image_directory(main_window, file_path):
+    directory = os.path.dirname(os.path.abspath(file_path))
+    main_window._last_image_directory = directory
+    main_window.config_manager.set('PATHS', 'last_image_directory', directory)
 
 
 class PaletteApplyDialog(QDialog):
@@ -163,7 +200,7 @@ def load_last_output_files(main_window):
             tilemap_data = f.read()
         main_window.edit_tiles_tab.load_tilemap(tilemap_data, tiles_path, preview_path if os.path.exists(preview_path) else None)
         main_window.menu_bar.action_save_tilemap.setEnabled(True)
-        main_window.menu_bar.action_save_selection.setEnabled(True)
+
         _update_convert_actions(main_window)
 
         if hasattr(main_window, 'history_manager'):
@@ -369,14 +406,7 @@ def _replace_tileset_palette(tiles_path, new_palette):
 def open_image_for_conversion(main_window):
     from ui.dialogs.conversion_dialog import ConversionDialog
     
-    if hasattr(main_window, '_last_image_directory') and main_window._last_image_directory:
-        start_dir = main_window._last_image_directory
-    else:
-        remember_paths = main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', True)
-        if remember_paths:
-            start_dir = main_window.config_manager.get('PATHS', 'last_image_directory', get_documents_folder())
-        else:
-            start_dir = get_documents_folder()
+    start_dir = _get_image_directory(main_window)
     
     input_path, _ = QFileDialog.getOpenFileName(
         main_window,
@@ -387,11 +417,7 @@ def open_image_for_conversion(main_window):
     if not input_path:
         return
 
-    main_window._last_image_directory = os.path.dirname(input_path)
-    
-    remember_paths = main_window.config_manager.getboolean('SETTINGS', 'remember_file_paths', True)
-    if remember_paths:
-        main_window.config_manager.set('PATHS', 'last_image_directory', main_window._last_image_directory)
+    _update_image_directory(main_window, input_path)
 
     dialog = ConversionDialog(image_path=input_path, parent=main_window)
     dialog.exec()
@@ -949,15 +975,18 @@ def save_tileset(main_window):
         )
         return
 
+    start_dir = _get_save_directory(main_window)
     target_path, selected_filter = QFileDialog.getSaveFileName(
         main_window,
         main_window.translator.tr("save_tileset"),
-        "tiles",
+        os.path.join(start_dir, "tiles"),
         main_window.translator.tr("filter_png_bmp")
     )
 
     if not target_path:
         return
+
+    _update_save_directory(main_window, target_path)
 
     try:
         if "bmp" in selected_filter.lower() or target_path.lower().endswith(".bmp"):
@@ -1103,7 +1132,6 @@ def open_tilemap(main_window):
         apply_zoom_to_view(main_window, main_window.preview_tab.preview_image_view, main_window.zoom_level / 100.0)
 
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
-    main_window.menu_bar.action_save_selection.setEnabled(True)
     main_window.sync_palettes_tab()
 
     if hasattr(main_window, 'history_manager'):
@@ -1176,7 +1204,6 @@ def new_tilemap(main_window):
     main_window.edit_tiles_tab.tilemap_width_spin.setValue(w)
     main_window.edit_tiles_tab.tilemap_height_spin.setValue(h)
     main_window.menu_bar.action_save_tilemap.setEnabled(True)
-    main_window.menu_bar.action_save_selection.setEnabled(True)
 
     if hasattr(main_window, 'history_manager'):
         main_window.history_manager.clear()
@@ -1205,14 +1232,17 @@ def save_tilemap(main_window):
 
     bpp, is_rot, converted = dlg.get_values()
 
+    start_dir = _get_save_directory(main_window)
     target_path, _ = QFileDialog.getSaveFileName(
         main_window,
         main_window.translator.tr("save_tilemap_dialog_title"),
-        "map",
+        os.path.join(start_dir, "map"),
         main_window.translator.tr("filter_bin")
     )
     if not target_path:
         return
+
+    _update_save_directory(main_window, target_path)
 
     try:
         if converted is not None:
@@ -1241,135 +1271,97 @@ def save_selection(main_window):
         return
 
     current_tab = main_window.main_tabs.currentIndex()
-    if current_tab == 2:
-        active_view = ep.edit_tilemap2_view
-    else:
-        active_view = et.edit_tilemap_view
+    active_tab = ep if current_tab == 2 else et
+    
+    x1, y1, x2, y2 = active_tab._tilemap_sel_area
+    sel_w = x2 - x1 + 1
+    sel_h = y2 - y1 + 1
 
-    QMessageBox.information(
+    reply = QMessageBox.question(
         main_window,
         main_window.translator.tr("save_selection"),
-        main_window.translator.tr("save_selection_instruction")
+        main_window.translator.tr("save_selection_confirm",
+                                  w=sel_w, h=sel_h, wpx=sel_w*8, hpx=sel_h*8,
+                                  x1=x1, y1=y1, x2=x2, y2=y2),
+        QMessageBox.Yes | QMessageBox.No
     )
+    if reply != QMessageBox.Yes:
+        return
 
-    _pending = {'done': False}
+    dlg = SaveTilemapDialog(main_window, sel_w=sel_w, sel_h=sel_h)
+    if dlg.exec() != QDialog.Accepted:
+        return
+    bpp, is_rot, _converted = dlg.get_values()
 
-    def on_selection(x1, y1, x2, y2):
-        if _pending['done']:
-            return
-        _pending['done'] = True
-        _disable_selection_mode()
-
-        sel_w = x2 - x1 + 1
-        sel_h = y2 - y1 + 1
-
-        reply = QMessageBox.question(
-            main_window,
-            main_window.translator.tr("save_selection"),
-            main_window.translator.tr("save_selection_confirm",
-                                      w=sel_w, h=sel_h, wpx=sel_w*8, hpx=sel_h*8,
-                                      x1=x1, y1=y1, x2=x2, y2=y2),
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply != QMessageBox.Yes:
-            return
-
-        dlg = SaveTilemapDialog(main_window, sel_w=sel_w, sel_h=sel_h)
-        if dlg.exec() != QDialog.Accepted:
-            return
-        bpp, is_rot, _converted = dlg.get_values()
-
-        if is_rot:
-            if (sel_w, sel_h) not in _ROT_SIZES:
-                valid = ', '.join(f'{w}×{h}' for w, h in sorted(_ROT_SIZES))
-                QMessageBox.warning(
-                    main_window,
-                    main_window.translator.tr("invalid_rot_size_title"),
-                    main_window.translator.tr("save_selection_invalid_rot_size",
-                                              w=sel_w, h=sel_h, valid=valid)
-                )
-                return
-
-        tilemap_data = et.tilemap_data
-        tilemap_w    = et.tilemap_width
-        is_rot_map   = getattr(main_window, 'current_rotation_mode', False)
-
-        def tilemap_index(tx, ty):
-            if is_rot_map or tilemap_w <= 32:
-                return ty * tilemap_w + tx
-            bx, by = tx // 32, ty // 32
-            bxs = tilemap_w // 32
-            return (by * bxs + bx) * 1024 + (ty % 32) * 32 + (tx % 32)
-
-        entry_size = 1 if is_rot_map else 2
-        sel_data = bytearray()
-        for row in range(y1, y2 + 1):
-            for col in range(x1, x2 + 1):
-                idx = tilemap_index(col, row)
-                if idx * entry_size + entry_size <= len(tilemap_data):
-                    sel_data.extend(tilemap_data[idx*entry_size:idx*entry_size+entry_size])
-                else:
-                    sel_data.extend(b'\x00' * entry_size)
-
-        if is_rot != is_rot_map:
-            converted_sel = bytearray()
-            if is_rot_map and not is_rot:
-                for b in sel_data:
-                    converted_sel.extend(bytes([b & 0xFF, 0]))
-            else:
-                for i in range(0, len(sel_data), 2):
-                    converted_sel.append(sel_data[i] & 0xFF)
-            sel_data = converted_sel
-
-        target_path, _ = QFileDialog.getSaveFileName(
-            main_window,
-            main_window.translator.tr("save_selection"),
-            "selection",
-            main_window.translator.tr("filter_bin")
-        )
-        if not target_path:
-            return
-
-        try:
-            with open(target_path, 'wb') as f:
-                f.write(sel_data)
-            if hasattr(main_window, 'config_manager'):
-                main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
-            main_window.current_bpp = bpp
-            QMessageBox.information(
-                main_window,
-                main_window.translator.tr("save_selection"),
-                main_window.translator.tr("save_selection_saved", path=target_path))
-        except Exception as e:
+    if is_rot:
+        if (sel_w, sel_h) not in _ROT_SIZES:
+            valid = ', '.join(f'{w}×{h}' for w, h in sorted(_ROT_SIZES))
             QMessageBox.warning(
                 main_window,
-                main_window.translator.tr("save_selection"),
-                main_window.translator.tr("save_selection_error", error=str(e)))
+                main_window.translator.tr("invalid_rot_size_title"),
+                main_window.translator.tr("save_selection_invalid_rot_size",
+                                          w=sel_w, h=sel_h, valid=valid)
+            )
+            return
 
-    def _disable_selection_mode():
-        for view in (et.edit_tilemap_view, ep.edit_tilemap2_view):
-            view.selection_mode = False
-            view.on_selection_complete = None
-            view.on_selection_hover = None
-            view.setCursor(Qt.ArrowCursor)
-        if hasattr(main_window, 'custom_status_bar'):
-            zoom = int(main_window.zoom_level) if hasattr(main_window, 'zoom_level') else 100
-            main_window.custom_status_bar.restore_default_status(zoom_level=zoom)
+    tilemap_data = et.tilemap_data
+    tilemap_w    = et.tilemap_width
+    is_rot_map   = getattr(main_window, 'current_rotation_mode', False)
 
-    from PySide6.QtCore import Qt
+    def tilemap_index(tx, ty):
+        if is_rot_map or tilemap_w <= 32:
+            return ty * tilemap_w + tx
+        bx, by = tx // 32, ty // 32
+        bxs = tilemap_w // 32
+        return (by * bxs + bx) * 1024 + (ty % 32) * 32 + (tx % 32)
 
-    def _on_hover(x1, y1, x2, y2):
-        if hasattr(main_window, 'custom_status_bar'):
-            zoom = int(main_window.zoom_level) if hasattr(main_window, 'zoom_level') else 100
-            main_window.custom_status_bar.update_selection_status(x1, y1, x2, y2, zoom_level=zoom)
+    entry_size = 1 if is_rot_map else 2
+    sel_data = bytearray()
+    for row in range(y1, y2 + 1):
+        for col in range(x1, x2 + 1):
+            idx = tilemap_index(col, row)
+            if idx * entry_size + entry_size <= len(tilemap_data):
+                sel_data.extend(tilemap_data[idx*entry_size:idx*entry_size+entry_size])
+            else:
+                sel_data.extend(b'\x00' * entry_size)
 
-    for view in (et.edit_tilemap_view, ep.edit_tilemap2_view):
-        view.selection_mode = True
-        view.on_selection_complete = on_selection
-        view.on_selection_hover = _on_hover
-        view.setCursor(Qt.CrossCursor)
+    if is_rot != is_rot_map:
+        converted_sel = bytearray()
+        if is_rot_map and not is_rot:
+            for b in sel_data:
+                converted_sel.extend(bytes([b & 0xFF, 0]))
+        else:
+            for i in range(0, len(sel_data), 2):
+                converted_sel.append(sel_data[i] & 0xFF)
+        sel_data = converted_sel
 
-    main_window.main_tabs.setCurrentIndex(current_tab if current_tab in (1, 2) else 1)
+    start_dir = _get_save_directory(main_window)
+    target_path, _ = QFileDialog.getSaveFileName(
+        main_window,
+        main_window.translator.tr("save_selection"),
+        os.path.join(start_dir, "selection"),
+        main_window.translator.tr("filter_bin")
+    )
+    if not target_path:
+        return
+
+    _update_save_directory(main_window, target_path)
+
+    try:
+        with open(target_path, 'wb') as f:
+            f.write(sel_data)
+        if hasattr(main_window, 'config_manager'):
+            main_window.config_manager.set('CONVERSION', 'bpp', '1' if bpp == 8 else '0')
+        main_window.current_bpp = bpp
+        QMessageBox.information(
+            main_window,
+            main_window.translator.tr("save_selection"),
+            main_window.translator.tr("save_selection_saved", path=target_path))
+    except Exception as e:
+        QMessageBox.warning(
+            main_window,
+            main_window.translator.tr("save_selection"),
+            main_window.translator.tr("save_selection_error", error=str(e)))
 
 def open_palette(main_window):
     from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -1464,7 +1456,22 @@ def save_palette(main_window):
     
     if not target_dir:
         return
-    
+
+    existing = [
+        os.path.basename(p) for p in palette_files
+        if os.path.exists(os.path.join(target_dir, os.path.basename(p)))
+    ]
+    if existing:
+        tr = main_window.translator.tr
+        reply = QMessageBox.question(
+            main_window,
+            tr("save_palette"),
+            tr("export_overwrite_confirm", files="\n".join(existing)),
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
     try:
         for source_path in palette_files:
             file_name = os.path.basename(source_path)

@@ -39,7 +39,8 @@ class ConfigManager:
                 'overlay_alpha': '128'
             }
             self.config['PATHS'] = {
-                'last_image_directory': ''
+                'last_image_directory': '',
+                'last_save_directory': ''
             }
             self.config['CONVERSION'] = {
                 'bpp': '0',
