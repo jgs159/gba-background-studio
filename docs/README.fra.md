@@ -1,4 +1,4 @@
-<p align="center"><img width="1868" height="560" src="assets/readme/banner.png" alt="Image" /></p>
+<p align="center"><img width="1868" height="560" src="../assets/readme/banner.png" alt="Image" /></p>
 <div align="center"><a href="https://discord.gg/wsFFExCWFu"><img src="https://img.shields.io/discord/1073012182264066099" alt="Discord"></a></div>
 
 ## GBA Background Studio
@@ -57,13 +57,13 @@ Ce README est disponible dans les langues suivantes :
 
 ## 🖼️ Captures d'écran
 
-<p align="center"><img width="896" height="590" src="assets/readme/fra_conversion_interfaz.png" alt="Image" /></p>
+<p align="center"><img width="896" height="590" src="../assets/readme/fra_conversion_interfaz.png" alt="Image" /></p>
 
-<p align="center"><img width="946" height="676" src="assets/readme/fra_preview.png" alt="Image" /></p>
+<p align="center"><img width="946" height="676" src="../assets/readme/fra_preview.png" alt="Image" /></p>
 
-<p align="center"><img width="946" height="676" src="assets/readme/fra_edit_tiles.png" alt="Image" /></p>
+<p align="center"><img width="946" height="676" src="../assets/readme/fra_edit_tiles.png" alt="Image" /></p>
 
-<p align="center"><img width="946" height="676" src="assets/readme/fra_edit_palettes.png" alt="Image" /></p>
+<p align="center"><img width="946" height="676" src="../assets/readme/fra_edit_palettes.png" alt="Image" /></p>
 
 ---
 
